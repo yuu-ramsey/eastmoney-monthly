@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>K线 AI 分析</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      width: 360px; margin: 0; padding: 14px;
+      color: #333; font-size: 13px;
+    }
+    h1 { font-size: 14px; margin: 0 0 12px; color: #222; }
+    h2 {
+      font-size: 11px; margin: 16px 0 8px; color: #888;
+      text-transform: uppercase; letter-spacing: 0.6px;
+      border-bottom: 1px solid #eee; padding-bottom: 4px;
+    }
+    label { display: block; margin: 8px 0 4px; font-size: 12px; color: #555; font-weight: 500; }
+    input[type=text], input[type=password], input[type=number], select {
+      width: 100%; box-sizing: border-box;
+      padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px;
+      font-family: inherit; font-size: 13px;
+      background: #fff;
+    }
+    input:focus, select:focus { outline: none; border-color: #f7931e; }
+    .row { display: flex; gap: 8px; margin-top: 12px; }
+    button {
+      flex: 1; padding: 7px; border: none; border-radius: 4px;
+      cursor: pointer; font-size: 12px; font-weight: 500; color: white;
+    }
+    .save { background: #2ecc71; }
+    .save:hover { background: #27ae60; }
+    .clear { background: #e74c3c; }
+    .clear:hover { background: #c0392b; }
+    .status { margin-top: 8px; font-size: 12px; color: #2ecc71; min-height: 16px; }
+    .hint { font-size: 11px; color: #999; margin-top: 4px; }
+    .hint a { color: #3498db; }
+
+    /* Tab 切换 */
+    .tab-bar {
+      display: flex; gap: 0; margin-bottom: 14px;
+      border-bottom: 2px solid #e8ecf1;
+    }
+    .tab-btn {
+      flex: 1; padding: 8px 0; text-align: center;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      color: #888; background: none; border: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab-btn.active {
+      color: #f7931e;
+      border-bottom-color: #f7931e;
+    }
+    .tab-btn:hover { color: #555; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* 成本面板 */
+    .cost-panel {
+      background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px;
+      padding: 10px 12px; margin-bottom: 4px; cursor: pointer;
+    }
+    .cost-panel:hover { background: #f0f1f3; }
+    .cost-summary { display: flex; justify-content: space-between; align-items: center; }
+    .cost-summary .label { font-weight: 600; font-size: 12px; color: #555; display: flex; align-items: center; gap: 4px; }
+    .cost-summary .value { font-size: 12px; color: #2ecc71; }
+    .cost-nav { font-size: 12px; color: #999; cursor: pointer; padding: 0 4px; user-select: none; }
+    .cost-nav:hover { color: #333; }
+    .cost-detail { display: none; margin-top: 8px; padding-top: 8px; border-top: 1px solid #dee2e6; }
+    .cost-detail.open { display: block; }
+    .cost-detail .model-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 11px; color: #666; }
+    .cost-detail .other-link { font-size: 11px; color: #3498db; cursor: pointer; margin-top: 4px; display: inline-block; }
+    .cost-detail .other-link:hover { text-decoration: underline; }
+
+    /* 容量横幅 */
+    .capacity-bar {
+      background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 4px;
+      padding: 6px 10px; margin-bottom: 10px; font-size: 11px; color: #888;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .capacity-bar.warn { background: #fffbeb; border-color: #fde68a; color: #d97706; }
+
+    /* 历史列表 */
+    .history-empty { color: #999; font-size: 12px; text-align: center; padding: 12px 0; }
+    .history-item {
+      border: 1px solid #e8ecf1; border-radius: 6px; margin-bottom: 8px;
+      overflow: hidden; background: #fff;
+    }
+    .history-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 10px; cursor: pointer; user-select: none;
+      background: #fafbfc;
+      gap: 6px;
+    }
+    .history-header:hover { background: #f0f3f6; }
+    .history-header .hi-info { flex: 1; min-width: 0; }
+    .history-header .hi-title { font-weight: 600; font-size: 13px; color: #222; }
+    .history-header .hi-sub { font-size: 10px; color: #999; margin-top: 2px; }
+    .history-header .hi-badge {
+      font-size: 9px; padding: 1px 6px; border-radius: 3px;
+      background: #3498db; color: #fff; white-space: nowrap;
+    }
+    .history-header .hi-badge.hasconv { background: #2ecc71; }
+    .history-header .hi-chevron { font-size: 10px; color: #999; margin-left: 4px; }
+    .history-body {
+      display: none; padding: 8px 10px; border-top: 1px solid #e8ecf1;
+      max-height: 280px; overflow-y: auto; font-size: 12px; line-height: 1.6;
+    }
+    .history-body.open { display: block; }
+    .history-body h3, .history-body h4 { margin: 8px 0 4px; font-size: 13px; }
+    .history-body p { margin: 4px 0; }
+    .history-body ul { margin: 4px 0; padding-left: 18px; }
+    .history-body strong { color: #c0392b; }
+    .history-actions {
+      display: flex; gap: 6px; padding: 6px 10px;
+      border-top: 1px solid #f0f0f0; background: #fafbfc;
+    }
+    .h-btn {
+      flex: 1; padding: 4px 8px; font-size: 10px; border: none;
+      border-radius: 3px; cursor: pointer; color: #fff;
+    }
+    .h-btn-export { background: #3498db; }
+    .h-btn-export:hover { background: #2980b9; }
+    .h-btn-del { background: #ecf0f1; color: #555; }
+    .h-btn-del:hover { background: #d5dbdb; color: #333; }
+
+    .history-actions-global {
+      display: flex; gap: 8px; margin-top: 12px;
+    }
+    .h-btn-global {
+      flex: 1; padding: 8px; font-size: 12px; border-radius: 4px;
+      border: none; cursor: pointer; color: #fff;
+    }
+    .h-btn-export-all { background: #3498db; }
+    .h-btn-export-all:hover { background: #2980b9; }
+    .h-btn-clear-all { background: #95a5a6; }
+    .h-btn-clear-all:hover { background: #7f8c8d; }
+
+    /* 追问记录 */
+    .conv-section { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #e0e5ea; }
+    .conv-section h4 { font-size: 12px; color: #555; margin: 0 0 6px; }
+    .conv-msg { margin: 4px 0; padding: 4px 8px; border-radius: 4px; font-size: 11px; }
+    .conv-msg.user { background: #eef2ff; color: #333; }
+    .conv-msg.assistant { background: #f8f9fa; color: #333; }
+  </style>
+</head>
+<body>
+  <h1>K线 AI 分析</h1>
+
+  <!-- Tab 切换 -->
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="settings">设置</button>
+    <button class="tab-btn" data-tab="history">历史</button>
+  </div>
+
+  <!-- ====== 设置 Tab ====== -->
+  <div class="tab-content active" id="tab-settings">
+
+    <!-- 成本面板 -->
+    <div class="cost-panel" id="costPanel">
+      <div class="cost-summary">
+        <span class="label"><span class="cost-nav" id="costNavPrev">◂</span><span id="costLabel">本月使用情况</span><span class="cost-nav" id="costNavNext">▸</span></span>
+        <span class="value" id="costValue">加载中...</span>
+      </div>
+      <div class="cost-detail" id="costDetail">
+        <div id="costDetailContent"></div>
+        <span class="other-link" id="costOtherLink" style="display:none;">查看其他 provider →</span>
+      </div>
+    </div>
+
+    <h2>设置</h2>
+
+    <label for="provider">模型提供商</label>
+    <select id="provider">
+      <option value="anthropic">Anthropic (Claude)</option>
+      <option value="deepseek">DeepSeek</option>
+    </select>
+
+    <label for="apiKey" id="apiKeyLabel">API Key</label>
+    <input type="password" id="apiKey" autocomplete="off">
+    <div class="hint" id="apiKeyHint"></div>
+
+    <label for="model">模型</label>
+    <input type="text" id="model" autocomplete="off">
+    <div class="hint">手动填写模型 ID，留空则跟随下方"分析深度"自动选择</div>
+
+    <label>分析深度（仅 Anthropic Claude）</label>
+    <div style="display:flex; gap:16px; margin:6px 0;">
+      <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-weight:400;">
+        <input type="radio" name="analysisDepth" value="standard" checked> 标准 (Sonnet)
+      </label>
+      <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-weight:400;">
+        <input type="radio" name="analysisDepth" value="deep"> 深度 (Opus)
+      </label>
+    </div>
+    <div class="hint" style="color:#d97706;">深度模式约 4-5 倍价格，但分析质量更高。仅 Anthropic 有效，DeepSeek 始终用 deepseek-chat。</div>
+
+    <label for="period">分析周期</label>
+    <select id="period">
+      <option value="monthly">月线</option>
+      <option value="weekly">周线</option>
+      <option value="daily">日线</option>
+      <option value="multi">多周期共振（月+周+日）</option>
+    </select>
+    <div class="hint" id="multiHint" style="display:none; color:#d97706;">
+      ⚠️ 多周期共振模式会在一次 LLM 调用中分析三个周期的 K 线，prompt 体积约为单周期的 3 倍，建议使用 Anthropic Sonnet 或 Opus 以保证大上下文准确度。多周期模式下辩论模式自动禁用。
+    </div>
+
+    <label for="template">分析维度（单次分析）</label>
+    <select id="template">
+      <option value="technical">技术面</option>
+      <option value="trend">趋势判断</option>
+      <option value="valuation">估值面</option>
+      <option value="sentiment">情绪面</option>
+    </select>
+    <div class="hint">仅在单次分析模式下生效，辩论模式始终使用旧风格体系</div>
+
+    <label for="analysisStyle">分析风格（辩论模式）</label>
+    <select id="analysisStyle">
+      <option value="technical">技术分析</option>
+      <option value="chanlun">缠论</option>
+      <option value="value">价值视角</option>
+      <option value="comprehensive">综合</option>
+    </select>
+    <div class="hint" id="styleHint" style="display:none; color:#d97706;"></div>
+
+    <div style="margin:12px 0 8px;">
+      <label style="display:flex; align-items:center; gap:6px; font-weight:500; cursor:pointer;">
+        <input type="checkbox" id="debateMode">
+        启用辩论模式（多智能体）
+      </label>
+      <div class="hint">
+        ⚠️ 辩论模式会调用 4 次 LLM（Bull/Bear/Predictor 并发 + Judge 综合），成本约为单次分析的 4 倍，时间约 1.5-2 倍。
+      </div>
+    </div>
+
+    <div style="margin:12px 0 8px;">
+      <label style="display:flex; align-items:center; gap:6px; font-weight:500; cursor:pointer;">
+        <input type="checkbox" id="decisionMode">
+        个人决策模式（输出明确操作建议）
+      </label>
+      <div class="hint" style="color:#d97706;">
+        ⚠️ 开启后输出会包含具体的加仓/减仓/止损位建议。仅供工具持有者本人研究使用，不构成对外投资建议。市场有风险，决策由你本人独立承担。
+      </div>
+    </div>
+
+    <label for="klineLimit">K线根数</label>
+    <input type="number" id="klineLimit" min="12" max="240" placeholder="60" autocomplete="off">
+
+    <div class="row">
+      <button class="save" id="saveBtn">保存</button>
+      <button class="clear" id="clearBtn">清除 Key</button>
+    </div>
+    <div class="status" id="status"></div>
+
+    <div id="structuredDebug" style="margin-top:12px; border-top:1px solid #eee; padding-top:8px;">
+      <span class="other-link" id="structuredDebugLink" style="font-size:11px; cursor:pointer;">📋 查看结构化数据</span>
+      <div id="structuredDebugContent" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- ====== 历史 Tab ====== -->
+  <div class="tab-content" id="tab-history">
+    <div class="capacity-bar" id="capacityBar" style="display:none;">
+      <span id="capacityText"></span>
+    </div>
+    <div id="historyList">
+      <div class="history-empty">暂无保存的分析记录</div>
+    </div>
+    <div class="history-actions-global" id="historyGlobalActions" style="display:none;">
+      <button class="h-btn-global h-btn-export-all" id="exportAllBtn">📥 导出全部</button>
+      <button class="h-btn-global h-btn-clear-all" id="clearAllHistoryBtn">🗑 清空全部</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 14px;
+  color: #333;
+  line-height: 1.7;
+  background: #fff;
+}
+
+.topbar {
+  position: sticky; top: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px;
+  background: #f8f8f8;
+  border-bottom: 1px solid #eee;
+  z-index: 10;
+}
+
+.meta { font-size: 13px; color: #555; }
+.meta .name { font-weight: 600; color: #222; font-size: 15px; }
+.meta .secondary { color: #999; font-size: 12px; margin-left: 8px; }
+
+.close-btn {
+  background: none; border: none; cursor: pointer;
+  font-size: 18px; color: #888; padding: 4px 10px; line-height: 1;
+}
+.close-btn:hover { color: #333; }
+
+.content {
+  padding: 20px 28px;
+  max-width: 720px; margin: 0 auto;
+}
+
+.loading, .error {
+  padding: 40px 0; text-align: center; color: #888;
+}
+.error { color: #c0392b; }
+
+h1, h2, h3, h4 {
+  margin: 18px 0 8px; font-weight: 600; color: #222;
+}
+h1 { font-size: 20px; }
+h2 { font-size: 17px; margin-top: 24px; }
+h3 { font-size: 15px; }
+
+p { margin: 8px 0; }
+ul { margin: 8px 0; padding-left: 24px; }
+li { margin: 4px 0; }
+
+strong { color: #c0392b; font-weight: 600; }
+em { color: #2c3e50; }
+
+code {
+  background: #f4f4f4; padding: 2px 6px; border-radius: 3px;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; font-size: 13px;
+}
+
+/* 辩论详情 */
+.debate-details {
+  margin-top: 24px; border: 1px solid #e0e0e0; border-radius: 6px; padding: 16px;
+}
+.debate-details summary {
+  cursor: pointer; font-weight: 600; font-size: 14px; color: #555; margin-bottom: 12px;
+}
+.debate-tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+.debate-tab {
+  padding: 4px 14px; border: 1px solid #ccc; border-radius: 4px; background: #f8f8f8;
+  cursor: pointer; font-size: 12px; color: #666;
+}
+.debate-tab.active { background: #3498db; color: white; border-color: #3498db; }
+.debate-panel { display: none; }
+.debate-panel.active { display: block; }
+.agent-meta {
+  font-size: 11px; color: #999; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0;
+}
+
+/* 跨级别一致性警告 */
+.cross-level-warnings {
+  background: #fff9e6;
+  border: 1px solid #f0d76e;
+  border-left: 4px solid #e7a800;
+  border-radius: 4px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+}
+.cross-level-warnings h4 {
+  margin: 0 0 8px; font-size: 14px; color: #8b6914; font-weight: 600;
+}
+.cross-level-warnings ul { margin: 8px 0; padding-left: 20px; }
+.cross-level-warnings li { margin: 4px 0; font-size: 13px; color: #5c4a0e; }
+.cross-level-warnings .hint { font-size: 11px; color: #999; margin: 8px 0 0; }

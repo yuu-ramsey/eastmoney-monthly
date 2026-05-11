@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "东方财富月线 AI 分析助手",
+  "version": "0.1.0",
+  "description": "在东方财富个股页面注入悬浮按钮,一键调用 Anthropic Claude 分析月线走势",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "*://push2his.eastmoney.com/*",
+    "https://api.anthropic.com/*",
+    "https://api.deepseek.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://quote.eastmoney.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["content.css"],
+      "matches": ["*://quote.eastmoney.com/*"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "月线 AI 分析 - 设置"
+  }
+}

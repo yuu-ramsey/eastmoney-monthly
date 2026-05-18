@@ -474,6 +474,24 @@ spec 要求"在 popup 顶部 warning 提示"，实际实现在 content.js 侧边
 - 新增 `lib/eval/compute-score.js`：`computeScoreFull()` 同时输出 full/excl_pf
 - 报告默认用 full 分母，excl_pf 仅作辅助参考
 
+## Frozen Eval Dataset（2026-05-18）
+
+### 背景
+Phase 11/12 实验发现每次用 `--limit=` 取前 N 只股票，baseline 漂移严重（0.1966→0.0806→0.0981），不同股票子集不可比。
+
+### 解决方案
+创建 `data/frozen-eval-dataset-v1.json`，从 Phase 12 Run A (640 样本, 40 只股票) 提取。
+
+**Absolute Baseline**：
+- Run ID: `runA-no-sector-2026-05-18-05-12-20`
+- 配置: no sector, no resonance, old #12 constraint, deepseek-chat, maxTokens=4000
+- **score = 0.1966**（全量分母, 640 样本）
+- GT 分布: strong_bull=45, strong_bear=44, bull=22, bear=26, neutral=23
+
+**规则**：后续所有 eval score 对比必须 vs 此 baseline。禁止用 subset baseline。
+加载入口: `lib/eval/load-frozen-dataset.js` → `loadFrozenDataset({ version:'v1', subsetStocks:N, seed:42 })`。
+Subset 用可复现随机抽样（mulberry32 PRNG），替代旧的 `--limit=` 取前 N 逻辑。
+
 ## Phase 11 & 12 量化验证（2026-05-18）
 
 ### 方法论

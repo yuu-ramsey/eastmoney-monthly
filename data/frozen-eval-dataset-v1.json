@@ -1,0 +1,1540 @@
+{
+  "version": "frozen-v1",
+  "createdAt": "2026-05-18T13:35:49.837Z",
+  "baseline": {
+    "runId": "runA-no-sector-2026-05-18-05-12-20",
+    "score": 0.1966,
+    "n": 640,
+    "config": "no sector, no resonance, old #12 constraint, deepseek-chat, maxTokens=4000"
+  },
+  "stocks": [
+    {
+      "code": "000001",
+      "name": "000001",
+      "market": "0",
+      "category": "hs300"
+    },
+    {
+      "code": "000166",
+      "name": "000166",
+      "market": "0",
+      "category": "hs300"
+    },
+    {
+      "code": "000538",
+      "name": "000538",
+      "market": "0",
+      "category": "hs300"
+    },
+    {
+      "code": "000568",
+      "name": "000568",
+      "market": "0",
+      "category": "hs300"
+    },
+    {
+      "code": "000858",
+      "name": "000858",
+      "market": "0",
+      "category": "hs300"
+    },
+    {
+      "code": "000876",
+      "name": "000876",
+      "market": "0",
+      "category": "hs300"
+    },
+    {
+      "code": "000877",
+      "name": "000877",
+      "market": "0",
+      "category": "hs300"
+    },
+    {
+      "code": "001979",
+      "name": "001979",
+      "market": "0",
+      "category": "hs300"
+    },
+    {
+      "code": "002180",
+      "name": "002180",
+      "market": "0",
+      "category": "hs300"
+    },
+    {
+      "code": "002241",
+      "name": "002241",
+      "market": "0",
+      "category": "hs300"
+    },
+    {
+      "code": "002311",
+      "name": "002311",
+      "market": "0",
+      "category": "hs300"
+    },
+    {
+      "code": "002410",
+      "name": "002410",
+      "market": "0",
+      "category": "hs300"
+    },
+    {
+      "code": "002493",
+      "name": "002493",
+      "market": "0",
+      "category": "hs300"
+    },
+    {
+      "code": "002841",
+      "name": "002841",
+      "market": "0",
+      "category": "hs300"
+    },
+    {
+      "code": "300122",
+      "name": "300122",
+      "market": "0",
+      "category": "hs300"
+    },
+    {
+      "code": "300450",
+      "name": "300450",
+      "market": "0",
+      "category": "hs300"
+    },
+    {
+      "code": "600031",
+      "name": "600031",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "600036",
+      "name": "600036",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "600233",
+      "name": "600233",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "600332",
+      "name": "600332",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "600346",
+      "name": "600346",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "600426",
+      "name": "600426",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "600436",
+      "name": "600436",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "600588",
+      "name": "600588",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "600795",
+      "name": "600795",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "600919",
+      "name": "600919",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "600941",
+      "name": "600941",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "600989",
+      "name": "600989",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "601012",
+      "name": "601012",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "601211",
+      "name": "601211",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "601236",
+      "name": "601236",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "601398",
+      "name": "601398",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "601600",
+      "name": "601600",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "601881",
+      "name": "601881",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "601901",
+      "name": "601901",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "603392",
+      "name": "603392",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "603806",
+      "name": "603806",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "605499",
+      "name": "605499",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "688065",
+      "name": "688065",
+      "market": "1",
+      "category": "hs300"
+    },
+    {
+      "code": "688256",
+      "name": "688256",
+      "market": "1",
+      "category": "hs300"
+    }
+  ],
+  "testPoints": [
+    {
+      "id": "tp_000001_202511",
+      "stockCode": "000001",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 413,
+      "groundTruth": "bear",
+      "alpha": -5.340223944875102
+    },
+    {
+      "id": "tp_000001_202505",
+      "stockCode": "000001",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 407,
+      "groundTruth": "bull",
+      "alpha": 4.105839416058387
+    },
+    {
+      "id": "tp_000001_202411",
+      "stockCode": "000001",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 401,
+      "groundTruth": "bull",
+      "alpha": 9.740259740259747
+    },
+    {
+      "id": "tp_000001_202405",
+      "stockCode": "000001",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 395,
+      "groundTruth": "strong_bull",
+      "alpha": 16.230366492146583
+    },
+    {
+      "id": "tp_000876_202511",
+      "stockCode": "000876",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 324,
+      "groundTruth": "strong_bear",
+      "alpha": -11.052072263549425
+    },
+    {
+      "id": "tp_000876_202505",
+      "stockCode": "000876",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 318,
+      "groundTruth": "bear",
+      "alpha": -3.5564853556485336
+    },
+    {
+      "id": "tp_000876_202411",
+      "stockCode": "000876",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 312,
+      "groundTruth": "neutral",
+      "alpha": -1.5772870662460605
+    },
+    {
+      "id": "tp_000876_202405",
+      "stockCode": "000876",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 306,
+      "groundTruth": "strong_bear",
+      "alpha": -10.399999999999991
+    },
+    {
+      "id": "tp_688256_202511",
+      "stockCode": "688256",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 64,
+      "groundTruth": "strong_bull",
+      "alpha": 35.49558434572108
+    },
+    {
+      "id": "tp_688256_202505",
+      "stockCode": "688256",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 58,
+      "groundTruth": "strong_bull",
+      "alpha": 124.8682354687848
+    },
+    {
+      "id": "tp_688256_202411",
+      "stockCode": "688256",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 52,
+      "groundTruth": "bull",
+      "alpha": 7.238348868175767
+    },
+    {
+      "id": "tp_688256_202405",
+      "stockCode": "688256",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 46,
+      "groundTruth": "strong_bull",
+      "alpha": 278.84780739466896
+    },
+    {
+      "id": "tp_601600_202511",
+      "stockCode": "601600",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 219,
+      "groundTruth": "bull",
+      "alpha": 3.996194100856327
+    },
+    {
+      "id": "tp_601600_202505",
+      "stockCode": "601600",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 213,
+      "groundTruth": "strong_bull",
+      "alpha": 94.5859872611465
+    },
+    {
+      "id": "tp_601600_202411",
+      "stockCode": "601600",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 207,
+      "groundTruth": "bear",
+      "alpha": -5.571030640668517
+    },
+    {
+      "id": "tp_601600_202405",
+      "stockCode": "601600",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 201,
+      "groundTruth": "bear",
+      "alpha": -8.751608751608748
+    },
+    {
+      "id": "tp_002180_202511",
+      "stockCode": "002180",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 207,
+      "groundTruth": "bear",
+      "alpha": -5.430107526881729
+    },
+    {
+      "id": "tp_002180_202505",
+      "stockCode": "002180",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 201,
+      "groundTruth": "bear",
+      "alpha": -6.388888888888901
+    },
+    {
+      "id": "tp_002180_202411",
+      "stockCode": "002180",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 195,
+      "groundTruth": "strong_bear",
+      "alpha": -14.017991004497746
+    },
+    {
+      "id": "tp_002180_202405",
+      "stockCode": "002180",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 189,
+      "groundTruth": "bull",
+      "alpha": 3.566176470588244
+    },
+    {
+      "id": "tp_601012_202511",
+      "stockCode": "601012",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 163,
+      "groundTruth": "strong_bear",
+      "alpha": -15.993537964458806
+    },
+    {
+      "id": "tp_601012_202505",
+      "stockCode": "601012",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 157,
+      "groundTruth": "strong_bull",
+      "alpha": 26.564673157162716
+    },
+    {
+      "id": "tp_601012_202411",
+      "stockCode": "601012",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 151,
+      "groundTruth": "strong_bear",
+      "alpha": -18.810810810810814
+    },
+    {
+      "id": "tp_601012_202405",
+      "stockCode": "601012",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 145,
+      "groundTruth": "strong_bear",
+      "alpha": -14.712269272529863
+    },
+    {
+      "id": "tp_600233_202511",
+      "stockCode": "600233",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 302,
+      "groundTruth": "strong_bull",
+      "alpha": 18.944281524926687
+    },
+    {
+      "id": "tp_600233_202505",
+      "stockCode": "600233",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 296,
+      "groundTruth": "strong_bull",
+      "alpha": 28.081123244929806
+    },
+    {
+      "id": "tp_600233_202411",
+      "stockCode": "600233",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 290,
+      "groundTruth": "bear",
+      "alpha": -8.516678495386794
+    },
+    {
+      "id": "tp_600233_202405",
+      "stockCode": "600233",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 284,
+      "groundTruth": "strong_bear",
+      "alpha": -10.774193548387096
+    },
+    {
+      "id": "tp_000166_202511",
+      "stockCode": "000166",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 130,
+      "groundTruth": "strong_bear",
+      "alpha": -11.328125000000002
+    },
+    {
+      "id": "tp_000166_202505",
+      "stockCode": "000166",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 124,
+      "groundTruth": "strong_bull",
+      "alpha": 13.333333333333316
+    },
+    {
+      "id": "tp_000166_202411",
+      "stockCode": "000166",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 118,
+      "groundTruth": "bear",
+      "alpha": -6.083650190114057
+    },
+    {
+      "id": "tp_000166_202405",
+      "stockCode": "000166",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 112,
+      "groundTruth": "strong_bull",
+      "alpha": 19.772727272727252
+    },
+    {
+      "id": "tp_002841_202511",
+      "stockCode": "002841",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 106,
+      "groundTruth": "bull",
+      "alpha": 3.531598513011167
+    },
+    {
+      "id": "tp_002841_202505",
+      "stockCode": "002841",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 100,
+      "groundTruth": "strong_bull",
+      "alpha": 23.016123932975017
+    },
+    {
+      "id": "tp_002841_202411",
+      "stockCode": "002841",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 94,
+      "groundTruth": "bear",
+      "alpha": -8.457173736827873
+    },
+    {
+      "id": "tp_002841_202405",
+      "stockCode": "002841",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 88,
+      "groundTruth": "strong_bull",
+      "alpha": 13.013044861597212
+    },
+    {
+      "id": "tp_601211_202511",
+      "stockCode": "601211",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 125,
+      "groundTruth": "strong_bear",
+      "alpha": -19.415448851774535
+    },
+    {
+      "id": "tp_601211_202505",
+      "stockCode": "601211",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 119,
+      "groundTruth": "strong_bull",
+      "alpha": 22.68656716417911
+    },
+    {
+      "id": "tp_601211_202411",
+      "stockCode": "601211",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 113,
+      "groundTruth": "neutral",
+      "alpha": 1.2432432432432454
+    },
+    {
+      "id": "tp_601211_202405",
+      "stockCode": "601211",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 107,
+      "groundTruth": "strong_bull",
+      "alpha": 40.5864197530864
+    },
+    {
+      "id": "tp_600332_202511",
+      "stockCode": "600332",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 292,
+      "groundTruth": "strong_bear",
+      "alpha": -13.527131782945744
+    },
+    {
+      "id": "tp_600332_202505",
+      "stockCode": "600332",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 286,
+      "groundTruth": "neutral",
+      "alpha": -1.8680899733130079
+    },
+    {
+      "id": "tp_600332_202411",
+      "stockCode": "600332",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 280,
+      "groundTruth": "bear",
+      "alpha": -7.975895072669266
+    },
+    {
+      "id": "tp_600332_202405",
+      "stockCode": "600332",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 274,
+      "groundTruth": "bear",
+      "alpha": -6.213921901528008
+    },
+    {
+      "id": "tp_600436_202511",
+      "stockCode": "600436",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 269,
+      "groundTruth": "strong_bear",
+      "alpha": -21.271891545935883
+    },
+    {
+      "id": "tp_600436_202505",
+      "stockCode": "600436",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 263,
+      "groundTruth": "strong_bear",
+      "alpha": -15.958771099935273
+    },
+    {
+      "id": "tp_600436_202411",
+      "stockCode": "600436",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 257,
+      "groundTruth": "strong_bear",
+      "alpha": -14.398190438905562
+    },
+    {
+      "id": "tp_600436_202405",
+      "stockCode": "600436",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 251,
+      "groundTruth": "bear",
+      "alpha": -4.098769915119604
+    },
+    {
+      "id": "tp_000858_202511",
+      "stockCode": "000858",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 327,
+      "groundTruth": "strong_bear",
+      "alpha": -24.637806888175582
+    },
+    {
+      "id": "tp_000858_202505",
+      "stockCode": "000858",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 321,
+      "groundTruth": "strong_bear",
+      "alpha": -12.221393653160991
+    },
+    {
+      "id": "tp_000858_202411",
+      "stockCode": "000858",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 315,
+      "groundTruth": "strong_bear",
+      "alpha": -18.2737450343084
+    },
+    {
+      "id": "tp_000858_202405",
+      "stockCode": "000858",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 309,
+      "groundTruth": "neutral",
+      "alpha": -1.4882955650288003
+    },
+    {
+      "id": "tp_600795_202511",
+      "stockCode": "600795",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 342,
+      "groundTruth": "strong_bear",
+      "alpha": -12.61101243339254
+    },
+    {
+      "id": "tp_600795_202505",
+      "stockCode": "600795",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 336,
+      "groundTruth": "strong_bull",
+      "alpha": 15.59633027522935
+    },
+    {
+      "id": "tp_600795_202411",
+      "stockCode": "600795",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 330,
+      "groundTruth": "bull",
+      "alpha": 6.192660550458705
+    },
+    {
+      "id": "tp_600795_202405",
+      "stockCode": "600795",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 324,
+      "groundTruth": "strong_bear",
+      "alpha": -12.599999999999998
+    },
+    {
+      "id": "tp_000877_202511",
+      "stockCode": "000877",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 322,
+      "groundTruth": "strong_bear",
+      "alpha": -22.452504317789288
+    },
+    {
+      "id": "tp_000877_202505",
+      "stockCode": "000877",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 316,
+      "groundTruth": "strong_bull",
+      "alpha": 15.401301518438176
+    },
+    {
+      "id": "tp_000877_202411",
+      "stockCode": "000877",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 310,
+      "groundTruth": "strong_bear",
+      "alpha": -29.375951293759524
+    },
+    {
+      "id": "tp_000877_202405",
+      "stockCode": "000877",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 304,
+      "groundTruth": "bear",
+      "alpha": -4.55311973018549
+    },
+    {
+      "id": "tp_601236_202511",
+      "stockCode": "601236",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 76,
+      "groundTruth": "strong_bear",
+      "alpha": -16.162790697674414
+    },
+    {
+      "id": "tp_601236_202505",
+      "stockCode": "601236",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 70,
+      "groundTruth": "neutral",
+      "alpha": 1.3613861386138542
+    },
+    {
+      "id": "tp_601236_202411",
+      "stockCode": "601236",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 64,
+      "groundTruth": "neutral",
+      "alpha": 1.080432172869146
+    },
+    {
+      "id": "tp_601236_202405",
+      "stockCode": "601236",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 58,
+      "groundTruth": "strong_bull",
+      "alpha": 24.85029940119761
+    },
+    {
+      "id": "tp_600588_202511",
+      "stockCode": "600588",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 294,
+      "groundTruth": "strong_bear",
+      "alpha": -19.284712482468443
+    },
+    {
+      "id": "tp_600588_202505",
+      "stockCode": "600588",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 288,
+      "groundTruth": "neutral",
+      "alpha": 1.6091954022988433
+    },
+    {
+      "id": "tp_600588_202411",
+      "stockCode": "600588",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 282,
+      "groundTruth": "neutral",
+      "alpha": 1.1346444780635294
+    },
+    {
+      "id": "tp_600588_202405",
+      "stockCode": "600588",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 276,
+      "groundTruth": "bear",
+      "alpha": -4.622222222222218
+    },
+    {
+      "id": "tp_000538_202511",
+      "stockCode": "000538",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 378,
+      "groundTruth": "bear",
+      "alpha": -6.571218795888396
+    },
+    {
+      "id": "tp_000538_202505",
+      "stockCode": "000538",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 372,
+      "groundTruth": "neutral",
+      "alpha": 2.4127691165553027
+    },
+    {
+      "id": "tp_000538_202411",
+      "stockCode": "000538",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 366,
+      "groundTruth": "neutral",
+      "alpha": -0.6165919282511311
+    },
+    {
+      "id": "tp_000538_202405",
+      "stockCode": "000538",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 360,
+      "groundTruth": "strong_bull",
+      "alpha": 17.293233082706756
+    },
+    {
+      "id": "tp_000568_202511",
+      "stockCode": "000568",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 377,
+      "groundTruth": "strong_bear",
+      "alpha": -32.352066607195965
+    },
+    {
+      "id": "tp_000568_202505",
+      "stockCode": "000568",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 371,
+      "groundTruth": "bull",
+      "alpha": 3.5054519239434088
+    },
+    {
+      "id": "tp_000568_202411",
+      "stockCode": "000568",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 365,
+      "groundTruth": "strong_bear",
+      "alpha": -18.239232993456085
+    },
+    {
+      "id": "tp_000568_202405",
+      "stockCode": "000568",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 359,
+      "groundTruth": "strong_bear",
+      "alpha": -27.291229801406185
+    },
+    {
+      "id": "tp_001979_202511",
+      "stockCode": "001979",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 119,
+      "groundTruth": "neutral",
+      "alpha": -2.051835853131744
+    },
+    {
+      "id": "tp_001979_202505",
+      "stockCode": "001979",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 113,
+      "groundTruth": "neutral",
+      "alpha": 1.766784452296824
+    },
+    {
+      "id": "tp_001979_202411",
+      "stockCode": "001979",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 107,
+      "groundTruth": "strong_bear",
+      "alpha": -25.97066436583261
+    },
+    {
+      "id": "tp_001979_202405",
+      "stockCode": "001979",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 101,
+      "groundTruth": "bull",
+      "alpha": 9.956236323851204
+    },
+    {
+      "id": "tp_600941_202511",
+      "stockCode": "600941",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 46,
+      "groundTruth": "bear",
+      "alpha": -9.034354688950792
+    },
+    {
+      "id": "tp_600941_202505",
+      "stockCode": "600941",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 40,
+      "groundTruth": "bear",
+      "alpha": -9.808996786861842
+    },
+    {
+      "id": "tp_600941_202411",
+      "stockCode": "600941",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 34,
+      "groundTruth": "bull",
+      "alpha": 8.32759129835613
+    },
+    {
+      "id": "tp_600941_202405",
+      "stockCode": "600941",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 28,
+      "groundTruth": "strong_bull",
+      "alpha": 24.801849405548218
+    },
+    {
+      "id": "tp_300122_202511",
+      "stockCode": "300122",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 180,
+      "groundTruth": "strong_bear",
+      "alpha": -26.848249027237355
+    },
+    {
+      "id": "tp_300122_202505",
+      "stockCode": "300122",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 174,
+      "groundTruth": "neutral",
+      "alpha": -1.410658307210029
+    },
+    {
+      "id": "tp_300122_202411",
+      "stockCode": "300122",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 168,
+      "groundTruth": "strong_bear",
+      "alpha": -32.887975334018506
+    },
+    {
+      "id": "tp_300122_202405",
+      "stockCode": "300122",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 162,
+      "groundTruth": "strong_bear",
+      "alpha": -17.29559748427673
+    },
+    {
+      "id": "tp_600989_202511",
+      "stockCode": "600989",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 78,
+      "groundTruth": "strong_bull",
+      "alpha": 62.00227531285554
+    },
+    {
+      "id": "tp_600989_202505",
+      "stockCode": "600989",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 72,
+      "groundTruth": "strong_bull",
+      "alpha": 25.555555555555554
+    },
+    {
+      "id": "tp_600989_202411",
+      "stockCode": "600989",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 66,
+      "groundTruth": "neutral",
+      "alpha": 2.659574468085109
+    },
+    {
+      "id": "tp_600989_202405",
+      "stockCode": "600989",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 60,
+      "groundTruth": "bull",
+      "alpha": 4.657351962741192
+    },
+    {
+      "id": "tp_002493_202511",
+      "stockCode": "002493",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 180,
+      "groundTruth": "strong_bull",
+      "alpha": 34.05349794238682
+    },
+    {
+      "id": "tp_002493_202505",
+      "stockCode": "002493",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 174,
+      "groundTruth": "strong_bull",
+      "alpha": 36.321303841676375
+    },
+    {
+      "id": "tp_002493_202411",
+      "stockCode": "002493",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 168,
+      "groundTruth": "strong_bear",
+      "alpha": -12.380952380952381
+    },
+    {
+      "id": "tp_002493_202405",
+      "stockCode": "002493",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 162,
+      "groundTruth": "bear",
+      "alpha": -8.850457782299076
+    },
+    {
+      "id": "tp_601901_202511",
+      "stockCode": "601901",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 167,
+      "groundTruth": "bear",
+      "alpha": -9.431524547803622
+    },
+    {
+      "id": "tp_601901_202505",
+      "stockCode": "601901",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 161,
+      "groundTruth": "bull",
+      "alpha": 4.144385026737963
+    },
+    {
+      "id": "tp_601901_202411",
+      "stockCode": "601901",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 155,
+      "groundTruth": "bear",
+      "alpha": -7.819905213270134
+    },
+    {
+      "id": "tp_601901_202405",
+      "stockCode": "601901",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 149,
+      "groundTruth": "neutral",
+      "alpha": 1.9900497512437831
+    },
+    {
+      "id": "tp_002241_202511",
+      "stockCode": "002241",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 210,
+      "groundTruth": "strong_bear",
+      "alpha": -15.65101565101566
+    },
+    {
+      "id": "tp_002241_202505",
+      "stockCode": "002241",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 204,
+      "groundTruth": "strong_bull",
+      "alpha": 39.330746847720654
+    },
+    {
+      "id": "tp_002241_202411",
+      "stockCode": "002241",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 198,
+      "groundTruth": "bear",
+      "alpha": -8.01905518062723
+    },
+    {
+      "id": "tp_002241_202405",
+      "stockCode": "002241",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 192,
+      "groundTruth": "strong_bull",
+      "alpha": 52.35820895522387
+    },
+    {
+      "id": "tp_688065_202511",
+      "stockCode": "688065",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 63,
+      "groundTruth": "bear",
+      "alpha": -3.3901874078753407
+    },
+    {
+      "id": "tp_688065_202505",
+      "stockCode": "688065",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 57,
+      "groundTruth": "bull",
+      "alpha": 6.4102564102564115
+    },
+    {
+      "id": "tp_688065_202411",
+      "stockCode": "688065",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 51,
+      "groundTruth": "bull",
+      "alpha": 5.489044499661169
+    },
+    {
+      "id": "tp_688065_202405",
+      "stockCode": "688065",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 45,
+      "groundTruth": "strong_bear",
+      "alpha": -20.083246618106138
+    },
+    {
+      "id": "tp_601881_202511",
+      "stockCode": "601881",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 106,
+      "groundTruth": "strong_bear",
+      "alpha": -21.886792452830193
+    },
+    {
+      "id": "tp_601881_202505",
+      "stockCode": "601881",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 100,
+      "groundTruth": "neutral",
+      "alpha": 1.4848289218850899
+    },
+    {
+      "id": "tp_601881_202411",
+      "stockCode": "601881",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 94,
+      "groundTruth": "strong_bull",
+      "alpha": 10.796576695194199
+    },
+    {
+      "id": "tp_601881_202405",
+      "stockCode": "601881",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 88,
+      "groundTruth": "strong_bull",
+      "alpha": 36.91460055096418
+    },
+    {
+      "id": "tp_002410_202511",
+      "stockCode": "002410",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 185,
+      "groundTruth": "strong_bear",
+      "alpha": -18.70047543581616
+    },
+    {
+      "id": "tp_002410_202505",
+      "stockCode": "002410",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 179,
+      "groundTruth": "bear",
+      "alpha": -8.110119047619047
+    },
+    {
+      "id": "tp_002410_202411",
+      "stockCode": "002410",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 173,
+      "groundTruth": "bull",
+      "alpha": 5.693664795509214
+    },
+    {
+      "id": "tp_002410_202405",
+      "stockCode": "002410",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 167,
+      "groundTruth": "neutral",
+      "alpha": 0.6189213085764835
+    },
+    {
+      "id": "tp_600426_202511",
+      "stockCode": "600426",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 281,
+      "groundTruth": "strong_bull",
+      "alpha": 21.365405022992583
+    },
+    {
+      "id": "tp_600426_202505",
+      "stockCode": "600426",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 275,
+      "groundTruth": "strong_bull",
+      "alpha": 55.05673408978786
+    },
+    {
+      "id": "tp_600426_202411",
+      "stockCode": "600426",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 269,
+      "groundTruth": "neutral",
+      "alpha": -0.3257328990227861
+    },
+    {
+      "id": "tp_600426_202405",
+      "stockCode": "600426",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 263,
+      "groundTruth": "strong_bear",
+      "alpha": -22.800586510263937
+    },
+    {
+      "id": "tp_603392_202511",
+      "stockCode": "603392",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 67,
+      "groundTruth": "strong_bear",
+      "alpha": -17.61765930862141
+    },
+    {
+      "id": "tp_603392_202505",
+      "stockCode": "603392",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 61,
+      "groundTruth": "strong_bear",
+      "alpha": -35.15151515151515
+    },
+    {
+      "id": "tp_603392_202411",
+      "stockCode": "603392",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 55,
+      "groundTruth": "strong_bear",
+      "alpha": -16.3696188648204
+    },
+    {
+      "id": "tp_603392_202405",
+      "stockCode": "603392",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 49,
+      "groundTruth": "bull",
+      "alpha": 3.9233038348082547
+    },
+    {
+      "id": "tp_601398_202511",
+      "stockCode": "601398",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 229,
+      "groundTruth": "bear",
+      "alpha": -7.179487179487174
+    },
+    {
+      "id": "tp_601398_202505",
+      "stockCode": "601398",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 223,
+      "groundTruth": "strong_bull",
+      "alpha": 17.575757575757578
+    },
+    {
+      "id": "tp_601398_202411",
+      "stockCode": "601398",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 217,
+      "groundTruth": "strong_bull",
+      "alpha": 28.752260397830014
+    },
+    {
+      "id": "tp_601398_202405",
+      "stockCode": "601398",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 211,
+      "groundTruth": "strong_bull",
+      "alpha": 39.689578713968956
+    },
+    {
+      "id": "tp_605499_202511",
+      "stockCode": "605499",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 54,
+      "groundTruth": "strong_bear",
+      "alpha": -29.420465751346438
+    },
+    {
+      "id": "tp_605499_202505",
+      "stockCode": "605499",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 48,
+      "groundTruth": "strong_bear",
+      "alpha": -15.782677165354336
+    },
+    {
+      "id": "tp_605499_202411",
+      "stockCode": "605499",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 42,
+      "groundTruth": "strong_bull",
+      "alpha": 49.188335009337735
+    },
+    {
+      "id": "tp_605499_202405",
+      "stockCode": "605499",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 36,
+      "groundTruth": "strong_bull",
+      "alpha": 56.35313001605137
+    },
+    {
+      "id": "tp_600346_202511",
+      "stockCode": "600346",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 283,
+      "groundTruth": "strong_bull",
+      "alpha": 11.528291909042833
+    },
+    {
+      "id": "tp_600346_202505",
+      "stockCode": "600346",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 277,
+      "groundTruth": "strong_bull",
+      "alpha": 54.10396716826267
+    },
+    {
+      "id": "tp_600346_202411",
+      "stockCode": "600346",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 271,
+      "groundTruth": "neutral",
+      "alpha": 2.530730296456975
+    },
+    {
+      "id": "tp_600346_202405",
+      "stockCode": "600346",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 265,
+      "groundTruth": "bull",
+      "alpha": 7.391304347826083
+    },
+    {
+      "id": "tp_600919_202511",
+      "stockCode": "600919",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 111,
+      "groundTruth": "bull",
+      "alpha": 7.603464870067364
+    },
+    {
+      "id": "tp_600919_202505",
+      "stockCode": "600919",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 105,
+      "groundTruth": "bear",
+      "alpha": -3.4515819750719023
+    },
+    {
+      "id": "tp_600919_202411",
+      "stockCode": "600919",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 99,
+      "groundTruth": "strong_bull",
+      "alpha": 38.90243902439026
+    },
+    {
+      "id": "tp_600919_202405",
+      "stockCode": "600919",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 93,
+      "groundTruth": "strong_bull",
+      "alpha": 29.064748201438857
+    },
+    {
+      "id": "tp_600036_202511",
+      "stockCode": "600036",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 283,
+      "groundTruth": "strong_bear",
+      "alpha": -10.228898426323317
+    },
+    {
+      "id": "tp_600036_202505",
+      "stockCode": "600036",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 277,
+      "groundTruth": "neutral",
+      "alpha": 1.657595249876303
+    },
+    {
+      "id": "tp_600036_202411",
+      "stockCode": "600036",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 271,
+      "groundTruth": "strong_bull",
+      "alpha": 28.83288328832883
+    },
+    {
+      "id": "tp_600036_202405",
+      "stockCode": "600036",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 265,
+      "groundTruth": "strong_bull",
+      "alpha": 23.85665529010238
+    },
+    {
+      "id": "tp_600031_202511",
+      "stockCode": "600031",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 268,
+      "groundTruth": "neutral",
+      "alpha": 0.6889763779527587
+    },
+    {
+      "id": "tp_600031_202505",
+      "stockCode": "600031",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 262,
+      "groundTruth": "strong_bull",
+      "alpha": 16.35462555066079
+    },
+    {
+      "id": "tp_600031_202411",
+      "stockCode": "600031",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 256,
+      "groundTruth": "bull",
+      "alpha": 4.937537180249862
+    },
+    {
+      "id": "tp_600031_202405",
+      "stockCode": "600031",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 250,
+      "groundTruth": "bull",
+      "alpha": 3.4009156311314674
+    },
+    {
+      "id": "tp_002311_202511",
+      "stockCode": "002311",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 192,
+      "groundTruth": "strong_bear",
+      "alpha": -14.69534050179211
+    },
+    {
+      "id": "tp_002311_202505",
+      "stockCode": "002311",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 186,
+      "groundTruth": "bear",
+      "alpha": -6.626201315123923
+    },
+    {
+      "id": "tp_002311_202411",
+      "stockCode": "002311",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 180,
+      "groundTruth": "strong_bull",
+      "alpha": 29.467849223946786
+    },
+    {
+      "id": "tp_002311_202405",
+      "stockCode": "002311",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 174,
+      "groundTruth": "neutral",
+      "alpha": -2.271796970937371
+    },
+    {
+      "id": "tp_603806_202511",
+      "stockCode": "603806",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 134,
+      "groundTruth": "strong_bull",
+      "alpha": 20.907158043940463
+    },
+    {
+      "id": "tp_603806_202505",
+      "stockCode": "603806",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 128,
+      "groundTruth": "strong_bull",
+      "alpha": 17.706576728499172
+    },
+    {
+      "id": "tp_603806_202411",
+      "stockCode": "603806",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 122,
+      "groundTruth": "strong_bear",
+      "alpha": -24.694944799535154
+    },
+    {
+      "id": "tp_603806_202405",
+      "stockCode": "603806",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 116,
+      "groundTruth": "strong_bear",
+      "alpha": -19.579646017699112
+    },
+    {
+      "id": "tp_300450_202511",
+      "stockCode": "300450",
+      "cutoffDate": "2025-11",
+      "cutoffIndex": 121,
+      "groundTruth": "bull",
+      "alpha": 6.4220183486238644
+    },
+    {
+      "id": "tp_300450_202505",
+      "stockCode": "300450",
+      "cutoffDate": "2025-05",
+      "cutoffIndex": 115,
+      "groundTruth": "strong_bull",
+      "alpha": 151.53497735279313
+    },
+    {
+      "id": "tp_300450_202411",
+      "stockCode": "300450",
+      "cutoffDate": "2024-11",
+      "cutoffIndex": 109,
+      "groundTruth": "bull",
+      "alpha": 5.220713073005095
+    },
+    {
+      "id": "tp_300450_202405",
+      "stockCode": "300450",
+      "cutoffDate": "2024-05",
+      "cutoffIndex": 103,
+      "groundTruth": "neutral",
+      "alpha": 1.8887187340479887
+    }
+  ],
+  "templates": [
+    "technical",
+    "trend",
+    "valuation",
+    "sentiment"
+  ]
+}

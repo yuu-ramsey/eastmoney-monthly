@@ -617,16 +617,82 @@ Dry-run 48 样本（3 只股票），5 agent 架构（Bull/Bear/Technical/Sector
 - 不跑全量 ¥70 eval
 - 诊断脚本: `scripts/diagnose-phase15.js`
 
-## Phase 17 LSTM 预备（待用户方案）
+## Phase 17 LSTM v1 Baseline（2026-05-19）
 
-### 数据准备检查
+### 架构
 
-| 项目 | 状态 | 数据 |
-|------|------|------|
-| 月线 K 线 | ✅ 就绪 | 300 只, 1991-01~2026-05, 62,475 条 |
-| 周线 K 线 | ✅ 就绪 | 262K 条 |
-| 日线 K 线 | ✅ 就绪 | 1.24M 条 |
-| Walk-forward 切分 | ✅ 可行 | Train 2015-2021 / Val 2022-2023 / Test 2024-2026 |
+LSTM(input=21, hidden=64, 1 layer, dropout=0.2) → FC(2 heads: y3, y6)
+Train: 2015-2021 (15,778 seqs) / Val: 2022-2023 (5,723) / Test: 2024-2026 (4,340)
+
+### 结果
+
+| 指标 | Val | Test | Δ |
+|------|-----|------|-----|
+| IC y3 | 0.095 (p≈0) | **0.025** (p=0.10) | -0.070 |
+| IC y6 | 0.074 | -0.024 | -0.097 |
+| Sharpe y3 (ann) | 0.267 | 0.144 | -0.123 |
+
+### 失败原因
+
+1. **Regime change**：2015-2021 牛市规律不适用 2024+ 市场
+2. **Val overfit**：monitor IC y3 导致选择了 Val 最优但 Test 失效的 checkpoint
+3. **单层 LSTM** 太浅，无法学习复杂的跨截面排序模式
+4. **固定 split** 训练：需 walk-forward retraining（Qlib 标准做法）
+
+### 处置
+
+- 代码保留 `lib/lstm/`，checkpoint 留作 Phase 19 信号源
+- Test 集已使用，标记为污染，不可再用作单模型评估
+- 24-26 数据可作为**组合策略 backtest 评估**（不同任务，不同纪律）
+- 文档: `lib/lstm/eval_test.py`, `lib/lstm/eval_val.py`
+
+## Phase 19 Walk-Forward Backtesting（设计）
+
+### 信号源（5 个，已量化验证）
+
+| # | 信号 | 最强指标 | 方向 | 覆盖 |
+|---|------|---------|------|------|
+| 1 | LSTM v1 pred | IC y3=0.095 (Val) | 正向 | 100% |
+| 2 | Resonance reverse | Sharpe=0.195 (1m) | 反向 | 100% |
+| 3 | Sector α 24m/12m | IC=0.074 | 反向 | 100% |
+| 4 | Phase 13 ASC high-conf | score=0.225 | 正向 | 9.4% |
+| 5 | MACD/RSI/KDJ composite | Phase 10 signal | 正向 | 100% |
+
+### 三层架构
+
+```
+Signal Layer (lib/signals/registry.js)
+  → 统一接口 fn(code, asOfDate) → score ∈ [-1, +1]
+
+Aggregation Layer (lib/backtest/aggregator.js)
+  → 等权 / IC-IR 加权 / Rank IC 集成
+
+Portfolio Layer (lib/backtest/portfolio.js)
+  → Top-K (10-30), 等权/风险平价, 月度调仓
+  → 单股 ≤15%, 行业 ≤25%
+
+Backtest Engine (lib/backtest/engine.js)
+  → Walk-forward strict, 滑点 0.3-0.5%, 手续费万2.5
+  → In-sample: 2015-2023 (调超参)
+  → Live test: 2024-2026 (冻结)
+```
+
+### 评估目标
+
+- Sharpe > 1.0, Max DD < 25%
+- vs HS300 等权 alpha + IR
+
+### 决策点（等用户确认）
+
+1. 信号集：5 个全用 or 选 subset?
+2. 聚合：等权起步 or 直接 IC-IR 加权?
+3. 框架：自写 lightweight or vectorbt?
+4. LSTM retrain：每月滚动重训 or 静态 Phase 17 checkpoint?
+
+### 改动文件
+
+- `lib/lstm/` — 数据 pipeline + 模型 + 训练 + 评估脚本
+- `lib/lstm/requirements.txt` — torch/numpy/pandas/scipy
 | 输入特征 | ✅ 就绪 | 15 通达信指标 (Phase 9) + sector alpha (Phase 12) + 共振因子 (Phase 11) |
 | 标签 | ✅ 就绪 | 6 月前瞻 alpha (groundTruth) |
 

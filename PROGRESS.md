@@ -474,3 +474,65 @@ spec 要求"在 popup 顶部 warning 提示"，实际实现在 content.js 侧边
 - 新增 `lib/eval/compute-score.js`：`computeScoreFull()` 同时输出 full/excl_pf
 - 报告默认用 full 分母，excl_pf 仅作辅助参考
 
+## Phase 11 & 12 量化验证（2026-05-18）
+
+### 方法论
+
+298 只 HS300 股票 × 2018-2025 月度数据，离线纯计算，零 LLM 成本。严格 walk-forward。
+
+### Phase 12: Sector Alpha IC 矩阵
+
+| lookback \ holding | 1m | 3m | 6m | 12m |
+|---|---|---|---|---|
+| 3m | -0.0075 | -0.0013 | -0.0121 | -0.0015 |
+| 6m | -0.0008 | -0.0069 | -0.0103 | -0.0086 |
+| 12m | +0.0075 | +0.0056 | +0.0004 | -0.0242 |
+| 24m | -0.0017 | -0.0174 | -0.0409 | **-0.0738** |
+
+**结论**：16 个 cell 全部 |IC| < 0.10。Hit Rate 47.8-51.4%。Long-Short Sharpe 全部为负。
+**Phase 12 关闭**。代码保留 `lib/sector/`，prompt 注入路径禁用（ENABLE_SECTOR_ALPHA=false）。
+详见 `docs/phase12-postmortem.md`。
+
+### Phase 11: 多周期共振预测力
+
+共振信号: strong_bull/bear = 三周期全同向, mild_bull/bear = 二周期同向。
+
+扣除 HS300 等权基准 alpha:
+
+| signal \ holding | 1m | 3m | 6m | 12m | n |
+|---|---|---|---|---|---|
+| strong_bull | 0.59% | 2.61% | 4.31% | 9.25% | 1,114 |
+| mild_bull | 0.87% | 2.95% | 6.10% | 10.70% | 2,721 |
+| **strong_bear** | **1.53%** | **3.48%** | **7.67%** | **11.15%** | 1,114 |
+| mild_bear | 2.55% | 18.43% | 40.26% | 36.65% | 2,939 |
+
+Long-Short (strong_bull − strong_bear): 全部为负，\|Sharpe\| ≈ 0.10。
+
+**结论**：三周期共振是边缘反向信号（strong_bear 未来收益系统性高于 strong_bull）。
+LLM v5 score 下降原因：HARD_CONSTRAINTS #11 强制跟随共振方向，但共振是反向指标。
+详见 `docs/phase11-postmortem.md`。
+
+### 对比
+
+| 指标 | Phase 12 sector alpha | Phase 11 resonance |
+|------|----------------------|-------------------|
+| 最强 IC/Sharpe | IC=-0.074 | Sharpe=-0.195 (1m) |
+| 方向 | 反向 | **反向** |
+| 状态 | 关闭 | 保留代码，禁用注入 |
+| LLM 注入 | 已验证无效（-0.03 Δ） | 已验证有害（v5 < v4） |
+| LSTM 候选 | 24m lookback (IC=-0.074) | 反向因子 (Sharpe=0.10) |
+
+### 战略转向
+
+1. **LLM prompt 注入路径暂停**：Phase 11 和 12 的量化信号均 |IC/Sharpe| < 0.20，不适合作为 LLM 硬约束
+2. **Phase 17 LSTM**：共振反向信号（Sharpe=0.10）和 sector alpha 24m（IC=-0.07）可作为特征
+3. **反向约束实验**：可选路径，Phase 11 改 #11 为反向逻辑后重新 eval（预算 ¥7-15）
+
+### 改动文件
+
+- `cli/analyze-sector-predictive-power.js` — Phase 12 IC 矩阵计算
+- `cli/analyze-resonance-predictive-power.js` — Phase 11 共振预测力计算
+- `cli/verify-resonance-matrix.js` — 共振矩阵可信度验证
+- `docs/phase*.md` — Phase 11 & 12 事后总结
+- `lib/prompt-templates.js` — #12 约束文本已改回中性措辞
+

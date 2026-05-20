@@ -720,3 +720,56 @@ Backtest Engine (lib/backtest/engine.js)
 
 项目内无 LSTM 代码残留。需从零搭建。
 
+## 工程审计 + 严格 v6 重测（2026-05-20）
+
+### P0: Proportional Split Bug
+原代码 `X[:n_tr]` 索引比例 split 混合了不同股票的同期数据。修复为严格 date-based split。
+
+### Strict v6 三频率对比
+
+| 频率 | 模型 | 股票 | Test IC | 判定 |
+|------|------|------|---------|------|
+| 日线 | LSTM-7 | 298 | **+0.141** | ✅ 唯一真实信号 |
+| 周线 | LSTM-7 | 296 | +0.007 | ❌ |
+| 月线 | LSTM-7 | 298 | -0.027 | ❌ (原 0.019 被 split 污染) |
+
+### 月线优化历程
+
+| 迭代 | 股票 | 方法 | 特征 | IC | 关键突破 |
+|------|------|------|------|-----|---------|
+| v1 | 298 | LSTM | 21 | -0.027 | 严格 split 暴露真相 |
+| v2 | 813 | LSTM | 21 | +0.027 | 加 CSI1000 数据 |
+| v3 | 785 | LightGBM | 11 | +0.042 | 树模型更适合月线 |
+| v4 | 1158 | LightGBM | 22 | +0.054 | 更多特征 |
+| v5 | 2247 | LightGBM | 22 | **+0.063** | 全 A 股 (3744 指数) |
+| v6 | 2247 | +Daily bridge | 19 | +0.015 | 日线桥接退化 |
+| v7 | 500 | +Fund flow | 16 | -0.013 | 资金流数据太稀疏 |
+| v8 | 1500 | Alpha158 | 31 | +0.043 | 更多特征≠更好 |
+| v9 | 1000 | Hyper sweep | 13 | +0.040 | 超参无改善 |
+
+### 日线增强尝试
+
+| 方法 | Test IC | 结论 |
+|------|---------|------|
+| LSTM-7 strict v6 | **+0.141** | ✅ baseline |
+| Triple-Barrier 3-class | +0.040 | 分类不如回归 |
+| ListNet ranking | +0.010 | 退化 |
+| MASTER cross-attn | -0.018 | 跨股票 attention 无效 |
+| Sprint 1 33-dim dist | -0.019 | 日线分布特征无帮助 |
+
+### DB 扩展
+
+- Baidu API: 3744 指数股 → 3265 入库, 2247 有效 (≥84月)
+- 全 A 股 5000 只因 akshare API 封锁未完成
+
+### 工作纪律 v1.0
+- 所有新代码强制头部注释 (INPUT_DATA_RANGE / WALK_FORWARD / TEST_SET_USAGE)
+- 禁用 spin 措辞清单
+- 强制 assertion + dry-run
+
+### 项目级结论
+
+**日线 LSTM IC=0.141 是唯一经过严格验证的信号。月线 LightGBM IC=0.063 天花板已确认。**
+更多特征/频率/模型架构/数据源均无法突破当前 IC 天花板。
+建议: Phase 23 Chrome 扩展产品化 + Paper Trading。
+

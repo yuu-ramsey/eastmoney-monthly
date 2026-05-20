@@ -25,7 +25,8 @@ for code in codes:
     n = len(g); c = g['close'].values.astype(float)
     o = g['open'].values.astype(float); h = g['high'].values.astype(float)
     l = g['low'].values.astype(float); v = g['volume'].values.astype(float)
-    tr = g['turnover_rate'].values.astype(float) if 'turnover_rate' in g.columns else np.zeros(n)
+    tr_col = 'turnover_rate' if 'turnover_rate' in g.columns else None
+    tr = g[tr_col].values.astype(float) if tr_col else np.zeros(n)
     dates = g['date'].tolist(); industry = ind_map.get(code, 'unknown')
 
     # Pre-compute indicators
@@ -94,6 +95,7 @@ feat_cols = [c for c in data.columns if c not in ['code','date','fwd_ret']]
 print(f'Train: {len(train)}, Test: {len(test)}')
 
 results = {}
+all_preds = {}
 for name, Model, params in [
     ('LightGBM', lgb.LGBMRegressor, {'objective':'regression','metric':'l1','num_leaves':63,'learning_rate':0.03,'n_estimators':200,'min_child_samples':10,'subsample':0.8,'colsample_bytree':0.8,'random_state':456,'verbosity':-1,'n_jobs':4}),
     ('XGBoost', xgb.XGBRegressor, {'objective':'reg:squarederror','max_depth':6,'learning_rate':0.05,'n_estimators':200,'subsample':0.8,'colsample_bytree':0.8,'random_state':456,'verbosity':0,'n_jobs':4}),
@@ -103,6 +105,7 @@ for name, Model, params in [
     model = Model(**params)
     model.fit(train[feat_cols].values, train['fwd_ret'].values)
     pred = model.predict(test[feat_cols].values)
+    all_preds[name] = pred
     ics = []
     for m in test['date'].unique():
         mask = test['date']==m; n_stocks = mask.sum()
@@ -112,6 +115,16 @@ for name, Model, params in [
     avg_ic = np.mean(ics)
     print(f'  avg monthly IC={avg_ic:+.4f} ({len(ics)} months, {time.time()-t0:.0f}s)')
     results[name] = avg_ic
+
+# Ensemble
+pred_ens = all_preds['LightGBM'] * 0.5 + all_preds['XGBoost'] * 0.5
+ics_ens = []
+for m in test['date'].unique():
+    mask = test['date']==m
+    if mask.sum()<20: continue
+    ics_ens.append(spearmanr(pred_ens[mask], test.loc[mask,'fwd_ret'].values)[0])
+results['Ensemble'] = np.mean(ics_ens)
+print(f"\nEnsemble: avg monthly IC={results['Ensemble']:+.4f}")
 
 print(f'\n=== ENHANCED MONTHLY ===')
 for n, ic in results.items(): print(f'{n}: IC={ic:+.4f}')

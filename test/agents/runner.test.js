@@ -163,7 +163,7 @@ function makePartial(role) {
 
 // 指纹必须匹配 sampleCtx（code=600519, period=monthly, klines[0].date=2026-04-30 close=1600）
 // buildFingerprint: 600519|monthly|2026-04-30:1600 → djb2 hash
-const VALID_FP = '2980147625'; // 预计算: djb2('600519|monthly|2026-04-30:1600')
+const VALID_FP = '386909631'; // 预计算: djb2('600519|monthly|1|2026-04-30|2026-04-30|1600')
 
 test('checkpoint: 无 checkpoint → 三个 Agent 全被调用', async () => {
   storageMap.clear();
@@ -315,4 +315,93 @@ test('checkpoint: ≥2 Agent 成功才调 Judge 规则未被破坏', async () =>
   assert.equal(result.judge, null, 'successCount=1 < 2，不应调 Judge');
   assert.ok(result.errors.judge);
   assert.match(result.errors.judge, /不足 2 个/);
+});
+
+// ---- 指纹仅用已收盘 bar 的专项测试 ----
+
+test('checkpoint: 同一 closed bars，当期 bar close 变动 → 指纹不变 → 复用 checkpoint', async () => {
+  storageMap.clear();
+  // 预设 checkpoint：bull+bear 已完成
+  const ck = {
+    v: 1,
+    ts: Date.now(),
+    fp: VALID_FP,
+    partials: { bull: makePartial('bull'), bear: makePartial('bear') },
+    errors: {},
+  };
+  storageMap.set(CK_KEY, ck);
+
+  // 构造 ctx：closed bar 不变，但多加一个当期 bar（模拟盘中 close 跳动）
+  const ctxWithCurrentBar = {
+    ...sampleCtx,
+    klines: [
+      { date: '2026-04-30', open: 1550, close: 1600, high: 1620, low: 1540, volume: 120000, changePercent: 3.2, ma5: 1540, ma20: 1500, ma60: 1420, dif: 12, dea: 9, hist: 6, turnoverRate: 2.5 },
+      { date: '2026-05-29', open: 1610, close: 1595, high: 1630, low: 1580, volume: 80000, changePercent: -0.3, ma5: 1580, ma20: 1550, ma60: 1450, dif: 10, dea: 8, hist: 4, turnoverRate: 1.8 },
+    ],
+  };
+
+  let callCount = 0;
+  globalThis.fetch = () => {
+    callCount++;
+    return Promise.resolve({
+      status: 200, ok: true,
+      json: () => Promise.resolve({
+        content: [{ type: 'text', text: `call ${callCount}` }],
+        usage: { input_tokens: 100, output_tokens: 50 },
+      }),
+      text: () => Promise.resolve('{}'),
+    });
+  };
+
+  const opts = { ...sampleOpts, checkpointKey: CK_KEY };
+  const result = await runDebate(ctxWithCurrentBar, opts);
+
+  // 当期 bar(2026-05-29)被 isBarClosed 过滤，指纹不变 → bull+bear 复用
+  assert.equal(callCount, 2, '当期 bar close 变动不应影响指纹 → 仅 predictor+judge 调 LLM = 2 次');
+  assert.equal(result.partials.bull.text, 'bull checkpoint 缓存', 'bull 应来自 checkpoint');
+  assert.equal(result.partials.bear.text, 'bear checkpoint 缓存', 'bear 应来自 checkpoint');
+  assert.ok(result.judge);
+});
+
+test('checkpoint: closed bar close 变了 → 指纹不匹配 → 丢弃 checkpoint，全跑', async () => {
+  storageMap.clear();
+  // 预设 checkpoint：bull+bear 已完成
+  const ck = {
+    v: 1,
+    ts: Date.now(),
+    fp: VALID_FP,
+    partials: { bull: makePartial('bull'), bear: makePartial('bear') },
+    errors: {},
+  };
+  storageMap.set(CK_KEY, ck);
+
+  // 构造 ctx：closed bar close 变了（模拟复权基准切换）
+  const ctxChangedClose = {
+    ...sampleCtx,
+    klines: [
+      { date: '2026-04-30', open: 1550, close: 1620, high: 1630, low: 1540, volume: 120000, changePercent: 4.5, ma5: 1550, ma20: 1510, ma60: 1430, dif: 13, dea: 10, hist: 7, turnoverRate: 2.6 },
+    ],
+  };
+
+  let callCount = 0;
+  globalThis.fetch = () => {
+    callCount++;
+    return Promise.resolve({
+      status: 200, ok: true,
+      json: () => Promise.resolve({
+        content: [{ type: 'text', text: `call ${callCount}` }],
+        usage: { input_tokens: 100, output_tokens: 50 },
+      }),
+      text: () => Promise.resolve('{}'),
+    });
+  };
+
+  const opts = { ...sampleOpts, checkpointKey: CK_KEY };
+  const result = await runDebate(ctxChangedClose, opts);
+
+  // closed bar close 从 1600 → 1620，指纹改变 → 丢弃 checkpoint → 全部重跑
+  assert.equal(callCount, 4, 'closed bar close 变了应丢弃 checkpoint，全部重跑 = 4 次');
+  assert.ok(result.partials.bull);
+  assert.notEqual(result.partials.bull.text, 'bull checkpoint 缓存', 'bull 不应复用旧 checkpoint');
+  assert.ok(result.judge);
 });

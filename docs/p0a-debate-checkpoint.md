@@ -1,6 +1,6 @@
-# P0a 辩论 checkpoint 续跑
+# P0a 辩论 checkpoint 续跑（含指纹修复）
 
-> 分支: `p0a-debate-checkpoint` | 日期: 2026-05-29 | 基于 p0-audit 审计结论实施
+> 分支: `p0a-debate-checkpoint` → `p0a-fix-fingerprint` | 日期: 2026-05-29 | 基于 p0-audit 审计结论实施
 
 ---
 
@@ -46,11 +46,24 @@ debate-wip:<market>.<code>:<period>:<bucket>:<style>:<decision>
 ### 输入指纹
 
 ```
-djb2(code|period|<尾部 5 根 K 线的 date:close>)
+djb2(code|period|barCount|firstDate|lastDate|lastClose)  ← 仅已收盘 bar
 ```
 
-若 K 线数据变了（用户刷新页面后东财返回不同数据），旧 checkpoint 指纹不匹配，
-自动丢弃重跑——防止用过期中间态拼接。
+**指纹修复 (p0a-fix-fingerprint)**: 初版指纹含当期未收盘 K 线的 close，
+交易时段盘中每次 tick 都改变指纹，导致 checkpoint 在盘中永远无法命中。
+修复后加入 `isBarClosed()` 过滤：
+
+- monthly: 当期月不参与指纹
+- weekly: 当期 ISO 周不参与指纹
+- daily: 今日不参与指纹
+
+当期 bar close 跳动不再影响指纹。若已收盘 bar 的 close 变了（复权基准
+切换、数据源修正），指纹自动失效丢弃重跑。
+
+### 超时清理
+
+checkpoint 超过 1 小时 (`CHECKPOINT_STALE_MS = 60*60*1000`) 自动丢弃，
+避免 storage 堆积。所有 catch 块均 `console.warn`，不再静默吞错。
 
 ### 串行写链
 
@@ -68,13 +81,16 @@ let mergeChain = Promise.resolve();
 
 ## 改动文件
 
-### `lib/agents/runner.js` (+83 行)
+### `lib/agents/runner.js` (+90 行)
 
 | 新增 | 说明 |
 |------|------|
 | `CHECKPOINT_VERSION = 1` | schema 版本，将来改结构时可递增 |
-| `buildFingerprint(ctx)` | djb2 hash of `code\|period\|klinesTail` |
-| `loadCheckpoint(key, fp)` | 读 storage，验指纹，不匹配则删除 |
+| `CHECKPOINT_STALE_MS` | 1 小时超时，过期 checkpoint 自动丢弃 |
+| `getIsoWeek(dateStr)` | ISO 周计算，与 background.js 一致 |
+| `isBarClosed(dateStr, period)` | 判断 bar 是否属于当期（monthly/weekly/daily），用于指纹过滤 |
+| `buildFingerprint(ctx)` | djb2 hash of `code\|period\|barCount\|firstDate\|lastDate\|lastClose`（仅已收盘 bar） |
+| `loadCheckpoint(key, fp)` | 读 storage，验指纹+超时，不匹配则删除 |
 | `mergeCheckpointPartial(key, role, value, fp)` | 合并写入单个 Agent 成功结果 |
 | `mergeCheckpointError(key, role, errMsg, fp)` | 合并写入单个 Agent 失败信息 |
 | `clearDebateCheckpoint(key)` | 删除 checkpoint（导出函数，background.js 调用） |
@@ -96,9 +112,9 @@ let mergeChain = Promise.resolve();
 :507  await clearDebateCheckpoint(...)               // 正式缓存写入后清理
 ```
 
-### `test/agents/runner.test.js` (+110 行)
+### `test/agents/runner.test.js` (+170 行)
 
-新增 mock `chrome.storage.local`（Map 实现）+ 4 个 checkpoint 专项测试：
+新增 mock `chrome.storage.local`（Map 实现）+ 6 个 checkpoint 专项测试：
 
 | 测试 | 场景 | 断言 |
 |------|------|------|
@@ -106,6 +122,8 @@ let mergeChain = Promise.resolve();
 | bull+bear 已缓存 → 只调 predictor | 预设 checkpoint 含 bull+bear | fetch 2 次（Pred+Judge），bull.text='bull checkpoint 缓存' |
 | 指纹不匹配 → 丢弃重跑 | 预设 checkpoint fp 错误 | fetch 4 次，旧值未出现在结果中 |
 | ≥2 成功规则不破 | checkpoint 仅 bull，其余 500 | successCount=1，Judge 跳过 |
+| 当期 bar close 变动 → 指纹不变 | closed bar 不变，加当期 bar 模拟盘中 | fetch 2 次，bull+bear 复用 checkpoint |
+| closed bar close 变动 → 丢弃 | 修改 closed bar close 模拟复权切换 | fetch 4 次，全量重跑 |
 
 ### `PROGRESS.md` (+20 行)
 
@@ -130,14 +148,16 @@ let mergeChain = Promise.resolve();
 ## 测试
 
 ```
-249 tests | 0 fail | 0 skip
+251 tests | 0 fail | 0 skip
 ```
 
-新增 4 个 checkpoint 测试，现有 245 个测试零回归。
+新增 6 个 checkpoint 测试（含 2 个指纹专项），现有测试零回归。
 
 ## 人工审核清单
 
-- [ ] `git diff master...p0a-debate-checkpoint` 确认未碰 prompt/LLM/评分/解析
+- [ ] `git diff master...p0a-fix-fingerprint` 确认未碰 prompt/LLM/评分/解析
 - [ ] 比较 `runDebate` 返回结构与改前逐字段一致
-- [ ] 跑 `node --test test/agents/runner.test.js` → 8/8 pass
-- [ ] 真实环境：`chrome://serviceworker-internals` → Stop → 重试分析 → console 确认已复用 Agent 未重新调 LLM
+- [ ] 跑 `node --test test/agents/runner.test.js` → 10/10 pass
+- [ ] 真实环境：交易时段 Stop SW → 重试分析 → console 确认 checkpoint 命中、复用 Agent
+- [ ] 指纹专项：盘中当期 bar close 跳动不影响指纹 → checkpoint 可命中
+- [ ] 指纹专项：修改 closed bar close → checkpoint 被丢弃重跑

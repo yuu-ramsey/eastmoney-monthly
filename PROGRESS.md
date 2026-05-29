@@ -1,5 +1,25 @@
 > **所有任务必须先读 .claude-charter.md（项目章程）**
 
+## 必须遵守的规则
+
+### 运行时 import 边界守卫（2026-05-29 确立）
+
+**不变量**: Service Worker (`background.js`) 的**静态 import 闭包**中不得出现以下 Node 原生模块：
+
+- `better-sqlite3`, `sqlite3` — C++ 原生模块
+- `node:fs`, `node:path`, `node:url`, `node:crypto`, `node:child_process`, `node:os`, `node:net`, `node:http`, `node:https`, `node:worker_threads`
+- 裸名: `fs`, `path`, `child_process`, `os`, `net`, `http`, `https`, `worker_threads`, `stream`, `util`
+
+`crypto` 裸名**不禁** — Chrome Service Worker 提供 Web Crypto API (`crypto.subtle`, `crypto.randomUUID`)。
+
+动态 `import()` 调用**不跟踪** — 本项目刻意用动态导入隔离 `better-sqlite3`（见 `lib/multi-period/resonance.js` 和 `native-host/server.js`），跟踪会误报。
+
+**守卫测试**: `test/import-guard.test.js` — 每次 `npm test` 自动运行。
+
+**违反时的正确做法**:
+- 运行时代码通过 Native Messaging 访问 DB（见 `background.js` 中的 `sendNativeMessage`）
+- 如需新增运行时模块引用，先确认它不（传递）依赖 Node 原生模块
+
 ## LLM Prompt 工程边际收益（2026-05-18 认知更新）
 
 | 阶段 | 方法 | score Δ | 累计变化 | 评级 |
@@ -767,9 +787,304 @@ Backtest Engine (lib/backtest/engine.js)
 - 禁用 spin 措辞清单
 - 强制 assertion + dry-run
 
+## Phase 5 v32 最终特征版（2026-05-25）
+
+### 32d 特征组合
+
+| 组 | 维度 | 内容 |
+|----|------|------|
+| G2 | 3 | MA5/MA20/MA60 偏离 |
+| G3 | 3 | MACD DIF/DEA/Histogram |
+| G4 | 2 | vol_6m 波动率 + ATR14 |
+| FFT | 10 | 简单振幅谱（无 freq/phase） |
+| G7 | 14 | 量价完整版（含 above_ma5） |
+
+**总计 32 维**。vs 31d 的差异：FFT 用简单振幅谱替代 freq+amp+phase 混合（+0.0037 IC），G7 恢复 above_ma5（+0.0037 IC）。
+
+### 三方对比（5-Fold CV + IC Decay T+1~T+6）
+
+| 版本 | 维度 | IC | ICIR | IC>0 | CV_mean | CV_all+ |
+|------|------|-----|------|------|---------|---------|
+| 61d | 61 | +0.0295 | +0.428 | 72.5% | +0.0297 | True |
+| 31d | 31 | +0.0341 | +0.479 | 71.8% | +0.0338 | True |
+| **32d** | **32** | **+0.0377** | **+0.510** | **72.5%** | **+0.0377** | **True** |
+
+**32d vs 61d: IC +27.9%**。所有 Fold、所有 horizon（T+1~T+6）32d 全面领先。
+
+### 关键发现
+
+1. **简单 FFT 振幅谱 > freq+amp+phase 混合**：保留频率/相位信息反而引入噪声
+2. **above_ma5 有价值**：G7 13→14 维的增量确定且显著
+3. **32d 是当前最优**：精简维度 + 最高 IC + 最低过拟合风险
+
+### 多头回测（Q5, 等权, 月度调仓）
+
+筛选：日均成交额 > 500 万 + 无涨跌停（±9.9%）。成本：滑点 0.3% + 手续费 0.025%。
+
+| 指标 | 数值 |
+|------|------|
+| 回测期 | 2015-01 ~ 2025-11（128 月） |
+| 累积净收益 | **+520.67%** |
+| 年化收益 | +21.01% |
+| 年化波动 | 27.47% |
+| Sharpe | **0.765** |
+| 最大回撤 | -42.20% |
+| Calmar | 0.498 |
+| 月胜率 | 57.8% |
+| 平均持仓 | 244 只 |
+
+逐年：2015 +67.7% / 2016 +30.6% / 2017 -0.3% / 2018 **-38.2%** / 2019 +40.9% / 2020 +18.8% / 2021 **+43.3%** / 2022 +16.3% / 2023 -7.1% / 2024 +34.0% / 2025 YTD **+35.2%**（Sharpe 3.17）。
+
+### 同业特征（32d vs 36d）
+
+新增 4 维：ind_rank_pct / ind_zscore / peer_dist_median / peer_dist_pct。
+
+| 版本 | IC | ICIR | IC>0 | Δ vs 32d |
+|------|-----|------|------|-----------|
+| 32d | +0.0377 | +0.510 | 72.5% | — |
+| 36d | +0.0314 | +0.462 | 69.5% | **-16.5%** |
+
+**结论：不采用。** 同业特征在所有 Fold、所有 horizon 全面降 IC。行业内相对排名信号已被现有 32 维充分捕获。
+
+### OOS 跟踪
+
+`scripts/v32_oos_track.py` 就绪，三个子命令：
+- `predict` — 月初生成当月预测
+- `realize` — 次月初填入 T+1~T+6 实现收益
+- `report` — 滚动 IC 报告
+
+数据文件：`.eastmoney-ai/oos/v32_oos_tracker.json`。从下月开始记录。
+
+### 输出文件
+
+- `scripts/phase5_v32_final.py` — 32d vs 31d vs 61d 三方对比
+- `scripts/v32_backtest_long.py` — Q5 多头回测
+- `scripts/v32_peer_features.py` — 同业特征对比
+- `scripts/v32_oos_track.py` — OOS 跟踪 CLI
+- `.eastmoney-ai/backtest/v32_backtest_summary.json` — 回测汇总
+- `.eastmoney-ai/diagnosis/v32_peer_summary.json` — 同业特征对比结果
+
+## IC/IR 方法论审计 + v32 全修复评估（2026-05-25）
+
+### 审计发现：icir_report.py 的 4 个方法论缺陷
+
+| # | 缺陷 | 影响 | 修复 |
+|---|------|------|------|
+| 1 | 累积 3 期收益 `(c[i+3]-c[i])/c[i]` | IC 机械膨胀 2-3x | 单月收益 `(c[i+1]-c[i])/c[i]` |
+| 2 | 日期混合 YYYY-MM / YYYY-MM-DD | 截面拆分，每月仅 1-3 只股票 | 统一 `str(date)[:7]` |
+| 3 | 61 维特征（非优化版） | 噪声特征稀释 IC | 32 维优化版 |
+| 4 | 46 个 date string ≠ 46 个自然月 | 窗口描述误导 | 137 自然月，76 训练后有效截面 |
+
+### v32 全修复结果（LightGBM+XGBoost+Ridge Ensemble, CSRC L2 中性化, 滚动 60 月）
+
+**T+1 ~ T+6 单月 IC 衰减：**
+
+| Lag | IC | ICIR | IC>0 | N(月) |
+|-----|-----|------|------|------|
+| T+1 | **+0.0765** | +0.98 | 85.5% | 76 |
+| T+2 | +0.0446 | +0.50 | 73.3% | 75 |
+| T+3 | +0.0489 | +0.51 | 70.3% | 74 |
+| T+4 | +0.0337 | +0.41 | 65.8% | 73 |
+| T+5 | +0.0308 | +0.36 | 69.4% | 72 |
+| T+6 | +0.0318 | +0.36 | 63.4% | 71 |
+
+**5-Fold CV：** 均值 IC=+0.0693，全正（0.049~0.077）
+
+**纯多头回测（Q5, 等权, 月频）：**
+
+| 指标 | Q1(弱) | Q3(中) | Q5(强) | LS |
+|------|--------|--------|--------|-----|
+| 年化收益 | +4.6% | +17.0% | **+34.9%** | +28.2% |
+| Sharpe | 0.20 | 0.85 | **1.53** | 3.02 |
+| 最大回撤 | -46.0% | -20.0% | -18.5% | -4.9% |
+| 月胜率 | 55.3% | 60.5% | **71.1%** | — |
+
+单调性: PASS。成本 50bp 后 LS Sharpe 仍有 2.24。
+
+### 修复前后对比
+
+| | icir_report.py (旧) | v32_final_eval.py (新) |
+|---|---|---|
+| 收益口径 | 累积 3 期 | **单月** |
+| 日期分组 | 混合格式，46 个 date string | **YYYY-MM, 76 个有效截面** |
+| 特征维度 | 61 维 | **32 维** |
+| 行业中性化 | 无 | **CSRC L2** |
+| 回测窗口 | 2024-01+ (46 月) | **2015-01+ (137 自然月)** |
+| **T+1 IC** | **0.177** (膨胀) | **0.0765** (诚实) |
+
+IC 从 0.177→0.0765 不是模型退化，而是去掉了累积收益+日期混乱的机械膨胀。
+T+1 IC=0.076 + 85.5% 月度正 IC + LS Sharpe 3.02 = 信号真实有效。
+
+### 输出文件
+
+- `scripts/v32_final_eval.py` — 全修复版评估脚本
+- `.eastmoney-ai/final_eval/v32_final_results.json` — 完整结果
+
+## Kronos 预测服务 Phase 1：基础环境搭建（2026-05-25）
+
+### 背景
+
+在现有月线因子引擎（LightGBM/XGBoost 树模型）之外，引入 Kronos 时序预测模型作为第二条信号线。
+Kronos 使用 BSQ（Binary Spherical Quantization）将 OHLCV K 线编码为离散 token，再用 decoder-only Transformer 自回归生成未来 K 线。
+
+两条信号线最终在 Node.js 信号融合层汇合。
+
+### 文件清单
+
+| 文件 | 行数 | 说明 |
+|------|------|------|
+| `kronos/module.py` | ~650 | 14 个核心 PyTorch 模块（BSQ/RoPE/TransformerBlock/分层嵌入/DualHead） |
+| `kronos/tokenizer.py` | ~200 | KronosTokenizer — encode/decode, HuggingFace PyTorchModelHubMixin |
+| `kronos/transformer.py` | ~205 | Kronos — decoder-only, decode_s1/decode_s2 两阶段自回归解码 |
+| `kronos/predictor.py` | ~300 | KronosPredictor — z-score 归一化/多采样/自回归生成 |
+| `kronos/data_adapter.py` | ~120 | SQLite → DataFrame 适配层（Phase 2） |
+| `kronos/signal_generator.py` | ~130 | 多次采样聚合 → 交易信号 dict（Phase 3） |
+| `kronos/download_weights.py` | ~130 | 从 HF Hub 下载预训练权重 CLI |
+| `kronos/__init__.py` | ~20 | 包导出 |
+| `kronos/tests/test_tokenizer.py` | ~140 | 8 tests — init/forward/encode/decode/half/padding |
+| `kronos/tests/test_transformer.py` | ~120 | 9 tests — forward/decode_s1/decode_s2/teacher forcing/CUDA |
+| `kronos/tests/test_predictor.py` | ~170 | 16 tests — 采样/时间戳/端到端/AR inference/CUDA |
+
+### 架构
+
+```
+百度月线 SQLite (klines-v2.sqlite)
+  → data_adapter.load_monthly_klines(code)       [Phase 2]
+  → orchestrator.run_analysis(code, predictor)    [Phase 4]
+  → predictor.predict(df, ...) × N samples        [Phase 1]
+  → signal_generator.generate_signal(predictions)  [Phase 3]
+  → dict { direction, change_pct, confidence, volatility }
+  ↓
+Node.js CLI: ema analyze <code>
+  → Python subprocess: cli_predict.py --json
+  → + lib/indicators/calculate.js 技术指标
+  → 综合研判输出
+```
+
+### 测试结果
+
+```
+36 passed, 1 skipped in 3.65s（预训练权重加载后）
+```
+
+- tokenizer: 10/10 passed（新增 2 个 pretrained 测试）
+- transformer: 9/10 passed（1 个 HF Hub 在线测试 skipped）
+- predictor: 16/16 passed
+- signal_generator: 自测通过（中位数聚合 + 断言验证）
+
+### 数据适配验证 — 贵州茅台 (600519)
+
+```
+股票: 600519
+数据条数: 297
+时间范围: 2001-08 → 2026-05
+字段: open/high/low/close/volume/amount (DatetimeIndex)
+```
+
+### Phase 2：数据适配层（2026-05-25）
+
+- `load_monthly_klines(code, db_path)` — SQLite → DataFrame
+- 字段映射：同名直通（open/high/low/close/volume/amount），amount null → 0
+- 日期解析：月线 "YYYY-MM" → 补 "-01" → pandas datetime
+- DataFrame index = DatetimeIndex（predictor 用 `df.index <= x_ts` 做时间过滤）
+- 600519 验证：297 条，2001-08 → 2026-05，零空值
+- 诊断输出走 stderr，避免污染 stdout JSON
+
+### Phase 3：预测信号化（2026-05-25）
+
+- `generate_signal(predictions: list[pd.DataFrame], threshold=2.0) -> dict`
+- 纯统计聚合，不依赖 predictor；上层 orchestrator 负责采样循环
+- **中位数聚合**（抗 outlier）：predicted_change_pct / high / low / close 用中位数
+- 方向判定也用中位数（\|median\| < 2% → flat）
+- 置信度：与最终判定方向一致的采样占比
+- 波动率：各采样涨跌幅的 std
+- 方向阈值：|median_change_pct| < 2% → flat
+
+### Phase 4：CLI 与 Node.js 集成（2026-05-25）
+
+- `orchestrator.run_analysis()` — 串联 data_adapter → N×predictor → signal_generator
+- `cli_predict.py` — 本地离线 CLI，支持 --json / --n-samples / --T / --temperature / --top-k
+- Node.js CLI `ema analyze <code>` — 技术指标 + Kronos AI + 综合研判
+- 默认 x_ts = 倒数第二月（避免数据边界崩溃，最后一月可做 backtest 验证）
+- JSON 模式下自动抑制非 JSON stdout（通过 os.devnull 重定向）
+
+### 模型检测结果（2026-05-25）
+
+#### 权重下载
+- Tokenizer: NeoQuasar/Kronos-Tokenizer-base → `kronos/weights/tokenizer/`
+- Model: NeoQuasar/Kronos-base → `kronos/weights/model/`
+- 配置: s1_bits=10, s2_bits=10, d_model=832, n_layers=12, n_heads=16
+
+#### 发现的坑 & 修复
+
+1. **参数命名混乱**：`T=256`（上下文长度）和 `temperature=0.6`（采样温度）混在一起
+   - 修复：`T` → `context_len`，CLI 参数 `--T` → `--context-len`
+   - 四文件同步：predictor.py / orchestrator.py / cli_predict.py / test_predictor.py
+
+2. **当月数据不完整**：5 月 25 日跑预测，5 月月线还是 partial month bar
+   - 修复：x_ts 自动推断时判断当月是否完整（`now.day < 28` 则为不完整），不完整则取上月
+
+3. **600519 在特定窗口崩溃**（待深入排查）：x_ts=最新月时，仅 600519 产生极端值（open=-1144），其他股票正常
+   - 推测根因：特定 200 月窗口的 z-score 归一化参数导致 encode 值超出 tokenizer 训练分布
+   - 当前缓解：上月策略 + 中位数聚合，但不该依赖这两种手段
+   - 真正需要查：BSQ decoder 对分布外 token 组合的响应，或反归一化的数值稳定性
+
+4. **温度过高**：temperature=1.0 时 std=38%，单次采样不可靠
+   - 修复：默认 temperature=0.6, top_k=30, top_p=0.85 → std 降至 ~12%
+
+5. **负价格 decode**：偶发 s1/s2 token 组合 decode 出负 OHLCV 值
+   - 保险措施：predictor 反归一化后 clamp(O/H/L/C ≥ 0.01, V/A ≥ 0)
+   - 这不该是主要手段——根因在上一条（BSQ decoder 鲁棒性）
+
+6. **stdout 污染 JSON**：data_adapter 和 from_pretrained 向 stdout 打印日志
+   - 修复：data_adapter 走 stderr，JSON 模式用 os.devnull 隔离中间输出
+
+7. **timestamps 列 vs Index**：predictor 用 `df.index <= x_ts` 过滤，但 data_adapter 返回 RangeIndex
+   - 修复：data_adapter 设 DatetimeIndex
+
+#### 实测性能
+
+| 股票 | 技术信号 | AI 预测 | 置信度 | 综合研判 |
+|------|---------|---------|--------|---------|
+| 600519 茅台 | 空头排列+MACD死叉 | -13.9% | 80% | 共振看空 |
+| 000001 平安银行 | 空头排列+KDJ死叉 | +1.83% | 13% | AI震荡/技术偏空 |
+| 600036 招商银行 | 均线交织 | -17.23% | 90% | AI看空 |
+
+#### 默认参数
+
+| 参数 | 默认值 | 类别 |
+|------|--------|------|
+| `context_len` | 256 | 上下文窗口（历史 K 线条数） |
+| `temperature` | 0.6 | 采样温度 |
+| `top_k` | 30 | top-k 过滤 |
+| `top_p` | 0.85 | nucleus 采样 |
+| `n_samples` | 30 | 独立采样次数 |
+| `pred_len` | 3 | 预测月数 |
+
+### 关键设计决策
+
+1. **不 clone 仓库，手写复现**：参照原 repo (shiyu-coder/Kronos) 源码，所有 `__init__` 签名与原 repo 完全一致，保证 `from_pretrained()` 兼容
+2. **独立 venv 隔离**：`kronos/venv/` (Python 3.13.11, torch 2.11.0+cu128)，不影响项目 `.venv`
+3. **字段映射**：SQLite 月线表字段名与 Kronos 需求完全一致（open/high/low/close/volume/amount），映射无需转换
+4. **DatetimeIndex**：DataFrame index = 月线日期，predictor 用 `df.index <= x_ts` 做时间过滤
+5. **中位数聚合**：signal_generator 用中位数替代均值，抗单次采样 outlier。方向判定也用中位数
+6. **最后完整月**：x_ts 默认取最后完整月（当月未结束则排除 partial month），不盲目用倒数第二月
+7. **context_len 命名**：上下文窗口长度用 `context_len`（不缩写为 T），与 `temperature`/`top_k` 明确区分
+8. **amount 容错**：null → 填 0，确保所有股票兼容
+
+### 待完成
+
+- [x] `python -m kronos.download_weights` 下载 HuggingFace 预训练权重
+- [x] 预训练权重测试通过（36/37，1个HF在线测试跳过）
+- [x] 端到端推理验证（600519/000001/600036 均通过）
+- [x] Node.js CLI `ema analyze` 集成完成
+- [ ] 与现有 32d LightGBM 信号做相关性分析
+- [ ] 信号融合层设计
+- [ ] 批量跑全部 A 股的 Kronos 预测，建缓存
+
 ### 项目级结论
 
 **日线 LSTM IC=0.141 是唯一经过严格验证的信号。月线 LightGBM IC=0.063 天花板已确认。**
 更多特征/频率/模型架构/数据源均无法突破当前 IC 天花板。
-建议: Phase 23 Chrome 扩展产品化 + Paper Trading。
+建议: Phase 23 Chrome 扩展产品化 + Paper Trading + Kronos 信号线补充。
 

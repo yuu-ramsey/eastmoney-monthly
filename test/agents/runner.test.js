@@ -405,3 +405,42 @@ test('checkpoint: closed bar close 变了 → 指纹不匹配 → 丢弃 checkpo
   assert.notEqual(result.partials.bull.text, 'bull checkpoint 缓存', 'bull 不应复用旧 checkpoint');
   assert.ok(result.judge);
 });
+
+// ---- #3: failed Agent 不被复用 ----
+
+test('checkpoint: 预置 bull 成功 + bear 持久化错误 → bull 复用，bear 重新调用', async () => {
+  storageMap.clear();
+  // 预设 checkpoint：bull 成功（partials），bear 失败（errors，不在 partials 中）
+  const ck = {
+    v: 1,
+    ts: Date.now(),
+    fp: VALID_FP,
+    partials: { bull: makePartial('bull') },
+    errors: { bear: 'LLM timeout' },
+  };
+  storageMap.set(CK_KEY, ck);
+
+  let callCount = 0;
+  globalThis.fetch = () => {
+    callCount++;
+    return Promise.resolve({
+      status: 200, ok: true,
+      json: () => Promise.resolve({
+        content: [{ type: 'text', text: `call ${callCount}` }],
+        usage: { input_tokens: 100, output_tokens: 50 },
+      }),
+      text: () => Promise.resolve('{}'),
+    });
+  };
+
+  const opts = { ...sampleOpts, checkpointKey: CK_KEY };
+  const result = await runDebate(sampleCtx, opts);
+
+  // bull 复用 checkpoint，bear + predictor + judge 调 LLM → 3 次 fetch
+  assert.equal(callCount, 3, 'bull 复用 checkpoint → bear+predictor+judge = 3 次 fetch');
+  assert.equal(result.partials.bull.text, 'bull checkpoint 缓存', 'bull 应来自 checkpoint');
+  assert.ok(result.partials.bear, 'bear 应被重新调用（非跳过）');
+  assert.notEqual(result.partials.bear.text, 'bear checkpoint 缓存', 'bear 不应复用 error 缓存');
+  assert.ok(result.partials.predictor);
+  assert.ok(result.judge);
+});

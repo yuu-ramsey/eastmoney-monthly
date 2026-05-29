@@ -321,43 +321,45 @@ async function handleAnalyze(pageUrl, opts = {}) {
       // Native host 不可用时静默降级
     }
 
-    // 尝试获取 MC Dropout 不确定性数据（通过 Native Messaging 读预计算 JSON）
+    // LSTM 信号注入开关（默认 OFF — 训练数据存在时间窗泄漏，参见 docs/p1-lstm-leak-check.md）
+    const ENABLE_LSTM_SIGNAL = false;
+
     let lstmSignalData = null;
-    try {
-      const mcResp = await chrome.runtime.sendNativeMessage(NATIVE_HOST, {
-        type: 'read',
-        key: `mc_dropout/${code}`,
-      });
-      if (mcResp && mcResp.type === 'read_result' && mcResp.data) {
-        const d = mcResp.data;
-        const ulevel = d.uncertainty_level || 'medium';
-        // MC Dropout 不确定性过滤：high 不确定性股票的 LSTM 信号不可靠，不注入 prompt
-        // （全量 eval 验证：high 不确定性 LLM 均分=0.00，low+medium 均分=0.28）
-        if (ulevel === 'high') {
-          console.log(`[analyze] MC Dropout high uncertainty for ${code}, 跳过 LSTM 信号`);
-          lstmSignalData = null;
-        } else {
-          lstmSignalData = {
-            lstm_signal: d.signal,
-            lstm_signal_raw: d.signal_raw,
-            y3_mean: d.y3_mean,
-            y3_std: d.y3_std,
-            y6_mean: d.y6_mean,
-            y6_std: d.y6_std,
-            overall_confidence: d.overall_confidence,
-            uncertainty_level: ulevel,
-            uncertainty_emoji: { low: '🟢', medium: '🟡', high: '🔴' }[ulevel] || '🟡',
-            uncertainty_desc: {
-              low: '模型预测一致性强，信号可信度较高',
-              medium: '模型预测存在分歧，信号需结合技术面验证',
-              high: '模型预测分歧大，信号不可靠，以技术分析为主',
-            }[ulevel] || '',
-            mc_samples: 50,
-          };
+    if (ENABLE_LSTM_SIGNAL) {
+      try {
+        const mcResp = await chrome.runtime.sendNativeMessage(NATIVE_HOST, {
+          type: 'read',
+          key: `mc_dropout/${code}`,
+        });
+        if (mcResp && mcResp.type === 'read_result' && mcResp.data) {
+          const d = mcResp.data;
+          const ulevel = d.uncertainty_level || 'medium';
+          if (ulevel === 'high') {
+            console.log(`[analyze] MC Dropout high uncertainty for ${code}, 跳过 LSTM 信号`);
+            lstmSignalData = null;
+          } else {
+            lstmSignalData = {
+              lstm_signal: d.signal,
+              lstm_signal_raw: d.signal_raw,
+              y3_mean: d.y3_mean,
+              y3_std: d.y3_std,
+              y6_mean: d.y6_mean,
+              y6_std: d.y6_std,
+              overall_confidence: d.overall_confidence,
+              uncertainty_level: ulevel,
+              uncertainty_emoji: { low: '🟢', medium: '🟡', high: '🔴' }[ulevel] || '🟡',
+              uncertainty_desc: {
+                low: '模型预测一致性强，信号可信度较高',
+                medium: '模型预测存在分歧，信号需结合技术面验证',
+                high: '模型预测分歧大，信号不可靠，以技术分析为主',
+              }[ulevel] || '',
+              mc_samples: 50,
+            };
+          }
         }
+      } catch (_) {
+        // Native host 不可用或数据未预计算时静默降级
       }
-    } catch (_) {
-      // Native host 不可用或数据未预计算时静默降级
     }
 
     prompt = await buildPromptByTemplate({ templateKey: settings.template, name: eastmoney.name, code, market, klines: klinesWithMA, period, provider: settings.provider, extraContext, decisionMode, indexData: hs300IndexData, sectorAlphaData, lstmSignalData });

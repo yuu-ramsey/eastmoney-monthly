@@ -20,6 +20,28 @@
 - 运行时代码通过 Native Messaging 访问 DB（见 `background.js` 中的 `sendNativeMessage`）
 - 如需新增运行时模块引用，先确认它不（传递）依赖 Node 原生模块
 
+### 辩论 checkpoint 续跑（2026-05-29 确立）
+
+辩论模式中 Bull/Bear/Predictor 三个 Agent 并发调用 LLM，单个 Agent 的 token
+成本约 0.01-0.05 USD。若 Service Worker 在辩论中途被 Chrome 终止，已完成
+Agent 的结果会丢失，用户重试时需从头跑全部三个 Agent，重复消耗 token。
+
+**checkpoint 机制**:
+- Key: `debate-wip:<market>.<code>:<period>:<bucket>:<style>:<decision>`
+  — 复用最终缓存 key 的同一身份标识
+- 输入指纹: djb2 hash of `code|period|klinesTail` — 输入数据变了就丢弃旧
+  checkpoint 重跑
+- 逐个落盘: 每个 Agent 一旦 fulfilled 立即通过串行写链合并写入
+  chrome.storage.local（读-改-写无竞态）
+- 续跑: `runDebate` 入口先读 checkpoint，指纹匹配且 partial 存在则
+  复用（Promise.resolve），不调 LLM
+- 收尾: 最终分析写入 `analysis:*` 缓存后，`clearDebateCheckpoint()` 清理
+- P0 边界: 仅保证重试续跑，不建 alarm 看门狗（P1）。Agent prompt / LLM
+  provider / score-fusion / 结构化输出解析均未修改
+
+**相关文件**: `lib/agents/runner.js`、`background.js:274-280,504-507`
+**测试**: `test/agents/runner.test.js` — 4 个 checkpoint 专项测试
+
 ## LLM Prompt 工程边际收益（2026-05-18 认知更新）
 
 | 阶段 | 方法 | score Δ | 累计变化 | 评级 |

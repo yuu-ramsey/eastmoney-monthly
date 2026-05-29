@@ -11,10 +11,13 @@ import { computeMACD } from './lib/compute-macd.js';
 import { buildPrompt, buildPromptByTemplate, buildMultiPeriodPrompt } from './lib/build-prompt.js';
 import { getProvider } from './lib/llm/index.js';
 import { estimateCost } from './lib/llm/pricing.js';
-import { runDebate } from './lib/agents/runner.js';
+import { runDebate, clearDebateCheckpoint } from './lib/agents/runner.js';
 import { extractStructuredOutput } from './lib/parse-structured-output.js';
 import { checkCrossLevelConsistency } from './lib/cross-level-check.js';
 import { HISTORY_KEY, MAX_HISTORY_ITEMS, MAX_HISTORY_BYTES, generateHistoryId, trimHistory, historyToMarkdown, formatHistoryDate } from './lib/history.js';
+import { getFinancialsTool } from './lib/tools/get-financials.js';
+import { getMoneyFlowTool } from './lib/tools/get-money-flow.js';
+import { runHistoricalAnalysis, calculateActualReturn, buildSelfCalibrationBlock, getBacktestCache, setBacktestCache, backtestCacheKey } from './lib/self-backtest.js';
 
 const EASTMONEY_KLINE_ENDPOINT = 'https://push2his.eastmoney.com/api/qt/stock/kline/get';
 
@@ -64,9 +67,9 @@ migrateSettings().catch(() => {});
 
 // ---- 消息路由 ----
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === 'ANALYZE') {
-    handleAnalyze(msg.url, { force: !!msg.force, pageEvents: msg.pageEvents })
+    handleAnalyze(msg.url, { force: !!msg.force, pageEvents: msg.pageEvents, tabId: sender?.tab?.id })
       .then((result) => sendResponse({ ok: true, ...result }))
       .catch((err) => sendResponse({ ok: false, error: err.message || String(err) }));
     return true;
@@ -114,6 +117,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
 async function handleAnalyze(pageUrl, opts = {}) {
   const force = !!opts.force;
+  const tabId = opts.tabId || null;
+  const startTime = Date.now();
 
   const parsed = parseStockUrl(pageUrl);
   if (!parsed) throw new Error(ERR.PARSE_URL);
@@ -189,6 +194,62 @@ async function handleAnalyze(pageUrl, opts = {}) {
   const model = settings.model || provider.defaultModel;
   const extraContext = { events: pageEvents };
 
+  // ---- 自我回测（仅 single 模式，数据 ≥36 根） ----
+  if (settings.enableSelfBacktest && mode === 'single' && klines.length >= 36) {
+    try {
+      const cutoffIndexes = klines.length >= 48
+        ? [klines.length - 24, klines.length - 12]
+        : [klines.length - 12];
+
+      console.log(`[backtest] 开始自我回测，cutoff=${cutoffIndexes.join(',')}，K线=${klines.length}根`);
+
+      const backtestResults = [];
+      for (const cutoff of cutoffIndexes) {
+        try {
+          // 先查缓存（仅缓存 LLM 判断，actual return 实时计算）
+          const cacheKey = backtestCacheKey(code, settings.template, cutoff, settings.provider);
+          const cached = await getBacktestCache(chrome.storage.local, cacheKey);
+
+          let judgmentResult;
+          if (cached) {
+            console.log(`[backtest] cutoff=${cutoff} 命中缓存`);
+            judgmentResult = cached;
+          } else {
+            console.log(`[backtest] cutoff=${cutoff} 调 LLM...`);
+            judgmentResult = await runHistoricalAnalysis(
+              klinesWithMA, cutoff, settings.template,
+              settings.provider,
+              { ...settings, name: eastmoney.name, code, apiKey: settings.apiKey },
+            );
+            await setBacktestCache(chrome.storage.local, cacheKey, { date: judgmentResult.date, judgment: judgmentResult.judgment, keyLevels: judgmentResult.keyLevels });
+          }
+
+          // 计算实际涨跌（不缓存，随价格实时变化）
+          const actualReturn = calculateActualReturn(
+            klinesWithMA, cutoff, klinesWithMA.length - 1,
+            hs300IndexData ? hs300IndexData.klines : null,
+          );
+
+          backtestResults.push({
+            date: judgmentResult.date,
+            judgment: judgmentResult.judgment,
+            keyLevels: judgmentResult.keyLevels,
+            actualReturn,
+          });
+        } catch (err) {
+          console.warn(`[backtest] cutoff=${cutoff} 失败，跳过：`, err.message);
+        }
+      }
+
+      if (backtestResults.length > 0) {
+        extraContext.backtestBlock = buildSelfCalibrationBlock(backtestResults);
+        console.log(`[backtest] 生成校准段，${backtestResults.length} 个时点`);
+      }
+    } catch (err) {
+      console.warn('[backtest] 回测流程失败，跳过：', err.message);
+    }
+  }
+
   console.log(`[analyze] ${settings.provider}/${model} K线尾3行:`,
     klinesWithMA.slice(-3).map((k) => `${k.date} O=${k.open} H=${k.high} L=${k.low} C=${k.close}`));
   console.log(`[analyze] ${settings.provider}/${model} mode=${mode} K线:${klinesWithMA.length}根`);
@@ -210,11 +271,13 @@ async function handleAnalyze(pageUrl, opts = {}) {
       extraContext,
       decisionMode,
     };
+    const checkpointKey = `debate-wip:${market}.${code}:${period}:${bucket}:${style}:${decision}`;
     debateResult = await runDebate(debateCtx, {
       provider: settings.provider,
       apiKey: settings.apiKey,
       model,
       maxTokens: DEFAULT_MAX_TOKENS,
+      checkpointKey,
     });
     // 渲染：Judge 主输出 > 三段拼接退路
     if (debateResult.judge) {
@@ -242,17 +305,143 @@ async function handleAnalyze(pageUrl, opts = {}) {
     }
   } else {
     // 单次分析路径
-    prompt = buildPromptByTemplate({ templateKey: settings.template, name: eastmoney.name, code, klines: klinesWithMA, period, provider: settings.provider, extraContext, decisionMode, indexData: hs300IndexData });
+    // 尝试获取行业 alpha（通过 Native Messaging 查询 SQLite）
+    let sectorAlphaData = null;
+    try {
+      const alphaResp = await chrome.runtime.sendNativeMessage(NATIVE_HOST, {
+        type: 'query_sector_alpha',
+        code,
+        period,
+        lookback: 12,
+      });
+      if (alphaResp && alphaResp.type === 'sector_alpha' && alphaResp.data) {
+        sectorAlphaData = alphaResp.data;
+      }
+    } catch (_) {
+      // Native host 不可用时静默降级
+    }
+
+    // 尝试获取 MC Dropout 不确定性数据（通过 Native Messaging 读预计算 JSON）
+    let lstmSignalData = null;
+    try {
+      const mcResp = await chrome.runtime.sendNativeMessage(NATIVE_HOST, {
+        type: 'read',
+        key: `mc_dropout/${code}`,
+      });
+      if (mcResp && mcResp.type === 'read_result' && mcResp.data) {
+        const d = mcResp.data;
+        const ulevel = d.uncertainty_level || 'medium';
+        // MC Dropout 不确定性过滤：high 不确定性股票的 LSTM 信号不可靠，不注入 prompt
+        // （全量 eval 验证：high 不确定性 LLM 均分=0.00，low+medium 均分=0.28）
+        if (ulevel === 'high') {
+          console.log(`[analyze] MC Dropout high uncertainty for ${code}, 跳过 LSTM 信号`);
+          lstmSignalData = null;
+        } else {
+          lstmSignalData = {
+            lstm_signal: d.signal,
+            lstm_signal_raw: d.signal_raw,
+            y3_mean: d.y3_mean,
+            y3_std: d.y3_std,
+            y6_mean: d.y6_mean,
+            y6_std: d.y6_std,
+            overall_confidence: d.overall_confidence,
+            uncertainty_level: ulevel,
+            uncertainty_emoji: { low: '🟢', medium: '🟡', high: '🔴' }[ulevel] || '🟡',
+            uncertainty_desc: {
+              low: '模型预测一致性强，信号可信度较高',
+              medium: '模型预测存在分歧，信号需结合技术面验证',
+              high: '模型预测分歧大，信号不可靠，以技术分析为主',
+            }[ulevel] || '',
+            mc_samples: 50,
+          };
+        }
+      }
+    } catch (_) {
+      // Native host 不可用或数据未预计算时静默降级
+    }
+
+    prompt = await buildPromptByTemplate({ templateKey: settings.template, name: eastmoney.name, code, market, klines: klinesWithMA, period, provider: settings.provider, extraContext, decisionMode, indexData: hs300IndexData, sectorAlphaData, lstmSignalData });
     console.log(`[analyze] ${settings.provider}/${model} prompt长度:${prompt.length}`);
 
-    const result = await provider.call(prompt, {
-      model,
-      apiKey: settings.apiKey,
-      maxTokens: DEFAULT_MAX_TOKENS,
-    });
+    // 仅 Anthropic provider 启用 tool_use
+    const tools = settings.provider === 'anthropic'
+      ? [getFinancialsTool, getMoneyFlowTool]
+      : undefined;
+
+    // 流式进度 + 工具调用跟踪
+    const toolCalls = [];
+    let toolCallSeq = 0;
+    const onProgress = tabId ? (event) => {
+      if (event.type === 'tool_start') {
+        const seq = ++toolCallSeq;
+        toolCalls.push({ seq, name: event.name, input: event.input, result: null, startMs: Date.now() });
+      } else if (event.type === 'tool_result') {
+        // 从后往前找同名且未填充的，避免同名混淆
+        for (let i = toolCalls.length - 1; i >= 0; i--) {
+          if (toolCalls[i].name === event.name && toolCalls[i].result === null) {
+            toolCalls[i].result = event.result;
+            toolCalls[i].durationMs = Date.now() - toolCalls[i].startMs;
+            break;
+          }
+        }
+      }
+      try {
+        chrome.tabs.sendMessage(tabId, { type: 'STREAM_PROGRESS', event });
+      } catch (_) { /* tab 可能已关闭 */ }
+    } : undefined;
+
+    // 流式期间用 alarm 保持 SW 唤醒
+    let alarmName = null;
+    if (tabId) {
+      alarmName = `stream_${Date.now()}`;
+      chrome.alarms.create(alarmName, { periodInMinutes: 0.5 });
+    }
+
+    let result;
+    try {
+      result = await provider.call(prompt, {
+        model,
+        apiKey: settings.apiKey,
+        maxTokens: DEFAULT_MAX_TOKENS,
+        tools,
+        onProgress,
+        enableThinking: settings.enableThinking,
+      });
+    } finally {
+      // 无论成功/失败，清理 alarm + 通知 content
+      if (alarmName) {
+        try { chrome.alarms.clear(alarmName); } catch (_) { /* ignore */ }
+        try { chrome.tabs.sendMessage(tabId, { type: 'STREAM_PROGRESS', event: { type: 'done' } }); } catch (_) { /* ignore */ }
+      }
+    }
+
     analysis = result.text;
     usage = result.usage || null;
     cost = result.usage ? estimateCost(settings.provider, model, result.usage) : 0;
+
+    // 调试日志（仅当开关开启）
+    if (settings.enableDebugLog) {
+      try {
+        const debugRecord = {
+          timestamp: Date.now(),
+          code, name: eastmoney.name,
+          template: settings.template, provider: settings.provider, model,
+          settings: {
+            enableSelfBacktest: settings.enableSelfBacktest,
+            enableThinking: settings.enableThinking,
+            period: settings.period,
+            decisionMode: settings.decisionMode,
+          },
+          fullPrompt: prompt,
+          toolCalls,
+          rawResponse: analysis,
+          usage: result.usage || { inputTokens: 0, outputTokens: 0 },
+          cost: { cny: cost },
+          durationMs: Date.now() - startTime,
+        };
+        await chrome.storage.local.set({ 'debug:lastAnalysis': debugRecord });
+      } catch (_) { /* ignore */ }
+    }
 
     if (result.usage) {
       await accumulateUsage(settings.provider, model, result.usage, cost);
@@ -312,6 +501,11 @@ async function handleAnalyze(pageUrl, opts = {}) {
     ...(crossLevelWarnings.length > 0 && { crossLevelWarnings }),
   };
   await chrome.storage.local.set({ [key]: record });
+
+  // 辩论 checkpoint 清理：正式缓存已写入，不再需要续跑数据
+  if (debateMode) {
+    try { await clearDebateCheckpoint(`debate-wip:${market}.${code}:${period}:${bucket}:${style}:${decision}`); } catch (_) { /* ignore */ }
+  }
 
   // 写入分析历史（不含 conversationHistory，后续由 content.js 补充）
   await saveToHistory({
@@ -538,11 +732,7 @@ async function handleMultiPeriod({ market, code, settings, style, decisionMode, 
   const bucket = timeBucket(latestDate, 'daily');
   const key = cacheKey(market, code, 'multi', bucket, style, 'single', decision);
 
-  // 命中缓存
-  if (!true) { // multi 模式暂不缓存（prompt 体积大，缓存价值低）
-    const stored = (await chrome.storage.local.get([key]))[key];
-    if (stored?.analysis) return { ...stored, cached: true };
-  }
+  // multi 模式暂不缓存（prompt 体积大，缓存价值低）
 
   if (!settings.apiKey) throw new Error(ERR.NO_KEY);
 
@@ -635,6 +825,7 @@ async function loadSettings() {
     'analysisDepth', 'template',
     'apiKey:anthropic', 'apiKey:deepseek',
     'model:anthropic', 'model:deepseek',
+    'enableSelfBacktest', 'enableThinking', 'enableDebugLog',
   ]);
 
   const provider = allItems.provider || 'anthropic';
@@ -659,6 +850,9 @@ async function loadSettings() {
     period: allItems.period || 'monthly',
     debateMode: allItems.debateMode || false,
     decisionMode: allItems.decisionMode || false,
+    enableSelfBacktest: allItems.enableSelfBacktest !== undefined ? !!allItems.enableSelfBacktest : true,
+    enableThinking: !!allItems.enableThinking,
+    enableDebugLog: !!allItems.enableDebugLog,
   };
 }
 
@@ -747,4 +941,59 @@ async function handleExportHistory(id) {
   const md = list.map(historyToMarkdown).join('\n\n---\n\n');
   return { markdown: md, filename: `分析历史_${formatHistoryDate(Date.now())}.md`, count: list.length };
 }
+
+// ---- Native Messaging 自动同步到 Node 端 ----
+
+const NATIVE_HOST = 'com.eastmoney_ai.sync';
+
+// 不同步的敏感 key 前缀
+const SYNC_SKIP_PREFIXES = [
+  'apiKey:',
+  'model:',
+  'migrated:',
+];
+
+function shouldSyncKey(key) {
+  return !SYNC_SKIP_PREFIXES.some((prefix) => key.startsWith(prefix));
+}
+
+// 防抖：同一 key 的变更累积，500ms 后批量发送
+const syncQueue = new Map();
+let syncTimer = null;
+
+function enqueueSync(key, newValue) {
+  if (!shouldSyncKey(key)) return;
+  syncQueue.set(key, newValue);
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(flushSync, 500);
+}
+
+async function flushSync() {
+  const items = {};
+  for (const [k, v] of syncQueue) {
+    items[k] = v;
+  }
+  syncQueue.clear();
+  syncTimer = null;
+
+  try {
+    await chrome.runtime.sendNativeMessage(NATIVE_HOST, {
+      type: 'sync_batch',
+      items,
+    });
+  } catch (_) {
+    // Native host 未安装或启动失败，静默忽略
+    // 数据仍在 chrome.storage.local 中，下次成功同步时会补上
+  }
+}
+
+// 监听 storage 变化（content.js / popup.js 写入时触发自动同步）
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== 'local') return;
+  for (const [key, change] of Object.entries(changes)) {
+    if (change.newValue !== undefined && shouldSyncKey(key)) {
+      enqueueSync(key, change.newValue);
+    }
+  }
+});
 

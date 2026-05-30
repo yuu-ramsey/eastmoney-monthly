@@ -57,6 +57,10 @@ for code in codes:
         pulled += 1
         if pulled % 500 == 0: print(f"  {pulled}/{len(codes)}...")
 print(f"Pulled {pulled} new, cache size: {len(cache)}")
+# Save klines cache for later baseline computation
+with open('data/baostock-klines-cache.json', 'w') as f:
+    json.dump(cache, f, ensure_ascii=False)
+print("Klines cache saved to data/baostock-klines-cache.json")
 
 # Build pool
 results = {'perTimepoint': {}, 'testPoints': []}

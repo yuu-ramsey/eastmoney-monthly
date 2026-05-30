@@ -1,4 +1,4 @@
-// Phase C v2: LLM eval on Baostock lowpos pool
+// Phase C v2: LLM eval on Baostock lowpos pool (with real kline data)
 import { readFileSync, appendFileSync, existsSync, mkdirSync } from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'node:url';
@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_DIR = path.resolve(__dirname, '..');
 const ds = JSON.parse(readFileSync(path.join(PROJECT_DIR, 'data', 'frozen-eval-lowpos-v2-baostock.json'), 'utf-8'));
+const kcache = JSON.parse(readFileSync(path.join(PROJECT_DIR, 'data', 'baostock-klines-cache.json'), 'utf-8'));
 const TRAIN = new Set(['2018-06','2018-12','2019-06','2020-09','2021-06','2022-06']);
 const uniquePairs = new Map();
 for (const tp of ds.testPoints) { if (tp.alpha == null) continue; const k = `${tp.stockCode}|${tp.cutoffDate}`; if (!uniquePairs.has(k)) uniquePairs.set(k, tp); }
@@ -25,6 +26,26 @@ const pending = pairs.filter(p => !completed.has(`${p.stockCode}|${p.cutoffDate}
 console.log(`Pending: ${pending.length}`);
 if (pending.length === 0) { console.log('All done.'); process.exit(0); }
 
+function getKlines(code, cutoffDate) {
+  const fullKey = Object.keys(kcache).find(k=>k.endsWith('.'+code));
+  const kl = kcache[code]||(fullKey?kcache[fullKey]:null);
+  if(!kl||kl.length<60) return null;
+  const ci=kl.findIndex(r=>r[0]===cutoffDate); if(ci<0) return null;
+  // Last 12 months of data up to cutoff
+  const rows=[];
+  for(let i=Math.max(0,ci-12); i<=ci; i++){
+    const close=kl[i][1].toFixed(2);
+    rows.push(kl[i][0]+' '+close);
+  }
+  return 'Date Close\n'+rows.join('\n');
+}
+
+function buildPrompt(tp) {
+  const kl=getKlines(tp.stockCode, tp.cutoffDate);
+  if(!kl) return null;
+  return '你是A股技术分析师。以下是'+tp.stockCode+'近12+个月月线(前复权):\n'+kl+'\n该股处于低位——过去12月底部20%且<MA60。判断未来6个月方向。\n\n输出JSON:\n```json\n{"signal":"strong_bull|bull|neutral|bear|strong_bear"}\n```\nsignal必五选一。';
+}
+
 async function callLLM(prompt) {
   const resp = await fetch('https://api.deepseek.com/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY}` }, body: JSON.stringify({ model: 'deepseek-chat', messages: [{ role: 'user', content: prompt }], max_tokens: 4000, temperature: 0.0 }) });
   if (!resp.ok) { const e = await resp.text().catch(()=>''); throw new Error(`HTTP ${resp.status}: ${e.slice(0,200)}`); }
@@ -37,7 +58,8 @@ let ok=completed.size, fail=0, totalCost=0; const start=Date.now();
 for (let i=0;i<pending.length;i+=2) {
   const batch=pending.slice(i,i+2);
   const results=await Promise.allSettled(batch.map(async tp=>{
-    const prompt=`你是A股技术分析师。${tp.stockCode}处于低位——过去12月底部20%且低于MA60。判断未来6个月方向。输出JSON:{\"signal\":\"strong_bull|bull|neutral|bear|strong_bear\"}`;
+    const prompt=buildPrompt(tp);
+    if(!prompt) return {stockCode:tp.stockCode,cutoffDate:tp.cutoffDate,signal:'no_kline_data',alpha:tp.alpha,cost:0};
     const {text,usage}=await retry(prompt);
     return {stockCode:tp.stockCode,cutoffDate:tp.cutoffDate,signal:parseSignal(text),alpha:tp.alpha,cost:usage.inputTokens/1e6*1+usage.outputTokens/1e6*4};
   }));

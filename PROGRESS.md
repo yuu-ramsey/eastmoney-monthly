@@ -1177,3 +1177,21 @@ Node.js CLI: ema analyze <code>
 更多特征/频率/模型架构/数据源均无法突破当前 IC 天花板。
 建议: Phase 23 Chrome 扩展产品化 + Paper Trading + Kronos 信号线补充。
 
+---
+
+## P3 信号门控最终结论（2026-05-30）
+
+统一基准池: 24tp Baostock 无偏池 (3190 pairs), 同口径量。
+
+| 信号 | Test spread | Test CI | Decay | 判读 |
+|------|-----------|---------|-------|------|
+| **Kronos** | +9.7% | **[+5.1,+15.3]** | 0.80 | **✓ 唯一通过, 已接 runtime** |
+| Reversal | -19.2% | [-24.5,-14.4] | 1.78 | ✗ 显著为负, 待撤出 runtime |
+| Momentum | -9.8% | [-15.5,-4.4] | 1.14 | ✗ |
+| LSTM/GRU/LGB | — | CI 均含 0 | 负/NaN | ✗ |
+
+关键发现: 反转 +6.6% 来自 12tp 池, 扩到 24tp 翻负至 -19.2%。Kronos 唯一 test CI 排除 0 + decay 健康 + r(LLM)=0.069。A/B 测试 Kronos 4/4 分歧票改变 LLM 方向。
+
+Runtime: Kronos=ON, 反转=ON(需撤), LSTM=OFF。
+
+

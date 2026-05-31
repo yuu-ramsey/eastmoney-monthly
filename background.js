@@ -321,6 +321,20 @@ async function handleAnalyze(pageUrl, opts = {}) {
       // Native host 不可用时静默降级
     }
 
+    // Kronos 信号注入（默认 ON — hold-out 验证通过，参见 docs/p3-kronos-confirm.md）
+    const ENABLE_KRONOS_SIGNAL = true;
+    let kronosSignalData = null;
+    if (ENABLE_KRONOS_SIGNAL) {
+      try {
+        const krResp = await chrome.runtime.sendNativeMessage(NATIVE_HOST, {
+          type: 'read', key: `kronos/${code}`,
+        });
+        if (krResp && krResp.type === 'read_result' && krResp.data) {
+          kronosSignalData = { prediction_6m_pct: krResp.data.prediction_6m_pct, direction: krResp.data.direction };
+        }
+      } catch (_) { /* 降级 */ }
+    }
+
     // LSTM 信号注入开关（默认 OFF — 训练数据存在时间窗泄漏，参见 docs/p1-lstm-leak-check.md）
     const ENABLE_LSTM_SIGNAL = false;
 
@@ -362,7 +376,7 @@ async function handleAnalyze(pageUrl, opts = {}) {
       }
     }
 
-    prompt = await buildPromptByTemplate({ templateKey: settings.template, name: eastmoney.name, code, market, klines: klinesWithMA, period, provider: settings.provider, extraContext, decisionMode, indexData: hs300IndexData, sectorAlphaData, lstmSignalData });
+    prompt = await buildPromptByTemplate({ templateKey: settings.template, name: eastmoney.name, code, market, klines: klinesWithMA, period, provider: settings.provider, extraContext, decisionMode, indexData: hs300IndexData, sectorAlphaData, lstmSignalData, kronosSignalData });
     console.log(`[analyze] ${settings.provider}/${model} prompt长度:${prompt.length}`);
 
     // 仅 Anthropic provider 启用 tool_use

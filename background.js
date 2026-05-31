@@ -335,6 +335,20 @@ async function handleAnalyze(pageUrl, opts = {}) {
       } catch (_) { /* 降级 */ }
     }
 
+    // 反转因子信号（默认 ON — hold-out 验证通过，参见 docs/p3-signal-gating.md）
+    const ENABLE_REVERSAL_SIGNAL = true;
+    let reversalSignalData = null;
+    if (ENABLE_REVERSAL_SIGNAL && klinesWithMA && klinesWithMA.length >= 60) {
+      const closes = klinesWithMA.map(k => k.close);
+      const n = klinesWithMA.length;
+      const ci = n - 1; // cutoff bar is the last bar
+      const rev1m = ci >= 1 ? (closes[ci] - closes[ci - 1]) / closes[ci - 1] : 0;
+      const rev3m = ci >= 3 ? (closes[ci] - closes[ci - 3]) / closes[ci - 3] : 0;
+      const ma60 = closes.slice(Math.max(0, ci - 60), ci + 1).reduce((a, b) => a + b, 0) / Math.min(60, ci + 1);
+      const ma60disc = (closes[ci] - ma60) / ma60;
+      reversalSignalData = { rev1m, rev3m, ma60disc, composite: rev1m + rev3m + ma60disc };
+    }
+
     // LSTM 信号注入开关（默认 OFF — 训练数据存在时间窗泄漏，参见 docs/p1-lstm-leak-check.md）
     const ENABLE_LSTM_SIGNAL = false;
 
@@ -376,7 +390,7 @@ async function handleAnalyze(pageUrl, opts = {}) {
       }
     }
 
-    prompt = await buildPromptByTemplate({ templateKey: settings.template, name: eastmoney.name, code, market, klines: klinesWithMA, period, provider: settings.provider, extraContext, decisionMode, indexData: hs300IndexData, sectorAlphaData, lstmSignalData, kronosSignalData });
+    prompt = await buildPromptByTemplate({ templateKey: settings.template, name: eastmoney.name, code, market, klines: klinesWithMA, period, provider: settings.provider, extraContext, decisionMode, indexData: hs300IndexData, sectorAlphaData, lstmSignalData, kronosSignalData, reversalSignalData });
     console.log(`[analyze] ${settings.provider}/${model} prompt长度:${prompt.length}`);
 
     // 仅 Anthropic provider 启用 tool_use

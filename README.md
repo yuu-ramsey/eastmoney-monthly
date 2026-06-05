@@ -16,7 +16,7 @@
 
 - 🚩 **[2026.06]** Regime-Adaptive MoE architecture designed (v2). Three-detector voting for regime detection, no single point of failure.
 - 🚩 **[2026.05]** Survivorship bias quantified at **8.4 percentage points** — rebuilt evaluation pool with Baostock (includes delisted stocks). All prior signal conclusions invalidated and re-evaluated.
-- 🚩 **[2026.05]** P0–P3 research cycle completed: 6 signal sources tested on 24-timepoint unbiased pool. Kronos is the only ML model that passed hold-out validation.
+- 🚩 **[2026.05]** P0–P3 research cycle completed: 12 signal sources tested on 24-timepoint unbiased pool. Kronos most reliable overall (+9.7%); momentum and LightGBM validated in bear-market regimes (+20.6%); LLM effective as interpreter with strong directional accuracy in extreme cases.
 - 🚩 **[2026.05]** Multi-agent debate system (Bull/Bear/Predictor/Judge) with checkpoint/resume for Chrome MV3 service worker lifecycle.
 - 🚩 **[2026.04]** Initial Chrome Extension (MV3) + Node.js CLI dual-entry system.
 
@@ -69,13 +69,13 @@ Validated on a 24-timepoint unbiased evaluation pool (3,100+ stock-timepoint pai
 
 | Signal | Type | Hold-out Test CI | Status |
 |--------|------|-----------------|--------|
-| Kronos | External Transformer | [+5.1, +15.3] | ✅ Validated |
-| LLM Analysis | LLM (Anthropic/DeepSeek) | Under re-evaluation | 🔄 Active (interpreter role) |
-| Reversal Factor | Statistical Factor | Per-regime validation pending | 🔄 Experimental |
-| Momentum Factor | Statistical Factor | Per-regime validation pending | 🔄 Experimental |
-| GRU (Triple-Barrier) | Own ML Model | Borderline | 🧪 Research |
-| LightGBM | Own ML Model | Regime-dependent | 🧪 Research |
-| LSTM (Daily) | Own ML Model | Training failed | ⏸️ Suspended |
+| Kronos | External Transformer | [+5.1, +15.3] | ✅ Most reliable ML signal — CI fully positive on 24tp |
+| Momentum Factor | Statistical Factor | +20.6% (bear) / −42.2% (bull) | ✅ Validated in bear markets — regime-dependent |
+| LightGBM | Own ML Model | +20.6% (bear) / −42.2% (bull) | ✅ Validated in bear markets — regime-dependent |
+| LLM Analysis | LLM (Anthropic/DeepSeek) | +1.6% CI includes 0 (70% neutral) | 🔄 Active interpreter — strong_bull hit rate +26% |
+| Reversal Factor | Statistical Factor | −19.2% on 24tp (flipped from +6.6%) | 🔄 Per-regime breakdown pending |
+| GRU (Triple-Barrier) | Own ML Model | Borderline (CI includes 0) | 🧪 Research — per-regime re-evaluation planned |
+| LSTM (Daily) | Own ML Model | Training failed (data leakage) | ⏸️ Suspended — walk-forward retraining needed |
 
 ---
 
@@ -99,7 +99,7 @@ Key methodological discoveries from the validation cycle:
 
 - **Survivorship bias = 8.4pp.** Excluding delisted stocks inflated low-position stock returns by 8.4 percentage points and flipped the reversal factor's sign from +6.6% to −19.2%. All conclusions from survivor-only pools were artifacts.
 - **Evaluation metric was pathological.** The original scoring matrix rewarded "neutral" predictions with a 0.3 floor, making "always predict neutral" the optimal strategy (score 0.401 vs. best model 0.197).
-- **Complex models underperformed simple ones on monthly data.** LSTM, GRU, and LightGBM all failed hold-out validation. The pattern is consistent: monthly-frequency data cannot feed deep learning models enough signal.
+- **Model performance is regime-dependent, not absolute.** LightGBM and momentum deliver +20.6% in bear markets but flip negative in bull markets. LSTM failed walk-forward training due to data leakage. GRU is borderline. Monthly-frequency data challenges deep learning models, but regime-aware routing can salvage regime-specific signals.
 - **LLM is too conservative.** 70.9% of LLM predictions are "neutral" — but when it does commit (strong_bull, n=30), alpha is +26%. The capability exists; the prompt suppresses it.
 
 Full research documentation in `docs/`.

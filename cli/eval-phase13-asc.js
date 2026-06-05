@@ -1,6 +1,6 @@
 // Phase 13: Adaptive Signal Calibration (ASC)
-// 单次运行 with #13 confidence约束 → 后处理校准曲线
-// 对比 frozen baseline score=0.1966
+// Single run with #13 confidence constraint → post-hoc calibration curve
+// Compare against frozen baseline score=0.1966
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -74,17 +74,17 @@ async function main() {
   const total = testPoints.length * 4;
 
   console.log('=== Phase 13 ASC ===');
-  console.log(`模式: ${dryRun ? 'DRY-RUN' : 'FULL frozen-v1'}, stocks=${dataset.stocks.length}, testPoints=${testPoints.length}, calls=${total}`);
+  console.log(`Mode: ${dryRun ? 'DRY-RUN' : 'FULL frozen-v1'}, stocks=${dataset.stocks.length}, testPoints=${testPoints.length}, calls=${total}`);
   console.log(`Frozen baseline score: ${FROZEN_BASELINE_SCORE}`);
   console.log(`EVAL_RUNNER_VERSION=${EVAL_RUNNER_VERSION} PROMPT_VERSION=${PROMPT_VERSION}`);
-  console.log('新增: HARD_CONSTRAINTS #13 confidence诚实法则 + ASC后处理\n');
+  console.log('New: HARD_CONSTRAINTS #13 confidence honesty rule + ASC post-processing\n');
 
   const { getDb } = await import('../lib/db/connection.js');
   const db = getDb();
 
   const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
   const outPath = path.join(RUNS_DIR, `phase13-asc-${timestamp}.jsonl`);
-  console.log(`输出: ${path.basename(outPath)}`);
+  console.log(`Output: ${path.basename(outPath)}`);
 
   const completed = loadCompleted(outPath);
   const stockMap = new Map(dataset.stocks.map(s => [s.code, s]));
@@ -94,16 +94,16 @@ async function main() {
       if (!completed.has(`${tp.stockCode}_${tpl}`)) pending.push({ tp, tpl });
     }
   }
-  console.log(`已完成: ${total - pending.length}, 待跑: ${pending.length}\n`);
+  console.log(`Completed: ${total - pending.length}, Pending: ${pending.length}\n`);
 
   if (pending.length === 0) {
-    console.log('全部已完成!');
+    console.log('All completed!');
     const records = fs.readFileSync(outPath, 'utf-8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l));
     printASCReport(records);
     return;
   }
 
-  // 预加载K线
+  // Preload K-lines
   const klinesCache = new Map();
   for (const code of [...new Set(pending.map(j => j.tp.stockCode))]) {
     const rows = db.prepare('SELECT * FROM monthly_klines WHERE code=? ORDER BY date').all(code);
@@ -124,7 +124,7 @@ async function main() {
       const stock = stockMap.get(tp.stockCode);
       const klines = klinesCache.get(tp.stockCode);
       if (!stock || !klines || tp.cutoffIndex >= klines.length || tp.cutoffIndex < 12) {
-        appendResult(outPath, { testPointId: tp.id, stockCode: tp.stockCode, template: tpl, error: '数据不足', score: null });
+        appendResult(outPath, { testPointId: tp.id, stockCode: tp.stockCode, template: tpl, error: 'insufficient data', score: null });
         failed++; completed_count++; return;
       }
 
@@ -189,10 +189,10 @@ async function main() {
   }
 
   const elapsedMin = ((Date.now()-startTime)/60000).toFixed(1);
-  console.log(`\n[ASC] 完成: ${succeeded}/${total} ok, ${failed} fail, ${elapsedMin}min, ¥${totalCost.toFixed(4)}`);
-  console.log(`[ASC] 重试: 一次成功=${retryStats.firstTry} 重试成功=${retryStats.retrySuccess} 最终失败=${retryStats.finalFail}\n`);
+  console.log(`\n[ASC] Done: ${succeeded}/${total} ok, ${failed} fail, ${elapsedMin}min, ¥${totalCost.toFixed(4)}`);
+  console.log(`[ASC] Retries: first-try=${retryStats.firstTry} retry-ok=${retryStats.retrySuccess} final-fail=${retryStats.finalFail}\n`);
 
-  // ASC 后处理
+  // ASC post-processing
   const records = fs.readFileSync(outPath, 'utf-8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l));
   printASCReport(records);
 }
@@ -211,9 +211,9 @@ function printASCReport(records) {
   if (highScore != null) {
     const delta = highScore - FROZEN_BASELINE_SCORE;
     console.log(`Δ (high-conf - baseline): ${delta >= 0 ? '+' : ''}${delta.toFixed(4)}`);
-    if (delta > 0.02) console.log('结论: high-conf 子集显著优于 baseline!');
-    else if (delta > -0.01) console.log('结论: 边缘改善，confidence 过滤略有效');
-    else console.log('结论: 无明显改善');
+    if (delta > 0.02) console.log('Conclusion: high-conf subset significantly better than baseline!');
+    else if (delta > -0.01) console.log('Conclusion: marginal improvement, confidence filtering is slightly effective');
+    else console.log('Conclusion: no significant improvement');
   }
 }
 

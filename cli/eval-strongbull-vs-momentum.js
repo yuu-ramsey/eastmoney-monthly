@@ -1,5 +1,5 @@
-// strong_bull vs 朴素动量基线 — 验证 LLM 唯一 edge 是否有独立价值
-// 用法: node cli/eval-strongbull-vs-momentum.js
+// strong_bull vs naive momentum baseline — verify whether LLM's sole edge has independent value
+// Usage: node cli/eval-strongbull-vs-momentum.js
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,7 +12,7 @@ const DATASET_PATH = path.join(PROJECT_DIR, 'data', 'frozen-eval-dataset-v1.json
 const N_BOOTSTRAP = 10000;
 
 function loadJsonl(fp) {
-  if (!fs.existsSync(fp)) { console.error(`不存在: ${fp}`); return []; }
+  if (!fs.existsSync(fp)) { console.error(`Not found: ${fp}`); return []; }
   return fs.readFileSync(fp, 'utf-8').trim().split('\n').filter(Boolean).map(l => {
     try { return JSON.parse(l); } catch (_) { return null; }
   }).filter(r => r !== null && !r.error);
@@ -53,11 +53,11 @@ function bootstrapCI(values, alpha = 0.05) {
   };
 }
 
-console.log('=== strong_bull vs 朴素动量基线 ===\n');
+console.log('=== strong_bull vs Naive Momentum Baseline ===\n');
 
 const dataset = JSON.parse(fs.readFileSync(DATASET_PATH, 'utf-8'));
 const v4Records = loadJsonl(V4_PATH);
-if (v4Records.length === 0) { console.error('v4 数据为空'); process.exit(1); }
+if (v4Records.length === 0) { console.error('v4 data is empty'); process.exit(1); }
 
 const alphaMap = new Map();
 for (const tp of dataset.testPoints) {
@@ -83,15 +83,15 @@ for (const r of withAlpha) {
 }
 
 // ---- DB ----
-console.log('加载月线...');
+console.log('Loading monthly K-lines...');
 const { getDb } = await import('../lib/db/connection.js');
 const db = getDb();
 const klinesCache = new Map();
 for (const code of new Set(withAlpha.map(r => r.code)))
   klinesCache.set(code, db.prepare('SELECT * FROM monthly_klines WHERE code=? ORDER BY date').all(code));
-console.log(`K线: ${klinesCache.size} stocks`);
+console.log(`K-lines: ${klinesCache.size} stocks`);
 
-// ---- 动量信号 ----
+// ---- Momentum signal ----
 function computeMomentum(klines, cutoffDate) {
   let cutoffIdx = -1;
   for (let i = 0; i < klines.length; i++) {
@@ -153,40 +153,40 @@ const momPairs = allPairs.filter(r => momKeys.has(`${r.code}|${r.cutoffDate}`));
 
 const uMean = allPairs.reduce((s, r) => s + r.alpha, 0) / allPairs.length;
 
-// ---- 输出 ----
-console.log(`\nstock 选择: 全 hs300, ${klinesCache.size} 只`);
-console.log(`有效 unique (stock,时点): ${allPairs.length}`);
-console.log(`无条件 alpha 均值: ${uMean.toFixed(2)}%`);
+// ---- Output ----
+console.log(`\nStock selection: all HS300, ${klinesCache.size} stocks`);
+console.log(`Valid unique (stock, timepoint): ${allPairs.length}`);
+console.log(`Unconditional alpha mean: ${uMean.toFixed(2)}%`);
 console.log(`strong_bull unique: ${sbPairs.length} (${(sbPairs.length/allPairs.length*100).toFixed(1)}%)`);
-console.log(`动量 top-${k} unique: ${momPairs.length}`);
+console.log(`Momentum top-${k} unique: ${momPairs.length}`);
 
 // 1. strong_bull CI
-console.log(`\n=== 1. strong_bull 显著性 ===`);
+console.log(`\n=== 1. strong_bull Significance ===`);
 const sbAlphas = sbPairs.map(r => r.alpha);
 const sbMean = sbAlphas.reduce((s,a)=>s+a,0)/sbAlphas.length;
-console.log(`alpha 均值: ${sbMean.toFixed(2)}% (无条件: ${uMean.toFixed(2)}%)`);
+console.log(`alpha mean: ${sbMean.toFixed(2)}% (unconditional: ${uMean.toFixed(2)}%)`);
 const sbCI = bootstrapCI(blockBootstrap(sbPairs, r => `${r.code}|${r.cutoffDate}`, s => s.reduce((a,b)=>a+b.alpha,0)/s.length).values);
 console.log(`95% CI: [${sbCI.lo.toFixed(2)}%, ${sbCI.hi.toFixed(2)}%]`);
-console.log(sbCI.lo > uMean ? `→ CI下界 > 无条件 → 显著 ✓` : `→ CI含/低于无条件 → 不显著 ✗`);
+console.log(sbCI.lo > uMean ? `→ CI lower > unconditional → significant ✓` : `→ CI includes/below unconditional → not significant ✗`);
 
-// 2. 动量基线
-console.log(`\n=== 2. 动量基线 ===`);
+// 2. Momentum baseline
+console.log(`\n=== 2. Momentum Baseline ===`);
 const momAlphas = momPairs.map(r => r.alpha);
 const momMean = momAlphas.reduce((s,a)=>s+a,0)/momAlphas.length;
-console.log(`alpha 均值: ${momMean.toFixed(2)}%`);
+console.log(`alpha mean: ${momMean.toFixed(2)}%`);
 const momCI = bootstrapCI(blockBootstrap(momPairs, r => `${r.code}|${r.cutoffDate}`, s => s.reduce((a,b)=>a+b.alpha,0)/s.length).values);
 console.log(`95% CI: [${momCI.lo.toFixed(2)}%, ${momCI.hi.toFixed(2)}%]`);
 
-// 3. 重叠度
-console.log(`\n=== 3. 重叠度 ===`);
+// 3. Overlap
+console.log(`\n=== 3. Overlap ===`);
 const sbSet = new Set(sbPairs.map(r => `${r.code}|${r.cutoffDate}`));
 const mSet = new Set(momPairs.map(r => `${r.code}|${r.cutoffDate}`));
 const inter = new Set([...sbSet].filter(x => mSet.has(x)));
 const jac = inter.size / new Set([...sbSet, ...mSet]).size;
-console.log(`LLM: ${sbSet.size}  动量: ${mSet.size}  交集: ${inter.size}  Jaccard: ${jac.toFixed(3)}`);
+console.log(`LLM: ${sbSet.size}  Momentum: ${mSet.size}  Intersection: ${inter.size}  Jaccard: ${jac.toFixed(3)}`);
 
-// 4. 差值
-console.log(`\n=== 4. 差值 (sb − mom) ===`);
+// 4. Difference
+console.log(`\n=== 4. Difference (sb − mom) ===`);
 const diff = sbMean - momMean;
 // paired bootstrap
 const sbBl = new Map(), momBl = new Map();
@@ -205,13 +205,13 @@ for (let b = 0; b < N_BOOTSTRAP; b++) {
     diffVals.push(sSamp.reduce((a,b)=>a+b.alpha,0)/sSamp.length - mSamp.reduce((a,b)=>a+b.alpha,0)/mSamp.length);
 }
 const diffCI = bootstrapCI(diffVals);
-console.log(`差值: ${diff.toFixed(2)}%`);
+console.log(`Difference: ${diff.toFixed(2)}%`);
 console.log(`95% CI: [${diffCI.lo.toFixed(2)}%, ${diffCI.hi.toFixed(2)}%]`);
 
-// 判读
-console.log(`\n=== 判读 ===`);
+// Interpretation
+console.log(`\n=== Interpretation ===`);
 const sbSig = sbCI.lo > uMean;
 const diffSig = diffCI.lo > 0;
-if (sbSig && diffSig) console.log(`→ A) strong_bull 显著 + 跑赢动量 → LLM 有独立 edge`);
-else if (sbSig && !diffSig) console.log(`→ B) strong_bull 显著但≈动量 (重叠=${jac.toFixed(2)}) → LLM是昂贵动量代理`);
-else console.log(`→ C) strong_bull 自身不显著 → 先扩样本再下结论`);
+if (sbSig && diffSig) console.log(`→ A) strong_bull significant + beats momentum → LLM has independent edge`);
+else if (sbSig && !diffSig) console.log(`→ B) strong_bull significant but ≈ momentum (overlap=${jac.toFixed(2)}) → LLM is expensive momentum proxy`);
+else console.log(`→ C) strong_bull itself not significant → expand sample before concluding`);

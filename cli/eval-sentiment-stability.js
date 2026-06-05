@@ -1,7 +1,7 @@
-// 反事实情绪稳定性评估
-// 用法：
-//   node cli/eval-sentiment-stability.js --dry-run     (3 stocks, 只打印 prompt)
-//   node cli/eval-sentiment-stability.js --subset 5    (5 stocks, 完整 LLM 调用)
+// Counterfactual sentiment stability evaluation
+// Usage:
+//   node cli/eval-sentiment-stability.js --dry-run     (3 stocks, print prompts only)
+//   node cli/eval-sentiment-stability.js --subset 5    (5 stocks, full LLM calls)
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -20,14 +20,14 @@ const RUNS_DIR = path.join(EVAL_DIR, 'runs');
 const DATA_DIR = path.join(PROJECT_DIR, 'data');
 
 const EVAL_MAX_TOKENS = 4000;
-const LLM_CONCURRENCY = 1;  // 串行调用（每个 stock 的 3 个情景必须顺序跑才能对比）
+const LLM_CONCURRENCY = 1;  // serial calls (3 scenarios per stock must run sequentially to compare)
 const LLM_DELAY_MS = 300;
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [1000, 4000, 16000];
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// 加载 .env
+// Load .env
 function loadEnv() {
   const envPath = path.join(PROJECT_DIR, '.env');
   if (!fs.existsSync(envPath)) return {};
@@ -69,11 +69,11 @@ function parseSignal(rawResponse) {
   return 'parse_failed';
 }
 
-// 从 v1 数据集的真实 eval run 加载初始 events（模拟 content.js 抓取的"大事提醒"）
+// Load initial events from real eval run in v1 dataset (simulates "major reminders" scraped by content.js)
 function loadMockEvents() {
   const mockPath = path.join(DATA_DIR, 'events-mock.json');
   if (fs.existsSync(mockPath)) return JSON.parse(fs.readFileSync(mockPath, 'utf-8'));
-  // 使用默认空事件 + LLM 自行判断
+  // Use default empty events + LLM judges on its own
   return [];
 }
 
@@ -85,13 +85,13 @@ async function main() {
 
   const env = loadEnv();
   const apiKey = env.DEEPSEEK_API_KEY;
-  if (!apiKey && !dryRun) throw new Error('DEEPSEEK_API_KEY 未设置');
+  if (!apiKey && !dryRun) throw new Error('DEEPSEEK_API_KEY not set');
 
-  console.log('=== 反事实情绪稳定性评估 ===');
-  console.log(`模式: ${dryRun ? 'DRY-RUN' : `FULL (${subsetN} stocks)`}`);
+  console.log('=== Counterfactual Sentiment Stability Evaluation ===');
+  console.log(`Mode: ${dryRun ? 'DRY-RUN' : `FULL (${subsetN} stocks)`}`);
 
   const dataset = loadFrozenDataset({ version: 'v1', subsetStocks: subsetN });
-  console.log(`数据集: ${dataset.stocks.length} stocks, ${dataset.testPoints.length} testPoints`);
+  console.log(`Dataset: ${dataset.stocks.length} stocks, ${dataset.testPoints.length} testPoints`);
 
   const { getDb } = await import('../lib/db/connection.js');
   const db = getDb();
@@ -104,14 +104,14 @@ async function main() {
 
   const mockEvents = loadMockEvents();
   const scenarios = ['baseline', 'bullish', 'bearish'];
-  const templates = ['sentiment'];  // sentiment 模板对事件最敏感
+  const templates = ['sentiment'];  // sentiment template is most sensitive to events
 
   if (dryRun) {
-    // Dry-run：只打印第一个 test point 的 3 个 prompt
+    // Dry-run: print 3 prompts for the first test point only
     const tp = dataset.testPoints[0];
     const stock = dataset.stocks.find(s => s.code === tp.stockCode);
     const klines = klinesCache.get(tp.stockCode);
-    if (!klines) { console.log('K线不足'); return; }
+    if (!klines) { console.log('Insufficient K-lines'); return; }
 
     const cutoffKlines = klines.slice(0, tp.cutoffIndex + 1);
     const closes = cutoffKlines.map(k => k.close);
@@ -131,15 +131,15 @@ async function main() {
         extraContext: { events },
       });
       console.log(`\n=== ${scenario.toUpperCase()} SCENARIO ===`);
-      console.log(`Events: ${events.length} 条`);
+      console.log(`Events: ${events.length} entries`);
       events.slice(0, 5).forEach(e => console.log(`  ${e.date} [${e.type}] ${e.title}`));
-      console.log(`Prompt (前500字): ${prompt.slice(0, 500)}...\n`);
+      console.log(`Prompt (first 500 chars): ${prompt.slice(0, 500)}...\n`);
     }
-    console.log('Dry-run 完成。检查 prompt 注入是否正确。');
+    console.log('Dry-run complete. Verify prompt injection is correct.');
     return;
   }
 
-  // 完整模式
+  // Full mode
   const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
   const outPath = path.join(RUNS_DIR, `sentiment-stability-${timestamp}.jsonl`);
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
@@ -147,7 +147,7 @@ async function main() {
   const startTime = Date.now();
   let completed = 0, ok = 0, fail = 0, totalCost = 0;
   const total = dataset.testPoints.length * scenarios.length * templates.length;
-  console.log(`总任务: ${total} (${dataset.testPoints.length} testPoints × ${scenarios.length} 情景 × ${templates.length} 模板)\n`);
+  console.log(`Total tasks: ${total} (${dataset.testPoints.length} testPoints × ${scenarios.length} scenarios × ${templates.length} templates)\n`);
 
   for (const tp of dataset.testPoints) {
     const stock = dataset.stocks.find(s => s.code === tp.stockCode);
@@ -204,13 +204,13 @@ async function main() {
 
       if (completed % 6 === 0 || completed === total) {
         const elapsed = ((Date.now() - startTime) / 60000).toFixed(1);
-        console.log(`进度: ${completed}/${total} | 成功:${ok} 失败:${fail} | 耗时:${elapsed}min | 费用:¥${totalCost.toFixed(2)}`);
+        console.log(`Progress: ${completed}/${total} | ok:${ok} fail:${fail} | elapsed:${elapsed}min | cost:¥${totalCost.toFixed(2)}`);
       }
 
       await sleep(LLM_DELAY_MS);
     }
 
-    // 计算该 test point 的稳定性得分
+    // Compute stability score for this test point
     if (Object.keys(scenarioSignals).length === 3) {
       const stability = computeStabilityScore([
         scenarioSignals.baseline,
@@ -230,10 +230,10 @@ async function main() {
   }
 
   const elapsed = ((Date.now() - startTime) / 60000).toFixed(1);
-  console.log(`\n=== 完成 ===`);
-  console.log(`耗时: ${elapsed}min | 费用: ¥${totalCost.toFixed(2)}`);
+  console.log(`\n=== Complete ===`);
+  console.log(`Elapsed: ${elapsed}min | Cost: ¥${totalCost.toFixed(2)}`);
 
-  // 统计
+  // Statistics
   const allResults = [];
   for (const line of fs.readFileSync(outPath, 'utf-8').trim().split('\n').filter(Boolean)) {
     try { allResults.push(JSON.parse(line)); } catch (_) {}
@@ -243,12 +243,12 @@ async function main() {
   for (const s of summaries) levels[s.stabilityLevel] = (levels[s.stabilityLevel] || 0) + 1;
   const avgStability = summaries.reduce((s, r) => s + r.stabilityScore, 0) / Math.max(1, summaries.length);
 
-  console.log(`\n=== 稳定性分布 ===`);
+  console.log(`\n=== Stability Distribution ===`);
   console.log(`robust (>0.75):    ${levels.robust} (${(100*levels.robust/summaries.length).toFixed(0)}%)`);
   console.log(`sensitive (0.5-0.75): ${levels.sensitive} (${(100*levels.sensitive/summaries.length).toFixed(0)}%)`);
   console.log(`fragile (<0.5):    ${levels.fragile} (${(100*levels.fragile/summaries.length).toFixed(0)}%)`);
-  console.log(`平均稳定性得分: ${avgStability.toFixed(4)}`);
-  console.log(`\n输出: ${outPath}`);
+  console.log(`Avg stability score: ${avgStability.toFixed(4)}`);
+  console.log(`\nOutput: ${outPath}`);
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

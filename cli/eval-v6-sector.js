@@ -1,5 +1,5 @@
-// v6-sector eval — Run A (no sector) vs Run B (with sector) 严格对照
-// 6 条防护：dry-run / 断点续传 / 重试 / 限流 / 独立jsonl / 进度日志
+// v6-sector eval — strict comparison: Run A (no sector) vs Run B (with sector)
+// 6 safeguards: dry-run / checkpoint resume / retry / rate limit / independent jsonl / progress log
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as readline from 'node:readline';
@@ -19,17 +19,17 @@ const PARSER_VERSION = '1.0.0';
 const PROMPT_VERSION = 'v6-sector';
 const EVAL_MAX_TOKENS = 4000;
 
-// ---- 防护 4: 限流配置 ----
+// ---- Guard 4: rate limit config ----
 const LLM_CONCURRENCY = 2;
 const LLM_DELAY_MS = 500;
 
-// ---- 防护 3: 重试配置 ----
+// ---- Guard 3: retry config ----
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [1000, 4000, 16000];
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// ---- LLM 调用 ----
+// ---- LLM call ----
 async function callDeepSeek(prompt, apiKey, model = 'deepseek-chat') {
   const resp = await fetch('https://api.deepseek.com/chat/completions', {
     method: 'POST',
@@ -51,7 +51,7 @@ async function callDeepSeek(prompt, apiKey, model = 'deepseek-chat') {
   return { text, usage: { inputTokens: usage.prompt_tokens || 0, outputTokens: usage.completion_tokens || 0 } };
 }
 
-// ---- 防护 3: 带重试的 LLM 调用 ----
+// ---- Guard 3: LLM call with retry ----
 async function callWithRetry(prompt, apiKey, model) {
   let lastErr;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -69,7 +69,7 @@ async function callWithRetry(prompt, apiKey, model) {
   throw lastErr;
 }
 
-// ---- 解析 LLM 输出 ----
+// ---- Parse LLM output ----
 function parseSignal(rawResponse) {
   if (!rawResponse) return { predictedSignal: 'parse_failed', scoreData: null };
   let scoreData = null;
@@ -81,7 +81,7 @@ function parseSignal(rawResponse) {
   return { predictedSignal, scoreData };
 }
 
-// ---- 防护 2: 断点续传：读已有结果 ----
+// ---- Guard 2: checkpoint resume — read existing results ----
 function loadCompleted(filePath) {
   if (!fs.existsSync(filePath)) return new Set();
   const content = fs.readFileSync(filePath, 'utf-8').trim();
@@ -90,25 +90,25 @@ function loadCompleted(filePath) {
   for (const line of content.split('\n').filter(Boolean)) {
     try {
       const r = JSON.parse(line);
-      if (r.error) continue; // 失败的也算未完成
+      if (r.error) continue; // failed records also count as incomplete
       completed.add(`${r.stockCode}_${r.template}`);
     } catch (_) {}
   }
   return completed;
 }
 
-// ---- 防护 2: append 到 jsonl ----
+// ---- Guard 2: append to jsonl ----
 function appendResult(filePath, record) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.appendFileSync(filePath, JSON.stringify(record) + '\n', 'utf-8');
 }
 
-// ---- 主流程 ----
+// ---- Main flow ----
 async function runOneMode({ mode, runMode, dataset, apiKey, model, db, calcSectorAlpha, resonanceCache, outPath }) {
   const { testPoints, stocks } = dataset;
   const stockMap = new Map(stocks.map(s => [s.code, s]));
 
-  // 断点续传
+  // checkpoint resume
   const completed = loadCompleted(outPath);
   const pending = [];
   for (const tp of testPoints) {
@@ -122,24 +122,24 @@ async function runOneMode({ mode, runMode, dataset, apiKey, model, db, calcSecto
 
   const total = testPoints.length * 4;
   const skipped = total - pending.length;
-  console.log(`\n[${runMode}] 总 ${total} 调用, 已完成 ${skipped}, 待跑 ${pending.length}`);
+  console.log(`\n[${runMode}] total ${total} calls, completed ${skipped}, pending ${pending.length}`);
 
   if (pending.length === 0) {
-    console.log(`[${runMode}] 全部已完成, 跳过`);
+    console.log(`[${runMode}] all completed, skip`);
     return { total, succeeded: total - skipped, failed: 0, retryStats: { firstTry: total - skipped, retrySuccess: 0, finalFail: 0 } };
   }
 
-  // 从 DB 预加载所有 K 线
-  console.log(`[${runMode}] 预加载 K 线...`);
+  // Preload all K-lines from DB
+  console.log(`[${runMode}] preloading K-lines...`);
   const klinesCache = new Map();
   const uniqueCodes = [...new Set(pending.map(j => j.tp.stockCode))];
   for (const code of uniqueCodes) {
     const rows = db.prepare('SELECT * FROM monthly_klines WHERE code=? ORDER BY date').all(code);
     if (rows.length >= 24) klinesCache.set(code, rows);
   }
-  console.log(`[${runMode}] K 线缓存: ${klinesCache.size}/${uniqueCodes.size} 只`);
+  console.log(`[${runMode}] K-line cache: ${klinesCache.size}/${uniqueCodes.size} stocks`);
 
-  // 记录开始时间
+  // Record start time
   const startTime = Date.now();
   let completed_count = skipped;
   let succeeded = skipped;
@@ -147,27 +147,27 @@ async function runOneMode({ mode, runMode, dataset, apiKey, model, db, calcSecto
   let totalCost = 0;
   const retryStats = { firstTry: skipped, retrySuccess: 0, finalFail: 0 };
 
-  // 处理每个待跑任务
+  // Process each pending task
   const jobs = [...pending];
   let jobIdx = 0;
 
-  // 防护 4: 串行主循环，每次并发 LLM_CONCURRENCY 个
+  // Guard 4: serial main loop, LLM_CONCURRENCY concurrent per batch
   while (jobIdx < jobs.length) {
     const batch = jobs.slice(jobIdx, jobIdx + LLM_CONCURRENCY);
     const batchPromises = batch.map(async ({ tp, tpl, key }) => {
       const stock = stockMap.get(tp.stockCode);
       const klines = klinesCache.get(tp.stockCode);
       if (!stock || !klines) {
-        const record = makeErrorRecord(tp, tpl, runMode, 'K线缓存缺失');
+        const record = makeErrorRecord(tp, tpl, runMode, 'K-line cache missing');
         appendResult(outPath, record);
         failed++;
         completed_count++;
         return { key, record, ok: false };
       }
 
-      // 按 cutoffIndex 截断
+      // Truncate by cutoffIndex
       if (tp.cutoffIndex >= klines.length || tp.cutoffIndex < 12) {
-        const record = makeErrorRecord(tp, tpl, runMode, `cutoffIndex=${tp.cutoffIndex} 超出K线范围 ${klines.length}`);
+        const record = makeErrorRecord(tp, tpl, runMode, `cutoffIndex=${tp.cutoffIndex} exceeds K-line range ${klines.length}`);
         appendResult(outPath, record);
         failed++;
         completed_count++;
@@ -176,7 +176,7 @@ async function runOneMode({ mode, runMode, dataset, apiKey, model, db, calcSecto
 
       const cutoffKlines = klines.slice(0, tp.cutoffIndex + 1);
 
-      // 计算指标
+      // Compute indicators
       const closes = cutoffKlines.map(k => k.close);
       const ma5 = computeMA(closes, 5);
       const ma20 = computeMA(closes, 20);
@@ -201,13 +201,13 @@ async function runOneMode({ mode, runMode, dataset, apiKey, model, db, calcSecto
         } catch (_) {}
       }
 
-      // 共振 (仅 Run B reverse_resonance)
+      // resonance (Run B reverse_resonance only)
       let resonance = null;
       if (mode === 'reverse_resonance' && resonanceCache) {
         resonance = resonanceCache.get(`${tp.stockCode}_${tp.cutoffDate}`) || null;
       }
 
-      // 构建 prompt
+      // Build prompt
       const prompt = await buildPromptByTemplate({
         templateKey: tpl,
         name: stock.name || tp.stockCode,
@@ -220,7 +220,7 @@ async function runOneMode({ mode, runMode, dataset, apiKey, model, db, calcSecto
         resonance,
       });
 
-      // 调用 LLM（带重试）
+      // Call LLM (with retry)
       try {
         const { result, retries } = await callWithRetry(prompt, apiKey, model);
         if (retries > 0) retryStats.retrySuccess++;
@@ -282,7 +282,7 @@ async function runOneMode({ mode, runMode, dataset, apiKey, model, db, calcSecto
 
     await Promise.allSettled(batchPromises);
 
-    // 防护 6: 进度日志
+    // Guard 6: progress log
     if (completed_count % 20 === 0 || completed_count === total) {
       const elapsed = ((Date.now() - startTime) / 60000).toFixed(1);
       const pct = (completed_count / total * 100).toFixed(1);
@@ -295,8 +295,8 @@ async function runOneMode({ mode, runMode, dataset, apiKey, model, db, calcSecto
   }
 
   const elapsedMin = ((Date.now() - startTime) / 60000).toFixed(1);
-  console.log(`\n[${runMode}] 完成: ${succeeded}/${total} ok, ${failed} fail, ${elapsedMin}min, ¥${totalCost.toFixed(4)}`);
-  console.log(`[${runMode}] 重试统计: 一次成功=${retryStats.firstTry} 重试成功=${retryStats.retrySuccess} 最终失败=${retryStats.finalFail}`);
+  console.log(`\n[${runMode}] done: ${succeeded}/${total} ok, ${fail} fail, ${elapsedMin}min, ¥${totalCost.toFixed(4)}`);
+  console.log(`[${runMode}] retry stats: first-try=${retryStats.firstTry} retry-ok=${retryStats.retrySuccess} final-fail=${retryStats.finalFail}`);
 
   return { total, succeeded, failed, totalCost, retryStats, elapsedMin, outPath };
 }
@@ -321,7 +321,7 @@ function makeErrorRecord(tp, tpl, runMode, error) {
   };
 }
 
-// ---- 统计输出 ----
+// ---- Statistics output ----
 function printComparisonTable(resultsA, resultsB) {
   const readResults = (filePath) => {
     if (!fs.existsSync(filePath)) return [];
@@ -334,7 +334,7 @@ function printComparisonTable(resultsA, resultsB) {
   const statsA = computeScoreTransparent(recsA);
   const statsB = computeScoreTransparent(recsB);
 
-  const n = recsA.length; // 假设 Run A 和 Run B 样本数相同
+  const n = recsA.length; // assume Run A and Run B have same sample size
 
   function ci95(p, total) {
     if (total === 0) return '±?';
@@ -360,7 +360,7 @@ function printComparisonTable(resultsA, resultsB) {
   const strongBearA = fA.signalDistribution.strong_bear / fA.denominator;
   const strongBearB = fB.signalDistribution.strong_bear / fB.denominator;
 
-  // strong_bull 假阳性
+  // strong_bull false positive
   const strongBullRecsA = recsA.filter(r => r.predictedSignal === 'strong_bull');
   const strongBullRecsB = recsB.filter(r => r.predictedSignal === 'strong_bull');
   const strongBullFPA = strongBullRecsA.length > 0 ? strongBullRecsA.filter(r => r.groundTruth !== 'strong_bull').length / strongBullRecsA.length : 0;
@@ -375,11 +375,11 @@ function printComparisonTable(resultsA, resultsB) {
   const avgTokensB = recsB.filter(r => r.tokensUsed).reduce((s, r) => s + (r.tokensUsed?.input || 0) + (r.tokensUsed?.output || 0), 0) / Math.max(1, recsB.filter(r => r.tokensUsed).length);
 
   console.log('\n' + '='.repeat(80));
-  console.log('=== Run A (no sector) vs Run B (with sector) 对照表 ===');
+  console.log('=== Run A (no sector) vs Run B (with sector) Comparison ===');
   console.log('='.repeat(80));
 
   const rows = [
-    ['加权 score (全量)', fA.weightedScore, fB.weightedScore, (fB.weightedScore - fA.weightedScore).toFixed(4), ci95(fA.weightedScore, n), sigTest(fA.weightedScore, fB.weightedScore, n)],
+    ['weighted score (all)', fA.weightedScore, fB.weightedScore, (fB.weightedScore - fA.weightedScore).toFixed(4), ci95(fA.weightedScore, n), sigTest(fA.weightedScore, fB.weightedScore, n)],
     ['score_excl_pf', pfA.weightedScore, pfB.weightedScore, (pfB.weightedScore - pfA.weightedScore).toFixed(4), '—', '—'],
     ['strong_bull %', fmtPct(strongBullA), fmtPct(strongBullB), fmtDelta(strongBullB - strongBullA), ci95(strongBullA, n), sigTest(strongBullA, strongBullB, n)],
     ['strong_bull FP', fmtPct(strongBullFPA), fmtPct(strongBullFPB), fmtDelta(strongBullFPB - strongBullFPA), '—', '—'],
@@ -388,13 +388,13 @@ function printComparisonTable(resultsA, resultsB) {
     ['bear %', fmtPct(fA.signalDistribution.bear / fA.denominator), fmtPct(fB.signalDistribution.bear / fB.denominator), fmtDelta(fB.signalDistribution.bear / fB.denominator - fA.signalDistribution.bear / fA.denominator), '—', '—'],
     ['neutral %', fmtPct(fA.signalDistribution.neutral / fA.denominator), fmtPct(fB.signalDistribution.neutral / fB.denominator), fmtDelta(fB.signalDistribution.neutral / fB.denominator - fA.signalDistribution.neutral / fA.denominator), '—', '—'],
     ['parse_failed', fA.signalDistribution.parse_failed, fB.signalDistribution.parse_failed, fB.signalDistribution.parse_failed - fA.signalDistribution.parse_failed, '—', '—'],
-    ['signal 覆盖', fmtPct(signalCoverageA), fmtPct(signalCoverageB), fmtDelta(signalCoverageB - signalCoverageA), '—', '—'],
-    ['平均 tokens', Math.round(avgTokensA), Math.round(avgTokensB), Math.round(avgTokensB - avgTokensA), '—', '—'],
-    ['总成本', `¥${resultsA.totalCost?.toFixed(2) || '?'}`, `¥${resultsB.totalCost?.toFixed(2) || '?'}`, '—', '—', '—'],
+    ['signal coverage', fmtPct(signalCoverageA), fmtPct(signalCoverageB), fmtDelta(signalCoverageB - signalCoverageA), '—', '—'],
+    ['avg tokens', Math.round(avgTokensA), Math.round(avgTokensB), Math.round(avgTokensB - avgTokensA), '—', '—'],
+    ['total cost', `¥${resultsA.totalCost?.toFixed(2) || '?'}`, `¥${resultsB.totalCost?.toFixed(2) || '?'}`, '—', '—', '—'],
   ];
 
-  // 打印表格
-  console.log('| 指标 | Run A | Run B | Δ | 95% CI | 显著? |');
+  // Print table
+  console.log('| Metric | Run A | Run B | Δ | 95% CI | Sig? |');
   console.log('|------|-------|-------|---|--------|-------|');
   for (const row of rows) {
     console.log(`| ${row[0]} | ${row[1]} | ${row[2]} | ${row[3]} | ${row[4]} | ${row[5]} |`);
@@ -407,11 +407,11 @@ function fmtPct(v) { return (v * 100).toFixed(1) + '%'; }
 function fmtDelta(v) { return (v >= 0 ? '+' : '') + (v * 100).toFixed(1) + '%'; }
 
 // ================================================================
-// CLI 入口
+// CLI entry
 // ================================================================
 async function main() {
   const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) throw new Error('请设置 DEEPSEEK_API_KEY 环境变量');
+  if (!apiKey) throw new Error('Please set DEEPSEEK_API_KEY environment variable');
 
   const dryRun = process.argv.includes('--dry-run');
   const runAOnly = process.argv.includes('--run-a-only');
@@ -421,23 +421,23 @@ async function main() {
   const seedArg = process.argv.find(a => a.startsWith('--seed='));
   const subsetSeed = seedArg ? parseInt(seedArg.split('=')[1]) : 42;
 
-  // 从 frozen dataset 加载
+  // Load from frozen dataset
   const { loadFrozenDataset } = await import('../lib/eval/load-frozen-dataset.js');
   const dataset = loadFrozenDataset({ version: 'v1', subsetStocks: subsetN, seed: subsetSeed });
   const testPoints = dataset.testPoints;
 
   console.log('=== eval-v6-sector ===');
-  console.log(`模式: ${dryRun ? 'DRY-RUN (subset=' + subsetN + ' stocks)' : 'FULL (frozen-v1, ' + dataset.stocks.length + ' stocks)'}`);
-  if (dataset.subsetInfo) console.log(`随机种子: ${dataset.subsetInfo.seed}, 抽样: ${dataset.subsetInfo.nStocks}/${dataset.subsetInfo.totalStocks}`);
+  console.log(`Mode: ${dryRun ? 'DRY-RUN (subset=' + subsetN + ' stocks)' : 'FULL (frozen-v1, ' + dataset.stocks.length + ' stocks)'}`);
+  if (dataset.subsetInfo) console.log(`Random seed: ${dataset.subsetInfo.seed}, sample: ${dataset.subsetInfo.nStocks}/${dataset.subsetInfo.totalStocks}`);
   console.log(`EVAL_RUNNER_VERSION=${EVAL_RUNNER_VERSION} PARSER_VERSION=${PARSER_VERSION} PROMPT_VERSION=${PROMPT_VERSION}`);
   console.log(`frozen baseline score: ${dataset.baseline?.score || 'N/A'}`);
   console.log('');
 
   console.log(`testPoints: ${testPoints.length} (total: ${dataset.testPoints.length})`);
   console.log(`stocks: ${dataset.stocks.length}`);
-  console.log(`预期 LLM 调用: ${testPoints.length * 4} / mode`);
+  console.log(`expected LLM calls: ${testPoints.length * 4} / mode`);
 
-  // 惰性初始化 DB
+  // Lazy init DB
   const { getDb } = await import('../lib/db/connection.js');
   const db = getDb();
 
@@ -446,8 +446,8 @@ async function main() {
   const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
   let resultA = null, resultB = null;
 
-  // 预计算共振数据 (对每个唯一的 stockCode + cutoffDate 计算一次)
-  console.log('\n预计算共振...');
+  // Precompute resonance data (once per unique stockCode + cutoffDate)
+  console.log('\nPrecomputing resonance...');
   const { getResonanceAsOf } = await import('../lib/multi-period/resonance.js');
   const resonanceCache = new Map();
   const uniqueTps = [...new Map(testPoints.map(tp => [`${tp.stockCode}_${tp.cutoffDate}`, tp])).values()];
@@ -460,12 +460,12 @@ async function main() {
     }
   }
   const validResonance = [...resonanceCache.values()].filter(r => r && r.resonanceLevel !== 'divergent').length;
-  console.log(`共振缓存: ${resonanceCache.size} 条, 有效共振=${validResonance}`);
+  console.log(`Resonance cache: ${resonanceCache.size} entries, valid=${validResonance}`);
 
   // --- Run A: no resonance ---
   if (!runBOnly) {
     const outPathA = path.join(RUNS_DIR, `runA-no-resonance-${timestamp}.jsonl`);
-    console.log(`\nRun A 输出: ${path.basename(outPathA)}`);
+    console.log(`\nRun A output: ${path.basename(outPathA)}`);
     resultA = await runOneMode({
       mode: 'no_resonance',
       runMode: 'A_no_resonance',
@@ -482,7 +482,7 @@ async function main() {
   // --- Run B: reverse resonance ---
   if (!runAOnly) {
     const outPathB = path.join(RUNS_DIR, `runB-reverse-resonance-${timestamp}.jsonl`);
-    console.log(`\nRun B 输出: ${path.basename(outPathB)}`);
+    console.log(`\nRun B output: ${path.basename(outPathB)}`);
     resultB = await runOneMode({
       mode: 'reverse_resonance',
       runMode: 'B_reverse_resonance',
@@ -496,7 +496,7 @@ async function main() {
     });
   }
 
-  // 对比表
+  // Comparison table
   if (resultA && resultB) {
     printComparisonTable(
       { outPath: resultA.outPath || path.join(RUNS_DIR, `runA-no-resonance-${timestamp}.jsonl`), totalCost: resultA.totalCost },

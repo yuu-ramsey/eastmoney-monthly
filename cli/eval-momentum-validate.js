@@ -1,5 +1,5 @@
-// V1+V2+V3 动量因子验证 (零LLM)
-// 用法: node cli/eval-momentum-validate.js
+// V1+V2+V3 Momentum Factor Validation (zero LLM)
+// Usage: node cli/eval-momentum-validate.js
 import { readFileSync } from 'fs';
 import Database from 'better-sqlite3';
 import * as path from 'path';
@@ -79,10 +79,10 @@ console.log(`Test:  n=${test.n} u=${test.nUnique} spread=${test.spread.toFixed(2
 
 const v1Ok = test.ci.lo > 0 && train.ci.lo > 0;
 const v1Stable = Math.abs(test.spread - train.spread) < Math.abs(train.spread) * 0.5;
-console.log(`V1: ${v1Ok ? (v1Stable ? '稳健 ✓' : '显著但量级差异>50%') : 'test CI含0 → 过拟合风险'}`);
+console.log(`V1: ${v1Ok ? (v1Stable ? 'Robust ✓' : 'Significant but magnitude diff >50%') : 'test CI includes 0 → overfitting risk'}`);
 
 // ====== V2 ======
-console.log('\n=== V2 Regime分层 ===');
+console.log('\n=== V2 Regime Stratification ===');
 const hs300 = db.prepare("SELECT date,close FROM monthly_klines WHERE code='000300' ORDER BY date").all();
 const regimeMap = {};
 
@@ -109,7 +109,7 @@ for (const reg of ['up', 'down', 'sideways']) {
 }
 
 // ====== V3 ======
-console.log('\n=== V3 可交易性 ===');
+console.log('\n=== V3 Tradability ===');
 assignSignals(allPairs);
 const sorted = [...allPairs].sort((a, b) => b.momZ - a.momZ);
 const n20 = Math.floor(allPairs.length * 0.2);
@@ -119,13 +119,13 @@ const bot20 = sorted.slice(-n20);
 const allMean = allPairs.reduce((s, p) => s + p.alpha, 0) / allPairs.length;
 const top20Mean = top20.reduce((s, p) => s + p.alpha, 0) / top20.length;
 const lOnlyExcess = top20Mean - allMean;
-console.log(`全样本均值: ${allMean.toFixed(2)}%  top20%: ${top20Mean.toFixed(2)}%  只做多超额: ${lOnlyExcess.toFixed(2)}%`);
+console.log(`All-sample mean: ${allMean.toFixed(2)}%  top20%: ${top20Mean.toFixed(2)}%  long-only excess: ${lOnlyExcess.toFixed(2)}%`);
 
 const origSpread = top20.reduce((s, p) => s + p.alpha, 0) / top20.length - bot20.reduce((s, p) => s + p.alpha, 0) / bot20.length;
 const wTop = winsorize(top20.map(p => p.alpha));
 const wBot = winsorize(bot20.map(p => p.alpha));
 const wSpread = wTop.reduce((a, b) => a + b, 0) / wTop.length - wBot.reduce((a, b) => a + b, 0) / wBot.length;
-console.log(`原始spread: ${origSpread.toFixed(2)}%  Winsorize: ${wSpread.toFixed(2)}%  极值贡献: ${(origSpread - wSpread).toFixed(2)}pp`);
+console.log(`Original spread: ${origSpread.toFixed(2)}%  Winsorize: ${wSpread.toFixed(2)}%  Outlier contribution: ${(origSpread - wSpread).toFixed(2)}pp`);
 
 // Turnover
 let toSum = 0, toN = 0;
@@ -141,13 +141,13 @@ for (let i = 0; i < tpMonths.length - 1; i++) {
   if (tot > 0) { toSum += 1 - overlap / tot; toN++; }
 }
 const avgTO = toN > 0 ? toSum / toN : 0;
-console.log(`\n相邻时点换手(≈): ${(avgTO * 100).toFixed(0)}%/period`);
+console.log(`\nAdjacent-period turnover (approx): ${(avgTO * 100).toFixed(0)}%/period`);
 
 for (const cost of [0.2, 0.3]) {
   const costPct = avgTO * cost * 2;
   const netSpread = wSpread - costPct;
   const netLong = lOnlyExcess - costPct;
-  console.log(`扣${cost.toFixed(1)}%成本: 净spread=${netSpread.toFixed(2)}%  净多头超额=${netLong.toFixed(2)}%`);
+  console.log(`After ${cost.toFixed(1)}% cost: net spread=${netSpread.toFixed(2)}%  net long excess=${netLong.toFixed(2)}%`);
 }
 
 db.close();

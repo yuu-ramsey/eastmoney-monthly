@@ -19,7 +19,7 @@ const LLM_CONCURRENCY = 1;     // 1 testPoint at a time (5 agents concurrent)
 const LLM_DELAY_MS = 500;
 const FROZEN_BASELINE = 0.1966;
 const PROMPT_VERSION = 'phase15-multi-agent';
-const PERIOD_LABELS = { monthly: '月线', weekly: '周线', daily: '日线' };
+const PERIOD_LABELS = { monthly: 'Monthly', weekly: 'Weekly', daily: 'Daily' };
 
 async function getLLM(prompt, apiKey) {
   const resp = await fetch('https://api.deepseek.com/chat/completions', {
@@ -133,7 +133,7 @@ async function main() {
 
     const ctx = {
       name: stock.name || tp.stockCode, code: tp.stockCode,
-      period: 'monthly', periodLabel: '月线', klines: kwi,
+      period: 'monthly', periodLabel: 'Monthly', klines: kwi,
       sectorAlphaData, templateKey: tpl,
     };
 

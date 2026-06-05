@@ -70,7 +70,7 @@ function parseSignal(rawResponse) {
   return { predictedSignal: scoreData?.signal || 'parse_failed', scoreData };
 }
 
-// ---- 断点续传 ----
+// ---- checkpoint resume ----
 function loadCompleted(fp) {
   if (!fs.existsSync(fp)) return new Set();
   const s = new Set();
@@ -82,7 +82,7 @@ function loadCompleted(fp) {
 
 function appendResult(fp, r) { fs.mkdirSync(path.dirname(fp), { recursive: true }); fs.appendFileSync(fp, JSON.stringify(r) + '\n'); }
 
-// ---- 加载 MC Dropout 数据 ----
+// ---- Load MC Dropout data ----
 function loadMcDropoutCache() {
   if (!fs.existsSync(PARQUET_PATH)) { console.warn('MC Dropout parquet not found, skipping'); return new Map(); }
   return new Promise((resolve) => {
@@ -101,11 +101,11 @@ for _, row in df.iterrows():
         'y6_mean': float(row['y6_mean']), 'y6_std': float(row['y6_std']),
         'overall_confidence': float(row['overall_confidence']),
         'uncertainty_level': ulevel,
-        'uncertainty_emoji': {'low': '🟢', 'medium': '🟡', 'high': '🔴'}.get(ulevel, '🟡'),
+        'uncertainty_emoji': {'low': '\u{1F7E2}', 'medium': '\u{1F7E1}', 'high': '\u{1F534}'}.get(ulevel, '\u{1F7E1}'),
         'uncertainty_desc': {
-            'low': '模型预测一致性强，信号可信度较高',
-            'medium': '模型预测存在分歧，信号需结合技术面验证',
-            'high': '模型预测分歧大，信号不可靠，以技术分析为主',
+            'low': 'Model predictions are highly consistent; signal has strong reliability',
+            'medium': 'Model predictions show disagreement; signal needs technical verification',
+            'high': 'Model predictions diverge significantly; signal unreliable, rely on technical analysis',
         }.get(ulevel, ''),
         'mc_samples': 50,
     }
@@ -116,45 +116,45 @@ print(json.dumps(result))
   });
 }
 
-// ---- 主流程 ----
+// ---- Main flow ----
 async function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes('--dry-run');
   const env = loadEnv();
   const apiKey = env.DEEPSEEK_API_KEY;
-  if (!apiKey) throw new Error('DEEPSEEK_API_KEY 未在 .env 中设置');
+  if (!apiKey) throw new Error('DEEPSEEK_API_KEY not set in .env');
 
-  console.log('=== MC Dropout A/B 评估 ===');
-  console.log(`模式: ${dryRun ? 'DRY-RUN (3 stocks)' : 'FULL (40 stocks)'}`);
+  console.log('=== MC Dropout A/B Evaluation ===');
+  console.log(`Mode: ${dryRun ? 'DRY-RUN (3 stocks)' : 'FULL (40 stocks)'}`);
 
   // Load dataset
   const dataset = loadFrozenDataset({ version: 'v1', subsetStocks: dryRun ? 3 : null });
   const { testPoints, stocks } = dataset;
   const stockMap = new Map(stocks.map(s => [s.code, s]));
-  console.log(`数据集: ${stocks.length} stocks, ${testPoints.length} testPoints`);
+  console.log(`Dataset: ${stocks.length} stocks, ${testPoints.length} testPoints`);
 
-  // 加载 MC Dropout 缓存
+  // Load MC Dropout cache
   const mcCache = await loadMcDropoutCache();
-  console.log(`MC Dropout 缓存: ${Object.keys(mcCache).length} stocks`);
+  console.log(`MC Dropout cache: ${Object.keys(mcCache).length} stocks`);
 
-  // DB 连接
+  // DB connection
   const { getDb } = await import('../lib/db/connection.js');
   const { calcSectorAlpha } = await import('../lib/sector/alpha.js');
   const db = getDb();
 
-  // 预加载 K 线
+  // Preload K-lines
   const klinesCache = new Map();
   const uniqueCodes = [...new Set(testPoints.map(tp => tp.stockCode))];
   for (const code of uniqueCodes) {
     const rows = db.prepare('SELECT * FROM monthly_klines WHERE code=? ORDER BY date').all(code);
     if (rows.length >= 24) klinesCache.set(code, rows);
   }
-  console.log(`K线缓存: ${klinesCache.size}/${uniqueCodes.length} stocks`);
+  console.log(`K-line cache: ${klinesCache.size}/${uniqueCodes.length} stocks`);
 
-  // 评估模板
+  // Eval templates
   const templates = ['technical', 'trend', 'valuation', 'sentiment'];
   const total = testPoints.length * templates.length;
-  console.log(`总任务: ${total} (${testPoints.length} stocks × ${templates.length} templates)`);
+  console.log(`Total tasks: ${total} (${testPoints.length} stocks × ${templates.length} templates)`);
 
   const timestamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
   const outPath = path.join(RUNS_DIR, `mc-dropout-${timestamp}.jsonl`);
@@ -166,15 +166,15 @@ async function main() {
       if (!completed.has(`${tp.stockCode}_${tpl}`)) pending.push({ tp, tpl });
     }
   }
-  console.log(`待跑: ${pending.length}/${total}\n`);
+  console.log(`Pending: ${pending.length}/${total}\n`);
 
-  if (pending.length === 0) { console.log('全部完成'); return; }
+  if (pending.length === 0) { console.log('All done'); return; }
 
   const startTime = Date.now();
   let completed_count = total - pending.length, ok = completed_count, fail = 0;
   let totalCost = 0;
-  const scoresWith = [];  // MC Dropout 注入
-  const scoresWithout = [];  // 对照组（同样 stocks，不同 templates）
+  const scoresWith = [];  // MC Dropout injected
+  const scoresWithout = [];  // Control group (same stocks, different templates)
 
   let jobIdx = 0;
   while (jobIdx < pending.length) {
@@ -183,7 +183,7 @@ async function main() {
       const stock = stockMap.get(tp.stockCode);
       const klines = klinesCache.get(tp.stockCode);
       if (!stock || !klines || tp.cutoffIndex >= klines.length || tp.cutoffIndex < 12) {
-        appendResult(outPath, { stockCode: tp.stockCode, template: tpl, error: 'K线不足' });
+        appendResult(outPath, { stockCode: tp.stockCode, template: tpl, error: 'Insufficient K-lines' });
         fail++; completed_count++; return;
       }
 
@@ -200,7 +200,7 @@ async function main() {
       let sectorAlphaData = null;
       try { sectorAlphaData = calcSectorAlpha(db, tp.stockCode, 'monthly', 12, tp.cutoffDate); } catch (_) {}
 
-      // MC Dropout 数据
+      // MC Dropout data
       const lstmSignalData = mcCache[tp.stockCode] || null;
 
       const prompt = await buildPromptByTemplate({
@@ -243,7 +243,7 @@ async function main() {
     const results = await Promise.all(batchProms);
     for (const r of results) {
       if (r && r.ok) {
-        // 分 with/without MC Dropout 收集分数
+        // Separate scores by with/without MC Dropout
         if (r.lstmSignalData) scoresWith.push(r.record);
         else scoresWithout.push(r.record);
       }
@@ -252,18 +252,18 @@ async function main() {
     jobIdx += LLM_CONCURRENCY;
     if (completed_count % 4 === 0 || completed_count === total) {
       const elapsed = ((Date.now() - startTime) / 60000).toFixed(1);
-      console.log(`进度: ${completed_count}/${total} | 成功:${ok} 失败:${fail} | 耗时:${elapsed}min | 费用:¥${totalCost.toFixed(2)}`);
+      console.log(`Progress: ${completed_count}/${total} | ok:${ok} fail:${fail} | elapsed:${elapsed}min | cost:¥${totalCost.toFixed(2)}`);
     }
     if (jobIdx < pending.length) await sleep(LLM_DELAY_MS);
   }
 
-  // ---- 报告 ----
+  // ---- Report ----
   const elapsed = ((Date.now() - startTime) / 60000).toFixed(1);
-  console.log(`\n=== 评估完成 ===`);
-  console.log(`耗时: ${elapsed}min | 费用: ¥${totalCost.toFixed(2)}`);
-  console.log(`结果: ${outPath}`);
+  console.log(`\n=== Evaluation Complete ===`);
+  console.log(`Elapsed: ${elapsed}min | Cost: ¥${totalCost.toFixed(2)}`);
+  console.log(`Results: ${outPath}`);
 
-  // 统计
+  // Statistics
   const allResults = [];
   if (fs.existsSync(outPath)) {
     for (const line of fs.readFileSync(outPath, 'utf-8').trim().split('\n').filter(Boolean)) {
@@ -274,20 +274,20 @@ async function main() {
   const withMc = allResults.filter(r => r.hasMcDropout && !r.error);
   const withoutMc = allResults.filter(r => !r.hasMcDropout && !r.error);
 
-  console.log(`\n=== A/B 对比 ===`);
-  console.log(`With MC Dropout:    ${withMc.length} 结果, 均分=${(withMc.reduce((s,r)=>s+r.score,0)/Math.max(1,withMc.length)).toFixed(3)}`);
-  console.log(`Without MC Dropout: ${withoutMc.length} 结果, 均分=${(withoutMc.reduce((s,r)=>s+r.score,0)/Math.max(1,withoutMc.length)).toFixed(3)}`);
+  console.log(`\n=== A/B Comparison ===`);
+  console.log(`With MC Dropout:    ${withMc.length} results, avg=${(withMc.reduce((s,r)=>s+r.score,0)/Math.max(1,withMc.length)).toFixed(3)}`);
+  console.log(`Without MC Dropout: ${withoutMc.length} results, avg=${(withoutMc.reduce((s,r)=>s+r.score,0)/Math.max(1,withoutMc.length)).toFixed(3)}`);
 
-  // 按不确定性分组
+  // Group by uncertainty level
   for (const level of ['low', 'medium', 'high']) {
     const subset = withMc.filter(r => r.mcUncertainty === level);
     if (subset.length > 0) {
       const avg = subset.reduce((s, r) => s + r.score, 0) / subset.length;
-      console.log(`  MC ${level}不确定性: ${subset.length} 个, 均分=${avg.toFixed(3)}`);
+      console.log(`  MC ${level} uncertainty: ${subset.length} results, avg=${avg.toFixed(3)}`);
     }
   }
 
-  console.log(`\n输出文件: ${outPath}`);
+  console.log(`\nOutput file: ${outPath}`);
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

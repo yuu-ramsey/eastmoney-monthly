@@ -8,6 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_DIR = path.resolve(__dirname, '..');
 
 // Shenwan Level-1 31 industries (snapshot verified from legulegu.com 2026-05-17)
+// NOTE: industry names below are proper noun identifiers — do not translate
 const SW_LEVEL1_INDUSTRIES = [
   { code: '801010.SI', name: '农林牧渔' },
   { code: '801030.SI', name: '基础化工' },

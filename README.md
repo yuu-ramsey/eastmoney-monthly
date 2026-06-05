@@ -56,6 +56,8 @@ Layer 3: Expert Pool         Multiple signals, each validated per-regime
 Layer 4: Output              Weighted signal (math) + LLM interpretation (text, isolated from signal chain)
 ```
 
+![Architecture Diagram](docs/architecture.svg)
+
 **Design principles:**
 - **No single point of failure** — Any component can fail without breaking the system
 - **LLM isolation** — LLM generates explanations only; it never touches signal routing or weighting

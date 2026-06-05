@@ -50,7 +50,6 @@ kronos/venv/
 .vscode/
 .idea/
 *.swp
-kronos/venv/
 kronos/weights/
 temp_scripts/
 skills-lock.json

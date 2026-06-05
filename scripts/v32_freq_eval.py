@@ -1,7 +1,7 @@
 """
 v32_freq_eval.py — 32d factor monthly/weekly/daily three-frequency evaluation (based on v32_final_eval.py logic)
 ============================================================
-统一修复：单期收益 + 日期分组 + 32维 + CSRC L2 中性化
+Unified fix：单期收益 + date分组 + 32维 + CSRC L2 中性化
 
 频率Parameters化：
   月线: YYYY-MM, MA(5,20,60),  FFT60,  训练60月
@@ -35,7 +35,7 @@ np.random.seed(RANDOM_SEED)
 # 频率配置
 # ============================================================
 def _to_iso_week(date_str):
-    """日期字符串 → ISO week (YYYY-Www)"""
+    """date字符串 → ISO week (YYYY-Www)"""
     s = str(date_str)[:10]
     d = datetime.strptime(s, '%Y-%m-%d')
     iso = d.isocalendar()
@@ -253,7 +253,7 @@ def extract_features_32d(records, idx, cfg):
 
 
 # ============================================================
-# 数据加载
+# 数据Loaded
 # ============================================================
 def load_data(period):
     cfg = FREQ_CONFIG[period]
@@ -283,7 +283,7 @@ def load_data(period):
             seen[key] = rec
         stock_data[code] = sorted(seen.values(), key=lambda r: r['date'])
 
-    # 加载 CSRC L2 行业映射
+    # Loaded CSRC L2 行业映射
     industry_map = {}
     if os.path.exists(INDUSTRY_PATH):
         with open(INDUSTRY_PATH, 'r', encoding='utf-8') as f:
@@ -291,8 +291,8 @@ def load_data(period):
             industry_map = raw.get('stockToIndustry', {})
 
     covered = sum(1 for c in stock_data if c in industry_map)
-    print(f"  加载 {len(stock_data)} 只股票, {sum(len(v) for v in stock_data.values()):,} 条记录 "
-          f"| 行业覆盖 {covered}/{len(stock_data)} ({covered/max(len(stock_data),1)*100:.0f}%)")
+    print(f"  Loaded {len(stock_data)} stocks, {sum(len(v) for v in stock_data.values()):,} records "
+          f"| 行业Covering {covered}/{len(stock_data)} ({covered/max(len(stock_data),1)*100:.0f}%)")
 
     return stock_data, industry_map
 
@@ -311,13 +311,13 @@ def build_cross_sections(stock_data, period):
     group_fn = cfg["group_fn"]
     max_h = cfg["max_horizons"]
 
-    # 为每只股票建立 group_key → bar_index 的映射
+    # 为每stocks建立 group_key → bar_index 的映射
     stock_groups = {}
     for code, records in stock_data.items():
         groups = {}
         for j, r in enumerate(records):
             key = group_fn(r['date'])
-            groups[key] = j  # 每组的最后一条（同组内覆盖）
+            groups[key] = j  # 每组的最后一条（同组内Covering）
         stock_groups[code] = groups
 
     # 收集所有有效的 period key
@@ -343,7 +343,7 @@ def build_cross_sections(stock_data, period):
 
             # 用全局 period 日历计算单期收益（非accumulated）
             # T+N: 取 all_keys[pi+N] 的收盘 vs all_keys[pi+N-1] 的收盘
-            # 关键：必须两只股票都有数据才能算（停牌则跳过该期的收益）
+            # 关键：必须两stocks都有数据才能算（停牌则跳过该期的收益）
             rets = {}
             for lag in range(1, max_h + 1):
                 fwd_pi = pi + lag
@@ -365,7 +365,7 @@ def build_cross_sections(stock_data, period):
             cross_sections[period_key] = section
 
     avg_n = np.mean([len(v) for v in cross_sections.values()])
-    print(f"  有效截面: {len(cross_sections)} | 每截面均 {avg_n:.0f} 只股票")
+    print(f"  有效截面: {len(cross_sections)} | 每截面均 {avg_n:.0f} stocks")
     return cross_sections
 
 
@@ -816,7 +816,7 @@ def run_period(period):
     print(f"  {label} ({period}) — v32 全修复评估")
     print(f"{'='*70}")
 
-    print(f"\n[1/5] 加载数据...")
+    print(f"\n[1/5] Loaded数据...")
     stock_data, industry_map = load_data(period)
 
     print(f"\n[2/5] 构建截面...")
@@ -850,7 +850,7 @@ def run_period(period):
         'ls_sharpe': bt['ls']['sharpe'] if bt else 0,
     }
 
-    # 保存
+    # Save
     output = {
         'period': period, 'label': label,
         'ic_decay': {f"T+{lag}": {

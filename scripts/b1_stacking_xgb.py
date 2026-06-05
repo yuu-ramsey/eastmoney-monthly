@@ -17,7 +17,7 @@ PROJECT = Path(__file__).parent.parent
 OUT = PROJECT / '.eastmoney-ai' / 'lstm'
 DB = PROJECT / '.eastmoney-ai' / 'db' / 'klines-v2.sqlite'
 
-# ======== 1. 加载 LSTM monthly signals ========
+# ======== 1. Loaded LSTM monthly signals ========
 print("1/3 Loading data...")
 lstm_path = OUT / 'monthly_lstm_signals_v2.parquet'
 lstm_dict = {}
@@ -27,7 +27,7 @@ if lstm_path.exists():
         lstm_dict[(r['code'], r['month'])] = r['lstm_signal']
 print(f"  {len(lstm_dict)} LSTM signals")
 
-# ======== 2. 加载月线 ========
+# ======== 2. Loaded月线 ========
 conn = sqlite3.connect(str(DB))
 stocks = [r[0] for r in conn.execute(
     "SELECT DISTINCT stock_code FROM stock_industry_mapping").fetchall()]

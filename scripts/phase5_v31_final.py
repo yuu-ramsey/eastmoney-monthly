@@ -111,7 +111,7 @@ def cross_sectional_neutralize(features, dates, neutralizer, ntype='categorical'
 
 
 def build_features():
-    print(f"[{ts()}] 加载数据...", flush=True)
+    print(f"[{ts()}] Loaded数据...", flush=True)
     conn = sqlite3.connect(str(DB))
     codes = [r[0] for r in conn.execute(
         'SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
@@ -366,7 +366,7 @@ if __name__ == '__main__':
 
     # ====== Feature Importance (31d) ======
     print(f"\n{'='*75}")
-    print("31维特征重要性 (LGB gain + XGB gain)")
+    print("31维Feature importance (LGB gain + XGB gain)")
     print(f"{'='*75}")
     lgb_gain = r31['lgb'].feature_importances_
     xgb_gain_dict = r31['xgb'].get_booster().get_score(importance_type='gain')

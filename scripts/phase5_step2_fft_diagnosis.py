@@ -104,7 +104,7 @@ def cross_sectional_neutralize(features, dates, neutralizer, ntype='categorical'
 
 def build_features():
     """构建特征矩阵, 与phase5_feature_diagnosis.py一致"""
-    print(f"[{ts()}] 加载数据...", flush=True)
+    print(f"[{ts()}] Loaded数据...", flush=True)
     conn = sqlite3.connect(str(DB))
     codes = [r[0] for r in conn.execute(
         'SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
@@ -273,7 +273,7 @@ def fft_stability_analysis():
         'SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
     codes_used = sorted(codes)
 
-    # 随机抽200只股票
+    # 随机抽200stocks
     rng = np.random.RandomState(789)
     sampled_codes = rng.choice(codes_used, min(200, len(codes_used)), replace=False)
     print(f"[{ts()}] 抽样 {len(sampled_codes)} stocks for stability test", flush=True)
@@ -300,7 +300,7 @@ def fft_stability_analysis():
         if n < 63:
             continue
 
-        # 每只股票最多取30个时间点
+        # 每stocks最多取30个时间点
         test_points = list(range(62, n))
         if len(test_points) > 30:
             test_points = sorted(rng.choice(test_points, 30, replace=False))
@@ -373,7 +373,7 @@ def fft_stability_analysis():
         print(f"  {group_name}: FreqCV={avg_fc:.1f}%  AmpCV={avg_ac:.1f}%  Match={avg_mr:.1f}%  "
               f"Stable={stable_count}/{len(ranks)}")
 
-    # 保存
+    # Save
     stab_df = pd.DataFrame(stability_results)
     stab_df.to_csv(OUT / 'step2_2_fft_stability.csv', index=False, encoding='utf-8-sig')
     print(f"\nSaved: {OUT / 'step2_2_fft_stability.csv'}")
@@ -441,7 +441,7 @@ if __name__ == '__main__':
         pct = (delta_ic / abs(result_base['IC']) * 100) if abs(result_base['IC']) > 1e-8 else 0
         print(f"{r['label']:<25s} {r['IC']:+8.4f} {r['ICIR']:+8.3f} {delta_ic:+8.4f} {delta_ir:+8.3f} {pct:+7.1f}%")
 
-    # 保存 Step 2.1
+    # Save Step 2.1
     ablation_df = pd.DataFrame([{
         'experiment': r['label'],
         'IC': round(r['IC'], 5),

@@ -1,4 +1,4 @@
-// 构建 v2 frozen eval dataset —— 从 v1 精确匹配 cutoff dates，添加折扣多月回报标签
+// Build v2 frozen eval dataset —— 从 v1 精确匹配 cutoff dates，添加折扣多月回报标签
 // 用法：
 //   node scripts/build-frozen-dataset-v2.js                  (全量 298 股，自动生成 cutoff)
 //   node scripts/build-frozen-dataset-v2.js --match-v1       (精确使用 v1 的 stockCode+cutoffDate)

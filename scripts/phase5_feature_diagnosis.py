@@ -1,6 +1,6 @@
 """
 Phase 5: Feature diagnosis
-Step 1.1 — 特征重要性 (LightGBM gain/split, XGBoost gain/weight)
+Step 1.1 — Feature importance (LightGBM gain/split, XGBoost gain/weight)
 Step 1.2 — 逐组消融实验 (7组, 每次去掉一组重训, 对比IC/ICIR)
 """
 import warnings; warnings.filterwarnings('ignore')
@@ -86,7 +86,7 @@ assert len(FEATURE_NAMES) == 61, f"Expected 61, got {len(FEATURE_NAMES)}"
 
 def build_features():
     """构建特征矩阵，与phase4_full.py一致"""
-    print(f"[{ts()}] 加载数据...", flush=True)
+    print(f"[{ts()}] Loaded数据...", flush=True)
     conn = sqlite3.connect(str(DB))
     codes = [r[0] for r in conn.execute(
         'SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
@@ -232,9 +232,9 @@ if __name__ == '__main__':
     X_test = flat_ind[te_m]; y_test = y[te_m]
     dates_test = dates_arr[te_m]
 
-    # ====== Step 1.1: 特征重要性 ======
+    # ====== Step 1.1: Feature importance ======
     print(f"\n{'='*60}")
-    print("Step 1.1: 特征重要性分析")
+    print("Step 1.1: Feature importance分析")
     print(f"{'='*60}")
 
     result = train_and_eval(X_train_full, y_train_full, X_test, y_test, dates_test, "baseline")
@@ -326,7 +326,7 @@ if __name__ == '__main__':
     ablation_df.to_csv(OUT / 'step1_2_ablation.csv', index=False, encoding='utf-8-sig')
     print(f"\nSaved: {OUT / 'step1_2_ablation.csv'}")
 
-    # 保存完整结果JSON
+    # Save完整结果JSON
     summary = {
         'baseline_IC': float(result['IC']),
         'baseline_ICIR': float(result['ICIR']),

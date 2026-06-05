@@ -357,7 +357,7 @@ class KronosPredictor:
         recon_unorm[:, :4] = np.clip(recon_unorm[:, :4], 0.01, None)
         recon_unorm[:, 4:] = np.clip(recon_unorm[:, 4:], 0, None)
 
-        # 生成预测日期索引
+        # 生成预测date索引
         pred_dates = pd.date_range(start=y_ts, periods=pred_len, freq="MS")
 
         result = pd.DataFrame(
@@ -379,14 +379,14 @@ class KronosPredictor:
         sample_count: int = 3,
     ) -> list[pd.DataFrame]:
         """
-        批量预测多只股票。
+        批量预测多stocks。
 
         Args:
-            dfs: 每只股票的 OHLCV DataFrame 列表
+            dfs: 每stocks的 OHLCV DataFrame 列表
             其余参数同 predict()
 
         Returns:
-            每只股票的预测 DataFrame 列表
+            每stocks的预测 DataFrame 列表
         """
         results: list[pd.DataFrame] = []
         for i, df in enumerate(dfs):

@@ -1,10 +1,10 @@
-"""MC Dropout 批量推理 — 加载日线模型，N 次前向传播，输出不确定性量化结果
-用法：
-  python cli/mc_dropout_predict.py --codes 000001,000002  # 指定股票
-  python cli/mc_dropout_predict.py --limit 100             # 前 N 只股票
-  python cli/mc_dropout_predict.py --all                   # 全部股票
-  python cli/mc_dropout_predict.py --latest                # 仅最近一个交易日
-输出：.eastmoney-ai/lstm/mc_dropout_signals.parquet
+"""MC Dropout batch inference — Loaded日线模型，N 次前向传播，输出不确定性量化结果
+Usage:
+  python cli/mc_dropout_predict.py --codes 000001,000002  # specific stocks
+  python cli/mc_dropout_predict.py --limit 100             # first N stocks
+  python cli/mc_dropout_predict.py --all                   # all stocks
+  python cli/mc_dropout_predict.py --latest                # latest trading day only
+Output: .eastmoney-ai/lstm/mc_dropout_signals.parquet
 """
 import torch, torch.nn as nn, numpy as np, pandas as pd, sqlite3, argparse, time
 from pathlib import Path
@@ -17,7 +17,7 @@ LOOKBACK = 252
 MC_SAMPLES = 50
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# ======== 模型加载 ========
+# ======== Model Loading ========
 sys_path = str(PROJECT / 'lib' / 'lstm')
 import sys
 sys.path.insert(0, sys_path)
@@ -30,12 +30,12 @@ model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE, weights_only=T
 model.eval()
 print(f"Model: {sum(p.numel() for p in model.parameters()):,} params")
 
-# ======== 特征工程（与训练脚本完全一致） ========
+# ======== Feature Engineering ========
 def rolling_zscore_vec(s, w=60):
     return ((s - s.rolling(w, min_periods=w).mean()) / s.rolling(w, min_periods=w).std()).fillna(0).values
 
 def build_features(df_group):
-    """从单只股票的日线数据构建特征矩阵"""
+    """Build feature matrix from single stock daily data"""
     closes = df_group['close'].values.astype(float)
     opens = df_group['open'].values.astype(float)
     highs = df_group['high'].values.astype(float)
@@ -60,11 +60,11 @@ def build_features(df_group):
     feats[:, 19] = np.nan_to_num((closes - s.rolling(60).mean().values) / np.maximum(closes, 0.01), 0)
     feats[:, 20] = hash(df_group['code'].iloc[0]) % 31 / 31.0
     feats = np.nan_to_num(feats, 0.0)
-    return feats[:, :10]  # 仅前 10 维
+    return feats[:, :10]  # only first 10 dimensions
 
-# ======== MC Dropout 推理 ========
+# ======== MC Dropout Inference ========
 def mc_predict_batch(model, X_batch, n_samples=MC_SAMPLES):
-    """批量 MC Dropout：N 次前向传播，dropout 保持开启"""
+    """Batch MC Dropout: N forward passes，dropout 保持开启"""
     model.train()  # dropout 活跃
     all_samples = []
     with torch.no_grad():
@@ -77,7 +77,7 @@ def mc_predict_batch(model, X_batch, n_samples=MC_SAMPLES):
     return mean, std
 
 def confidence_penalty_vec(mean, std, strength=1.0):
-    """向量化置信度惩罚"""
+    """Vectorized confidence penalty"""
     eps = 1e-8
     cv = std / (np.abs(mean) + eps)
     penalty = 1.0 / (1.0 + strength * cv)
@@ -86,21 +86,21 @@ def confidence_penalty_vec(mean, std, strength=1.0):
     return adjusted, penalty, confidence, cv
 
 def uncertainty_level_vec(cv):
-    """向量化不确定性分级"""
+    """Vectorized uncertainty grading"""
     result = np.full(cv.shape[0], 'medium', dtype=object)
     result[cv < 0.3] = 'low'
     result[cv >= 0.7] = 'high'
     return result
 
-# ======== 主流程 ========
+# ======== Main Flow ========
 def main():
-    parser = argparse.ArgumentParser(description='MC Dropout 批量推理')
-    parser.add_argument('--codes', type=str, default='', help='逗号分隔的股票代码')
-    parser.add_argument('--limit', type=int, default=0, help='限制股票数量')
-    parser.add_argument('--all', action='store_true', help='全部股票')
-    parser.add_argument('--latest', action='store_true', help='仅最近一个交易日')
-    parser.add_argument('--batch-size', type=int, default=256, help='GPU 推理 batch size')
-    parser.add_argument('--n-samples', type=int, default=MC_SAMPLES, help='MC 采样次数')
+    parser = argparse.ArgumentParser(description='MC Dropout batch inference')
+    parser.add_argument('--codes', type=str, default='', help='comma-separated stock codes')
+    parser.add_argument('--limit', type=int, default=0, help='limit stock count')
+    parser.add_argument('--all', action='store_true', help='all stocks')
+    parser.add_argument('--latest', action='store_true', help='latest trading day only')
+    parser.add_argument('--batch-size', type=int, default=256, help='GPU inference batch size')
+    parser.add_argument('--n-samples', type=int, default=MC_SAMPLES, help='MC sample count')
     args = parser.parse_args()
 
     conn = sqlite3.connect(str(DB))
@@ -114,11 +114,11 @@ def main():
     elif args.limit > 0:
         codes = all_stocks[:args.limit]
     else:
-        codes = all_stocks[:50]  # 默认前 50 只
+        codes = all_stocks[:50]  # default: first 50 stocks
 
     print(f"Target stocks: {len(codes)}")
 
-    # 加载日线数据
+    # Load daily kline data
     d_df = pd.read_sql_query(f"""
         SELECT code, date, open, high, low, close, volume
         FROM daily_klines
@@ -141,14 +141,14 @@ def main():
         n = len(g)
         dates = g['date'].tolist()
 
-        # 构建特征
+        # Build features
         feats = build_features(g)
 
-        # 构建序列 batch
+        # Build sequence batch
         seqs = []
         seq_dates = []
         if args.latest:
-            # 仅最后一个日期
+            # Latest date only
             i = n - 1
             if i >= LOOKBACK - 1:
                 seqs.append(feats[i - LOOKBACK + 1:i + 1])
@@ -161,7 +161,7 @@ def main():
         if not seqs:
             continue
 
-        # 分批 GPU 推理
+        # Batch GPU inference
         all_mean, all_std = [], []
         for j in range(0, len(seqs), args.batch_size):
             batch = torch.from_numpy(np.array(seqs[j:j + args.batch_size])).float().to(DEVICE)
@@ -172,10 +172,10 @@ def main():
         means = np.concatenate(all_mean, axis=0)  # (n_dates, 2)
         stds = np.concatenate(all_std, axis=0)
 
-        # 置信度惩罚
+        # Confidence penalty
         y3_adj, y3_penalty, y3_conf, y3_cv = confidence_penalty_vec(means[:, 0], stds[:, 0])
         y6_adj, y6_penalty, y6_conf, y6_cv = confidence_penalty_vec(means[:, 1], stds[:, 1])
-        # 仅用 y3 计算 overall_confidence，y6 是训练时的 dummy target（恒为 0），不参与
+        # Only use y3 for overall_confidence，y6 是训练时的 dummy target（恒为 0），不参与
         overall_conf = y3_conf
         avg_cv = y3_cv
         ulevel = uncertainty_level_vec(avg_cv)
@@ -201,14 +201,14 @@ def main():
         if stock_count % 20 == 0:
             print(f"  Progress: {stock_count}/{len(codes)} stocks, {len(all_rows)} signals")
 
-    # 保存
+    # Save
     df_out = pd.DataFrame(all_rows)
     out_path = OUT / 'mc_dropout_signals.parquet'
     df_out.to_parquet(out_path, index=False)
     print(f"\nSaved {len(df_out)} signals to {out_path}")
 
-    # 统计摘要
-    print(f"\n=== 不确定性分布 ===")
+    # Summary statistics
+    print(f"\n=== Uncertainty Distribution ===")
     if len(df_out) > 0:
         for level in ['low', 'medium', 'high']:
             count = (df_out['uncertainty_level'] == level).sum()

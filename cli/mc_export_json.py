@@ -1,6 +1,6 @@
-"""将 mc_dropout_signals.parquet 导出为 per-stock JSON 文件
-供 Chrome 扩展 native-host 读取。
-输出位置：.eastmoney-ai/storage/mc_dropout/<code>.json
+"""Export mc_dropout_signals.parquet为 per-stock JSON 文件
+For Chrome extension native-host consumption。
+Output location: .eastmoney-ai/storage/mc_dropout/<code>.json
 """
 import pandas as pd, json
 from pathlib import Path
@@ -11,16 +11,16 @@ OUT_DIR = PROJECT / '.eastmoney-ai' / 'storage' / 'mc_dropout'
 
 def main():
     if not PARQUET_PATH.exists():
-        print(f"文件不存在: {PARQUET_PATH}")
-        print("请先运行: python cli/mc_dropout_predict.py --all --latest")
+        print(f"File not found: {PARQUET_PATH}")
+        print("Please run first: python cli/mc_dropout_predict.py --all --latest")
         return
 
     df = pd.read_parquet(PARQUET_PATH)
-    print(f"加载 {len(df)} 条记录")
+    print(f"Loaded {len(df)} records")
 
-    # 每个股票取最新一条
+    # Take latest row per stock
     latest = df.sort_values('date').groupby('code').last()
-    print(f"覆盖 {len(latest)} 只股票")
+    print(f"Covering {len(latest)} stocks")
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -46,7 +46,7 @@ def main():
         out_path.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
         exported += 1
 
-    print(f"导出完成: {exported} 文件 → {OUT_DIR}")
+    print(f"Export done: {exported} 文件 → {OUT_DIR}")
 
 if __name__ == '__main__':
     main()

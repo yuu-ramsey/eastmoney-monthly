@@ -1,4 +1,4 @@
-// Phase 15 诊断：抽 5 样本读完整 agent 输出
+// Phase 15 diagnosis: sample 5, read full agent output
 import * as fs from 'node:fs';
 
 const files = fs.readdirSync('.eastmoney-ai/eval/runs').filter(f => f.startsWith('phase15-'));

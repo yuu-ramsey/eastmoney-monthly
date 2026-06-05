@@ -71,8 +71,8 @@ def cross_sectional_neutralize(features, dates, neutralizer):
 
 
 def load_daily_filters():
-    """加载每日涨跌停和成交额数据, 按月聚合为筛选标记"""
-    print(f"[{ts()}] 加载日线数据用于筛选...", flush=True); t0 = time.time()
+    """Loaded每日涨跌停和成交额数据, 按月聚合为筛选标记"""
+    print(f"[{ts()}] Loaded日线数据用于筛选...", flush=True); t0 = time.time()
     conn = sqlite3.connect(str(DB))
     df = pd.read_sql_query("""
         SELECT code, date, amount, change_percent
@@ -102,7 +102,7 @@ def load_daily_filters():
 
 def build_32d_features():
     """构建32维特征, Returns特征矩阵 + 元数据"""
-    print(f"[{ts()}] 加载月线数据...", flush=True)
+    print(f"[{ts()}] Loaded月线数据...", flush=True)
     conn = sqlite3.connect(str(DB))
     codes = [r[0] for r in conn.execute(
         'SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
@@ -240,7 +240,7 @@ if __name__ == '__main__':
     print(f"\nEnsemble: IC={ic_ens:+.4f}  ICIR={icir_ens:+.3f}  IC>0={ic_pos:.1%}")
     print(f"集成权重: LGB={ics_m['LGB']:.3f}  XGB={ics_m['XGB']:.3f}  Ridge={ics_m['Ridge']:.3f}")
 
-    # ---- 5. 加载日线筛选数据 ----
+    # ---- 5. Loaded日线筛选数据 ----
     daily_flags = load_daily_filters()
 
     # ---- 6. 构建预测表 ----

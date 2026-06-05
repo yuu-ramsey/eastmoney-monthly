@@ -84,7 +84,7 @@ def cross_sectional_neutralize(features, dates, neutralizer, ntype='categorical'
 
 
 def build_features():
-    print(f"[{ts()}] 加载数据...", flush=True)
+    print(f"[{ts()}] Loaded数据...", flush=True)
     conn = sqlite3.connect(str(DB))
     codes = [r[0] for r in conn.execute(
         'SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
@@ -236,7 +236,7 @@ if __name__ == '__main__':
 
     # Baseline: 全61维
     print(f"\n{'=' * 60}")
-    print("对比: 61维 vs 52维 (精简)")
+    print("Comparison: 61维 vs 52维 (精简)")
     print(f"{'=' * 60}")
 
     r61 = train_and_eval(X_train_full, y_train_full, X_test_full, y_test, dates_test, "61d_baseline")
@@ -301,7 +301,7 @@ if __name__ == '__main__':
         print(f"  Fold {fold + 1} ({fold_start}~{fold_end}): "
               f"61d IC={ic61_fold:+.4f}  52d IC={ic52_fold:+.4f}  Δ={delta_fold:+.4f}")
 
-    # 保存
+    # Save
     summary = {
         'baseline_61d': {'IC': float(r61['IC']), 'ICIR': float(r61['ICIR'])},
         'pruned_52d': {'IC': float(r52['IC']), 'ICIR': float(r52['ICIR'])},

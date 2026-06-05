@@ -1,4 +1,4 @@
-// 从 Phase 12 Run A 提取 frozen eval dataset
+// Extract frozen eval dataset from Phase 12 Run A
 import * as fs from 'node:fs';
 
 const records = fs.readFileSync('.eastmoney-ai/eval/runs/runA-no-sector-2026-05-18-05-12-20.jsonl', 'utf-8')

@@ -15,7 +15,7 @@ def mc_predict(model, X_tensor, n_samples=50):
     """MC Dropout 推理：N 次前向传播，dropout 保持开启
 
     Args:
-        model: nn.Module（调用前需已加载权重）
+        model: nn.Module（调用前需已Loaded权重）
         X_tensor: torch.Tensor, shape (1, seq_len, input_dim)
         n_samples: 前向传播次数
 
@@ -70,7 +70,7 @@ def predict_signal_with_uncertainty(model, X_array, n_samples=50,
     """端到端：从 numpy 数组到带不确定性的信号
 
     Args:
-        model: nn.Module（已加载权重）
+        model: nn.Module（已Loaded权重）
         X_array: np.ndarray, shape (seq_len, input_dim) 单条序列
         n_samples: MC 采样次数
         penalty_strength: 置信度惩罚强度

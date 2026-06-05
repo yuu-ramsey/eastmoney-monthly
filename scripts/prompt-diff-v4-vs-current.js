@@ -1,4 +1,4 @@
-// 步骤 1: v4 promptUsed vs 当前 buildPromptByTemplate 的 diff
+// Step 1: v4 promptUsed vs 当前 buildPromptByTemplate 的 diff
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';

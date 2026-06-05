@@ -90,4 +90,4 @@ print(f"\nLSTM IC/coverage ratio: {test_r['ic3']:.3f} / 1.00")
 print(f"ASC score/coverage ratio: 0.225 / 0.094")
 
 if test_r['ic3'] > 0.05:
-    print("\n结论: LSTM baseline IC > 0.05, 正向预测, 100%覆盖. 优于所有 Phase 11-15 prompt 工程.")
+    print("\nConclusion: LSTM baseline IC > 0.05, positive prediction, 100%Covering. Outperforms all Phase 11-15 prompt engineering.")

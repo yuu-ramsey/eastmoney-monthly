@@ -67,7 +67,7 @@ def accumulate_history(new_df):
     if HISTORY_PARQUET.exists():
         old_df = pd.read_parquet(HISTORY_PARQUET)
         log(f"  History data: {len(old_df)} rows, {old_df['code'].nunique()} stocks")
-        # 合并 + 去重（New data覆盖旧数据）
+        # 合并 + 去重（New dataCovering旧数据）
         combined = pd.concat([old_df, new_df], ignore_index=True)
         combined = combined.drop_duplicates(subset=['code', 'date'], keep='last')
         combined = combined.sort_values(['code', 'date']).reset_index(drop=True)
@@ -91,7 +91,7 @@ def export_native_host_json(latest_df):
     STORAGE_DIR.mkdir(parents=True, exist_ok=True)
     exported = 0
     for code, group in latest_df.groupby('code'):
-        # 取latest日期
+        # 取latestdate
         row = group.sort_values('date').iloc[-1]
         ulevel = str(row.get('uncertainty_level', 'medium'))
         data = {

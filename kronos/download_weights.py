@@ -41,7 +41,7 @@ MODEL_DIR = WEIGHTS_DIR / "model"
 
 def download_tokenizer() -> Path:
     """download KronosTokenizer 权重，返回保存路径"""
-    print(f"[1/4] 从 {REPO_TOKENIZER} 加载 tokenizer 配置...")
+    print(f"[1/4] 从 {REPO_TOKENIZER} Loaded tokenizer 配置...")
     tokenizer = KronosTokenizer.from_pretrained(REPO_TOKENIZER)
     print(f"  配置: s1_bits={tokenizer.s1_bits}, s2_bits={tokenizer.s2_bits}, "
           f"d_model={tokenizer.d_model}, codebook_dim={tokenizer.codebook_dim}")
@@ -56,7 +56,7 @@ def download_tokenizer() -> Path:
 def download_model(model_size: str = "base") -> Path:
     """download Kronos 预测模型权重，返回保存路径"""
     repo = REPO_MODEL_LARGE if model_size == "large" else REPO_MODEL_BASE
-    print(f"[3/4] 从 {repo} 加载 model 配置...")
+    print(f"[3/4] 从 {repo} Loaded model 配置...")
     model = Kronos.from_pretrained(repo)
     print(f"  配置: s1_bits={model.s1_bits}, s2_bits={model.s2_bits}, "
           f"d_model={model.d_model}, n_layers={model.n_layers}, n_heads={model.n_heads}")
@@ -70,20 +70,20 @@ def download_model(model_size: str = "base") -> Path:
 
 def verify(tokenizer_path: Path, model_path: Path) -> bool:
     """
-    验证权重加载：创建 tokenizer + model 实例并跑一次 dummy forward pass。
+    验证权重Loaded：创建 tokenizer + model 实例并跑一次 dummy forward pass。
 
     Returns:
         True 表示验证通过，False 表示失败
     """
     print("\n========================================")
-    print("验证权重加载...")
+    print("验证权重Loaded...")
     print("========================================")
 
     try:
-        print("  加载 tokenizer...")
+        print("  Loaded tokenizer...")
         tokenizer = KronosTokenizer.from_pretrained(str(tokenizer_path))
 
-        print("  加载 model...")
+        print("  Loaded model...")
         model = Kronos.from_pretrained(str(model_path))
 
         # 合成测试数据

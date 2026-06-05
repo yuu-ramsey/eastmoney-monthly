@@ -1,9 +1,9 @@
 """
 v32_final_eval.py — 32d final factor evaluation (all fixes merged)
 ======================================================
-修复清单（全部来自验证流程确认）：
+Fix list（全部来自验证流程确认）：
   1. 收益口径：单月 (c[i+1]-c[i])/c[i]，非accumulated
-  2. 日期分组：统一截断 YYYY-MM，同月股票归入同一截面
+  2. date分组：统一截断 YYYY-MM，同月股票归入同一截面
   3. 特征版本：32维（FFT振幅10 + G7全14 + 均线偏离3 + MACD3 + G4精选2）
   4. 回测窗口：2015-01 ~ 数据末尾
   5. 行业中性化：CSRC L2
@@ -39,10 +39,10 @@ np.random.seed(RANDOM_SEED)
 
 
 # ============================================================
-# 数据加载
+# 数据Loaded
 # ============================================================
 def load_data():
-    """从 SQLite 加载月线数据，日期统一截断为 YYYY-MM"""
+    """从 SQLite Loaded月线数据，date统一截断为 YYYY-MM"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
@@ -54,7 +54,7 @@ def load_data():
     rows = cur.fetchall()
     conn.close()
 
-    # 按股票分组，日期截断为 YYYY-MM（修复#2：去日粒度）
+    # 按股票分组，date截断为 YYYY-MM（修复#2：去日粒度）
     stock_data = defaultdict(list)
     for code, date_str, o, h, l, c, v, t in rows:
         if c is None:  # 过滤 23 条 NULL close 记录
@@ -65,14 +65,14 @@ def load_data():
             'close': c, 'volume': v, 'turnover': t or 0.0
         })
 
-    # 同股同月多条记录取最后一条（去重）
+    # 同股同月多records取最后一条（去重）
     for code in stock_data:
         seen = {}
         for rec in stock_data[code]:
             seen[rec['ym']] = rec
         stock_data[code] = sorted(seen.values(), key=lambda x: x['ym'])
 
-    # 加载 CSRC L2 行业映射（stock→industry 在 stockToIndustry 子对象中）
+    # Loaded CSRC L2 行业映射（stock→industry 在 stockToIndustry 子对象中）
     industry_map = {}
     if os.path.exists(INDUSTRY_PATH):
         with open(INDUSTRY_PATH, 'r', encoding='utf-8') as f:
@@ -80,8 +80,8 @@ def load_data():
             industry_map = raw.get('stockToIndustry', {})
 
     covered = sum(1 for c in stock_data if c in industry_map)
-    print(f"加载 {len(stock_data)} 只股票 | "
-          f"行业覆盖 {covered}/{len(stock_data)} "
+    print(f"Loaded {len(stock_data)} stocks | "
+          f"行业Covering {covered}/{len(stock_data)} "
           f"({covered/max(len(stock_data),1)*100:.0f}%)")
 
     return stock_data, industry_map
@@ -351,7 +351,7 @@ def build_cross_sections(stock_data, industry_map):
             cross_sections[ym] = section
 
     avg_n = np.mean([len(v) for v in cross_sections.values()])
-    print(f"有效截面: {len(cross_sections)} 个月 | 月均 {avg_n:.0f} 只股票")
+    print(f"有效截面: {len(cross_sections)} 个月 | 月均 {avg_n:.0f} stocks")
     return cross_sections, all_yms
 
 
@@ -705,7 +705,7 @@ def main():
     print("32维 | 单月收益 | YYYY-MM截面 | CSRC L2 | 滚动60月")
     print("=" * 70)
 
-    print("\n[1/5] 加载数据...")
+    print("\n[1/5] Loaded数据...")
     stock_data, industry_map = load_data()
 
     print("\n[2/5] 构建截面...")
@@ -724,7 +724,7 @@ def main():
 
     print_results(ic_results, cv_results, backtest_stats, cost_results)
 
-    # 保存
+    # Save
     output = {
         'ic_decay': {str(k): [r['ic'] for r in v]
                      for k, v in ic_results.items()},

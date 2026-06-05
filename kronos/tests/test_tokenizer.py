@@ -17,7 +17,7 @@ _tokenizer_weights_dir = (
 )
 requires_weights = pytest.mark.skipif(
     not _tokenizer_weights_dir.exists(),
-    reason="未download权重，请先运行 download_weights.py"
+    reason="未download权重，Please run first download_weights.py"
 )
 
 
@@ -104,7 +104,7 @@ class TestKronosTokenizerForward:
 
 
 class TestKronosTokenizerPretrained:
-    """预训练权重加载测试（需先运行 download_weights.py）"""
+    """预训练权重Loaded测试（需先运行 download_weights.py）"""
 
     @requires_weights
     def test_from_pretrained_tokenizer(self):

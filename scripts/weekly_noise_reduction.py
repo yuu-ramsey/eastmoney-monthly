@@ -1,6 +1,6 @@
 """Weekly noise diagnosis + denoising plan: systematically solve high noise + complex model overfitting
 
-诊断维度：
+Diagnostic dimensions：
   1. 目标噪声：13周收益的方差分解（市场β vs 个股α）
   2. 特征噪声：各特征的自相关衰减（信号持续性）
   3. 过拟合诊断：模型容量 vs 有效样本量
@@ -25,7 +25,7 @@ PROJECT = Path(__file__).parent.parent
 OUT = PROJECT / '.eastmoney-ai' / 'lstm'
 DB = PROJECT / '.eastmoney-ai' / 'db' / 'klines-v2.sqlite'
 
-# ======== 0. 数据加载（复用 weekly_daily_bridge 的特征构建逻辑） ========
+# ======== 0. 数据Loaded（复用 weekly_daily_bridge 的特征构建逻辑） ========
 print("0/5 Loading & building features...")
 
 conn = sqlite3.connect(str(DB))

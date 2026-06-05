@@ -1,4 +1,4 @@
-// 审计脚本：用当前 parser 重解析 v4-signals jsonl，验证 score 可还原性
+// Audit script: re-parse with current parser v4-signals jsonl，验证 score 可还原性
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';

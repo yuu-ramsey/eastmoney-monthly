@@ -97,7 +97,7 @@ VERSION_NAMES = {
 
 
 def build_features():
-    print(f"[{ts()}] 加载数据...", flush=True)
+    print(f"[{ts()}] Loaded数据...", flush=True)
     conn = sqlite3.connect(str(DB))
     codes = [r[0] for r in conn.execute(
         'SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
@@ -342,7 +342,7 @@ if __name__ == '__main__':
             cv_d = results[vname]['cv_details'][i]
             print(f"  {vname}: IC={cv_d['IC']:+.4f}")
 
-    # 保存
+    # Save
     summary = {}
     for vname in ['61d', '52d', '41d', '32d']:
         r = results[vname]

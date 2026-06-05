@@ -1,7 +1,7 @@
 """
 Phase 5: FFT reconstruction — 30d→10d (keep only amplitude spectrum)
-对比: 61维 baseline vs 41维 (FFT振幅10维)
-Output: T+1~T+6 IC decay + 特征重要性
+Comparison: 61维 baseline vs 41维 (FFT振幅10维)
+Output: T+1~T+6 IC decay + Feature importance
 """
 import warnings; warnings.filterwarnings('ignore')
 import numpy as np, pandas as pd, sqlite3, time, json
@@ -110,7 +110,7 @@ def cross_sectional_neutralize(features, dates, neutralizer, ntype='categorical'
 
 
 def build_features():
-    print(f"[{ts()}] 加载数据...", flush=True)
+    print(f"[{ts()}] Loaded数据...", flush=True)
     conn = sqlite3.connect(str(DB))
     codes = [r[0] for r in conn.execute(
         'SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
@@ -318,7 +318,7 @@ if __name__ == '__main__':
 
     # ====== 训练 & 评估 ======
     print(f"\n{'=' * 70}")
-    print("对比: 61维(FFT 30d) vs 41维(FFT 10d振幅谱)")
+    print("Comparison: 61维(FFT 30d) vs 41维(FFT 10d振幅谱)")
     print(f"{'=' * 70}")
 
     r61 = train_and_eval(X61_tr, y_tr, X61_te, y_te, dates_te, fwd_te, "61d_baseline")
@@ -347,7 +347,7 @@ if __name__ == '__main__':
 
     # ====== Feature Importance (41维) ======
     print(f"\n{'=' * 70}")
-    print("41维特征重要性 (按LGB gain排序)")
+    print("41维Feature importance (按LGB gain排序)")
     print(f"{'=' * 70}")
 
     lgb_gain = r41['lgb'].feature_importances_
@@ -384,7 +384,7 @@ if __name__ == '__main__':
     print(f"\nTop 20 (by LGB gain):")
     print(imp_df.head(20)[['idx', 'feature', 'lgb_gain', 'xgb_gain']].to_string(index=False))
 
-    # 保存
+    # Save
     imp_df.to_csv(OUT / 'fft10_feature_importance.csv', index=False, encoding='utf-8-sig')
 
     decay_df = pd.DataFrame([{

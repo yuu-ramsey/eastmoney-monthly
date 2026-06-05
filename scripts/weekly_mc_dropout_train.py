@@ -1,6 +1,6 @@
 """Weekly MC Dropout denoising training: uncertainty quantification + discounted target + walk-forward evaluation
 
-降噪策略：
+Denoising strategy：
   1. 目标降噪：折扣多月回报（γ=0.9, 13w+26w+39w+52w）
   2. 推断降噪：MC Dropout 50次采样 → cv = std/|mean|
   3. 信号降噪：过滤 high uncertainty (cv≥0.7) → 去除~31%噪音信号
@@ -27,7 +27,7 @@ GAMMA = 0.9
 print(f"Device: {torch.cuda.get_device_name(0)}")
 print(f"MC Samples: {MC_SAMPLES}, Lookback: {LOOKBACK}w, Features: {FEATURE_DIM}")
 
-# ======== 1. 数据加载 + 安全特征 + 折扣目标 ========
+# ======== 1. 数据Loaded + 安全特征 + 折扣目标 ========
 print("\n1/5 Loading weekly data + building safe features + discounted target...")
 
 conn = sqlite3.connect(str(DB))
@@ -373,7 +373,7 @@ for name, (model, val_ic) in trained_models.items():
     print(f"    High: {pct_high:.0f}%  IC={strata['high']['ic']:.4f}" if strata['high']['ic'] else f"    High: {pct_high:.0f}%  IC=N/A")
     print(f"    Filtered (no high): IC={ic_f:.4f}  N={int(keep.sum())}")
 
-    # 保存到 trained_models 供后续用
+    # Save到 trained_models 供后续用
     trained_models[name] = (model, val_ic, {
         'ic_all': ic_all, 'sr': sr,
         'ic_filtered': ic_f,
@@ -521,7 +521,7 @@ for name, (model, val_ic, res) in trained_models.items():
     ic_high = f"{s['high']['ic']:.4f}" if s['high']['ic'] is not None else 'N/A'
     print(f"  {name:<20} {res['ic_all']:8.4f} {res['ic_filtered']:8.4f} {ic_low:>8} {ic_med:>8} {ic_high:>8} {val_ic:8.4f} {res['sr']:8.3f}")
 
-# 不确定性分布
+# Uncertainty Distribution
 print(f"\n{'Model':<20} {'Low%':>8} {'Med%':>8} {'High%':>8} {'Filt Gain':>10}")
 print(f"{'-'*20} {'-'*8} {'-'*8} {'-'*8} {'-'*10}")
 for name, (model, val_ic, res) in trained_models.items():

@@ -40,21 +40,21 @@ _MODEL_DIR = _KRONOS_DIR / "weights" / "model"
 
 
 def load_predictor(device: str = "cuda") -> KronosPredictor:
-    """加载 tokenizer + model 权重"""
+    """Loaded tokenizer + model 权重"""
     if not _TOKENIZER_DIR.exists():
         raise FileNotFoundError(
             f"Tokenizer 权重未找到: {_TOKENIZER_DIR}\n"
-            f"请先运行: python -m kronos.download_weights"
+            f"Please run first: python -m kronos.download_weights"
         )
     if not _MODEL_DIR.exists():
         raise FileNotFoundError(
             f"Model 权重未找到: {_MODEL_DIR}\n"
-            f"请先运行: python -m kronos.download_weights"
+            f"Please run first: python -m kronos.download_weights"
         )
 
-    print(f"加载 tokenizer: {_TOKENIZER_DIR}", file=sys.stderr)
+    print(f"Loaded tokenizer: {_TOKENIZER_DIR}", file=sys.stderr)
     tokenizer = KronosTokenizer.from_pretrained(str(_TOKENIZER_DIR))
-    print(f"加载 model: {_MODEL_DIR}", file=sys.stderr)
+    print(f"Loaded model: {_MODEL_DIR}", file=sys.stderr)
     model = Kronos.from_pretrained(str(_MODEL_DIR))
 
     predictor = KronosPredictor(tokenizer, model, device=device)
@@ -67,7 +67,7 @@ def format_text(signal: dict) -> str:
     direction_label = {"up": "看多", "down": "看空", "flat": "震荡"}
 
     lines = [
-        f"代码: {signal['code']}",
+        f"code: {signal['code']}",
         f"数据: {signal['data_count']} 条 ({signal['data_range']})",
         f"预测: 未来 {signal['pred_len']} 个月",
         "",
@@ -85,7 +85,7 @@ def format_text(signal: dict) -> str:
 
 def main():
     parser = argparse.ArgumentParser(description="Kronos 本地离线预测")
-    parser.add_argument("code", help="股票代码，如 600519")
+    parser.add_argument("code", help="股票code，如 600519")
     parser.add_argument("--json", action="store_true", help="JSON 输出（供 Node.js 解析）")
     parser.add_argument("--n-samples", type=int, default=30, help="采样次数 (default: 30)")
     parser.add_argument("--pred-len", type=int, default=3, help="预测月数 (default: 3)")
@@ -104,7 +104,7 @@ def main():
         sys.stdout = open(os.devnull, 'w')
 
     try:
-        # 加载模型
+        # Loaded模型
         try:
             predictor = load_predictor(args.device)
         except FileNotFoundError as e:

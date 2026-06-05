@@ -50,9 +50,9 @@ for code in codes:
 
     for i in range(60, n-6):  # i = signal computation index
         if c[i] <= 0.01: continue
-        signal_date = dates[i]           # 信号计算日期（当前月末）
-        ret_start_date = dates[i+1]      # 收益起始日期（下月末，用于计算 return = (c[i+3]-c[i])/c[i] 中 c[i]的日期）
-        ret_end_date = dates[i+3]        # 收益截止日期（3个月后）
+        signal_date = dates[i]           # 信号计算date（当前月末）
+        ret_start_date = dates[i+1]      # 收益起始date（下月末，用于计算 return = (c[i+3]-c[i])/c[i] 中 c[i]的date）
+        ret_end_date = dates[i+3]        # 收益截止date（3个月后）
         fwd_raw = (c[i+3] - c[i]) / c[i]
         if abs(fwd_raw) > 2: continue
 

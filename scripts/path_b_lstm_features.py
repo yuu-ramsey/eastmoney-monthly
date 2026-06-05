@@ -61,7 +61,7 @@ for code in codes:
     p5h=pd.Series(c).rolling(60).max().values; p5l=pd.Series(c).rolling(60).min().values
     vol_ma3=pd.Series(v).rolling(3).mean().values; vol_ma12=pd.Series(v).rolling(12).mean().values
     # Candle body features
-    body_pct = np.abs(c-o)/np.maximum(h-l, 0.01)  # 实体占比
+    body_pct = np.abs(c-o)/np.maximum(h-l, 0.01)  # body ratio
     upper_shadow = (np.maximum(o,c)-h)/np.maximum(h-l, 0.01)  # 上影线比
     lower_shadow = (l-np.minimum(o,c))/np.maximum(h-l, 0.01)  # 下影线比
     # Consecutive up/down months
@@ -113,7 +113,7 @@ for code in codes:
         flat.append(ma10[i]/max(ma60[i],0.01)-1 if i>=60 and not np.isnan(ma10[i]) and not np.isnan(ma60[i]) else 0)  # MA10/MA60
         flat.append(1.0 if c[i]>ma5[i] else 0.0)  # above MA5
         flat.append(1.0 if c[i]>ma10[i] else 0.0)  # above MA10
-        flat.append(body_pct[i] if not np.isnan(body_pct[i]) else 0)  # 实体占比
+        flat.append(body_pct[i] if not np.isnan(body_pct[i]) else 0)  # body ratio
         flat.append(upper_shadow[i] if not np.isnan(upper_shadow[i]) else 0)  # 上影线
         flat.append(lower_shadow[i] if not np.isnan(lower_shadow[i]) else 0)  # 下影线
         flat.append(up_streak[i] / 12.0)  # 连涨月数(归一化)

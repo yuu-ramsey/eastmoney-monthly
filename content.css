@@ -46,7 +46,7 @@
 
 .panel.open { transform: translateX(0); }
 
-/* ---- 顶部标题栏 ---- */
+/* ---- Top title bar ---- */
 .panel-header {
   display: flex;
   align-items: center;
@@ -94,7 +94,7 @@
 }
 .close:hover { color: #333; }
 
-/* ---- 概览条 ---- */
+/* ---- Overview bar ---- */
 .panel-overview {
   display: flex;
   align-items: center;
@@ -143,7 +143,7 @@
   border-radius: 10px;
 }
 
-/* ---- 元信息条 ---- */
+/* ---- Meta info bar ---- */
 .panel-meta {
   padding: 6px 16px;
   font-size: 11px;
@@ -171,7 +171,7 @@
   color: white;
 }
 
-/* ---- 主内容区 ---- */
+/* ---- Main content area ---- */
 .panel-body {
   flex: 1;
   overflow-y: auto;
@@ -198,7 +198,7 @@
   border-left: 3px solid #c0392b;
 }
 
-/* ---- 卡片折叠 ---- */
+/* ---- Card collapse ---- */
 .card {
   margin-bottom: 10px;
   border: 1px solid #e8ecf1;
@@ -253,7 +253,7 @@
 }
 .card-body.collapsed { display: none; }
 
-/* ---- 卡片内分析文本 ---- */
+/* ---- In-card analysis text ---- */
 .card-body h3, .card-body h4, .card-body h5 {
   margin: 12px 0 6px;
   font-weight: 600;
@@ -282,7 +282,7 @@
   font-size: 12px;
 }
 
-/* ---- 非卡片模式兜底 ---- */
+/* ---- Fallback for non-card mode ---- */
 .analysis h1, .analysis h2, .analysis h3, .analysis h4 {
   margin: 16px 0 8px;
   font-weight: 600;
@@ -305,7 +305,7 @@
   font-size: 13px;
 }
 
-/* ---- 多轮对话区域 ---- */
+/* ---- Multi-turn chat area ---- */
 .chat-area {
   display: flex;
   flex-direction: column;
@@ -459,7 +459,7 @@
   cursor: wait;
 }
 
-/* 思考流 */
+/* Thinking stream */
 .thinking-stream {
   border: 1px solid #dee2e6;
   border-radius: 6px;
@@ -515,7 +515,7 @@
   font-weight: 500;
 }
 
-/* 仪表盘卡片 */
+/* Dashboard card */
 .dashboard-card {
   background: #f8f9fa;
   border: 1px solid #dee2e6;

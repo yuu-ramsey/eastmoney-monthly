@@ -7,7 +7,7 @@ const records = fs.readFileSync(file, 'utf-8').trim().split('\n').filter(Boolean
 // Signal distribution
 const sigDist = {};
 for (const r of records) { const s = r.predictedSignal || '?'; sigDist[s] = (sigDist[s] || 0) + 1; }
-console.log('Signal分布:', JSON.stringify(sigDist));
+console.log('Signal distribution:', JSON.stringify(sigDist));
 
 // 抽样 3 条
 for (let i = 0; i < Math.min(3, records.length); i++) {

@@ -27,7 +27,7 @@ conn.close()
 # Problem 1: Walk-forward date ranges
 # ============================================================
 print("\n" + "=" * 60)
-print("问题 1: Walk-forward split 日期验证")
+print("问题 1: Walk-forward split date验证")
 print("=" * 60)
 
 # Simulate the same sequence generation logic
@@ -81,7 +81,7 @@ train_val_overlap = train_dates & val_dates
 val_test_overlap = val_dates & test_dates
 train_test_overlap = train_dates & test_dates
 
-print(f"\n日期重叠检查:")
+print(f"\ndate重叠检查:")
 print(f"  Train ∩ Val: {len(train_val_overlap)} dates")
 if train_val_overlap:
     print(f"    {sorted(train_val_overlap)[:5]}...")
@@ -142,7 +142,7 @@ if skipped:
         start_years = df_skipped['date_range'].str.extract(r'^(\d{4})')[0]
         print(f"  Start years: {start_years.value_counts().sort_index().to_dict()}")
 
-print(f"\n覆盖率: {len(stocks_all) - len(skipped)}/{len(stocks_all)} = {(len(stocks_all) - len(skipped)) / len(stocks_all) * 100:.1f}%")
+print(f"\nCovering率: {len(stocks_all) - len(skipped)}/{len(stocks_all)} = {(len(stocks_all) - len(skipped)) / len(stocks_all) * 100:.1f}%")
 
 # ============================================================
 # Problem 3: y pre-clip distribution

@@ -91,7 +91,7 @@ console.log(`M:${[...monthlyData.values()].reduce((s,v)=>s+v.length,0)} W:${[...
 const evalMonths = [...new Set([...monthlyData.values()].flat().map(k => k.date))].filter(d => d >= '2018-01' && d <= '2024-12').sort();
 console.log(`Eval months: ${evalMonths.length}`);
 
-// 为每个月计算 HS300 等权基准收益
+// Compute HS300 equal-weight benchmark return for each month
 function getPriceAtOrBefore(klines, date) {
   let last = null;
   for (const k of klines) { if (k.date > date) break; last = k; }

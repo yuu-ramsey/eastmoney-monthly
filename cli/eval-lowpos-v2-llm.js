@@ -43,7 +43,7 @@ function getKlines(code, cutoffDate) {
 function buildPrompt(tp) {
   const kl=getKlines(tp.stockCode, tp.cutoffDate);
   if(!kl) return null;
-  return '你是A股技术分析师。以下是'+tp.stockCode+'近12+个月月线(前复权):\n'+kl+'\n该股处于低位——过去12月底部20%且<MA60。判断未来6个月方向。\n\n输出JSON:\n```json\n{"signal":"strong_bull|bull|neutral|bear|strong_bear"}\n```\nsignal必五选一。';
+  return 'You are an A-share technical analyst. Below is '+tp.stockCode+' 12+ months of monthly klines (pre-adjusted):\n'+kl+'\nThe stock is at a low position — bottom 20% of past 12 months and <MA60. Assess 6-month direction.\n\nOutput JSON:\n```json\n{"signal":"strong_bull|bull|neutral|bear|strong_bear"}\n```\nSignal must be one of five options.';
 }
 
 async function callLLM(prompt) {

@@ -1,4 +1,4 @@
-// OSV.dev 自动安全扫描 — 对 package-lock.json 每个依赖查已知 CVE
+// OSV.dev automatic security scan — 对 package-lock.json 每个依赖查已知 CVE
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';

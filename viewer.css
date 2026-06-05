@@ -74,7 +74,7 @@ code {
   font-size: 11px; color: #999; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0;
 }
 
-/* 跨级别一致性警告 */
+/* Cross-level consistency warning */
 .cross-level-warnings {
   background: #fff9e6;
   border: 1px solid #f0d76e;

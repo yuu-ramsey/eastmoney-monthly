@@ -1,4 +1,4 @@
-// 步骤 2: 从 v4 jsonl 重建 dataset-v6.json
+// Step 2: rebuild from v4 jsonl dataset-v6.json
 // 直接复用 v4 的 groundTruth/stockReturn/alpha，
 // 从本地 SQLite 补 cutoffIndex
 import * as fs from 'node:fs';

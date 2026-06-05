@@ -49,20 +49,20 @@ print("Loading macro data...")
 try:
     import akshare as ak
     m2 = ak.macro_china_m2_yearly()
-    m2['date'] = pd.to_datetime(m2['日期']).dt.strftime('%Y-%m')
+    m2['date'] = pd.to_datetime(m2['date']).dt.strftime('%Y-%m')
     m2_map = dict(zip(m2['date'], m2['今值']))
 
     pmi = ak.macro_china_pmi_yearly()
-    if '日期' in pmi.columns:
-        pmi['date'] = pd.to_datetime(pmi['日期']).dt.strftime('%Y-%m')
-        pmi_col = '制造业' if '制造业' in pmi.columns else '今值'
+    if 'date' in pmi.columns:
+        pmi['date'] = pd.to_datetime(pmi['date']).dt.strftime('%Y-%m')
+        pmi_col = 'manufacturing' if 'manufacturing' in pmi.columns else '今值'
         pmi_map = dict(zip(pmi['date'], pmi[pmi_col]))
     else:
         pmi_map = {}
 
     cpi = ak.macro_china_cpi_monthly()
-    cpi['date'] = pd.to_datetime(cpi['日期']).dt.strftime('%Y-%m')
-    cpi_map = dict(zip(cpi['date'], cpi['同比增长']))
+    cpi['date'] = pd.to_datetime(cpi['date']).dt.strftime('%Y-%m')
+    cpi_map = dict(zip(cpi['date'], cpi['yoy_growth']))
     print(f"  M2: {len(m2_map)} months, PMI: {len(pmi_map)}, CPI: {len(cpi_map)}")
 except Exception as e:
     print(f"  Macro failed: {e}, using fallback")

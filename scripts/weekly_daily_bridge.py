@@ -1,5 +1,5 @@
 """Weekly IC improvement plan: daily signal aggregation bridge + enriched features + multi-model comparison
-核心假设：日线LSTM (IC=0.141) 已有预测能力，聚合到周级别可迁移信号
+Core hypothesis：日线LSTM (IC=0.141) 已有预测能力，聚合到周级别可迁移信号
 
 方案：
   A. 日线信号直接聚合：daily score → weekly agg → 评估 IC (零成本)
@@ -18,7 +18,7 @@ PROJECT = Path(__file__).parent.parent
 OUT = PROJECT / '.eastmoney-ai' / 'lstm'
 DB = PROJECT / '.eastmoney-ai' / 'db' / 'klines-v2.sqlite'
 
-# ======== 1. 加载数据 ========
+# ======== 1. Loaded数据 ========
 print("1/4 Loading data...")
 
 # 日线信号
@@ -89,7 +89,7 @@ w_df = w_df.merge(daily_agg, on=['code', 'week_id'], how='left')
 print("\n3/4 Building weekly features & targets...")
 
 def compute_weekly_features(g):
-    """为单只股票构建周线特征矩阵"""
+    """为单stocks构建周线特征矩阵"""
     n = len(g)
     closes = g['close'].values.astype(float)
     highs = g['high'].values.astype(float)
@@ -332,7 +332,7 @@ best_name = max(results.items(), key=lambda x: np.mean(x[1]) if x[1] else -999)[
 best_ic = np.mean(results[best_name]) if results[best_name] else 0
 print(f"  最佳: {best_name} IC = {best_ic:.4f} (提升 {best_ic/0.0074:.0f}x)")
 
-# ======== 特征重要性 ========
+# ======== Feature importance ========
 if results['enriched_lgb']:
     print(f"\n{'='*60}")
     print("LightGBM Feature Importance (全量训练)")

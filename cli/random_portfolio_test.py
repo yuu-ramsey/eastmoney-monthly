@@ -1,11 +1,11 @@
-"""随机组合对照组验证
-基于 B站 BV1ckrZBNEXg 方法论：
-- 生成 N 组随机等规模组合
-- 计算随机组合收益分布
+"""Random portfolio control group validation
+Based on Bilibili BV1ckrZBNEXg 方法论：
+- Generate N random equal-sized portfolios
+- Compute random portfolio return distribution
 - 检查策略收益是否超过 random_mean + 3σ
 - 输出显著性报告
 
-用法：
+Usage:
   python cli/random_portfolio_test.py --dataset .eastmoney-ai/eval/dataset-v6.json
   python cli/random_portfolio_test.py --dataset ... --n-random 500 --threshold 3.0
   python cli/random_portfolio_test.py --results .eastmoney-ai/eval/results.json  # 含 LLM 预测结果
@@ -18,7 +18,7 @@ PROJECT = Path(__file__).parent.parent
 
 
 def load_testpoints(dataset_path):
-    """加载测试点，返回 [{stockCode, actualReturn, groundTruth, ...}]"""
+    """Loaded测试点，返回 [{stockCode, actualReturn, groundTruth, ...}]"""
     with open(dataset_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
     test_points = data.get('testPoints', data if isinstance(data, list) else [])
@@ -26,7 +26,7 @@ def load_testpoints(dataset_path):
 
 
 def load_results(results_path):
-    """加载 LLM 评估结果，返回 [{stockCode, predictedSignal, ...}]"""
+    """Loaded LLM 评估结果，返回 [{stockCode, predictedSignal, ...}]"""
     with open(results_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
     return data.get('results', data if isinstance(data, list) else [])
@@ -190,7 +190,7 @@ def main():
     args = parser.parse_args()
 
     test_points, stocks = load_testpoints(args.dataset)
-    print(f"数据集: {len(test_points)} 个测试点, {len(stocks)} 只股票")
+    print(f"数据集: {len(test_points)} 个测试点, {len(stocks)} stocks")
 
     # ---- 模式 1：基于 groundTruth 信号（不依赖 LLM 预测） ----
     print("\n=== 模式 1：基于 groundTruth 信号 ===")

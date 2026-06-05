@@ -1,4 +1,4 @@
-// 深度审计：分析 v4 重解析不一致的根因
+// Deep audit: analyze root cause of v4 re-parse inconsistencies
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';

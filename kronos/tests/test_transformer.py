@@ -16,7 +16,7 @@ _model_weights_dir = (
 )
 requires_weights = pytest.mark.skipif(
     not _model_weights_dir.exists(),
-    reason="未download权重，请先运行 download_weights.py"
+    reason="未download权重，Please run first download_weights.py"
 )
 
 
@@ -123,9 +123,9 @@ class TestKronosForward:
 
 
 class TestKronosPretrained:
-    """预训练权重加载测试（需先运行 download_weights.py）"""
+    """预训练权重Loaded测试（需先运行 download_weights.py）"""
 
-    @pytest.mark.skip(reason="需要 HF Hub 在线加载")
+    @pytest.mark.skip(reason="需要 HF Hub 在线Loaded")
     def test_from_pretrained_hub(self):
         model = Kronos.from_pretrained("NeoQuasar/Kronos-base")
         assert model.d_model == 832

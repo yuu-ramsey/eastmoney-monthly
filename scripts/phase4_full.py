@@ -1,7 +1,7 @@
 """
 Phase 4: Robustness check — full version
 =============================
-基于行业中性化因子（LGB+XGB+Ridge Ensemble），执行：
+Based on industry-neutralized factors（LGB+XGB+Ridge Ensemble），执行：
   Task 4.1: 收益延迟 IC 衰减 (T+1 ~ T+6)
   Task 4.2: 因子噪声敏感度 (5%/10%/20% 幅度, 各50次)
   Task 4.3: Permutation Test (1000次, 月度截面内打乱标签)
@@ -79,8 +79,8 @@ def cross_sectional_neutralize(features, dates, neutralizer, ntype='categorical'
 # ============================================================
 # 1. Build data + features (复用 Phase 3 pipeline, 多加 T+4~T+6 标签)
 # ============================================================
-print(f"[{ts()}] Phase 4 鲁棒性检验 — 开始", flush=True)
-print(f"[{ts()}] 加载数据...", flush=True)
+print(f"[{ts()}] Phase 4 Robustness check — 开始", flush=True)
+print(f"[{ts()}] Loaded数据...", flush=True)
 
 conn = sqlite3.connect(str(DB))
 codes = [r[0] for r in conn.execute(
@@ -97,11 +97,11 @@ df = pd.read_sql_query(
 conn.close()
 
 codes_used = sorted(codes_with_ind)
-print(f"[{ts()}] {len(codes_used)} 只股票(有行业映射), {len(df)} 行", flush=True)
+print(f"[{ts()}] {len(codes_used)} stocks(有行业映射), {len(df)} 行", flush=True)
 
 df['month'] = df['date'].str[:7]
 
-# 构建特征: T 期因子 → T+1~T+6 期标签
+# Build features: T 期因子 → T+1~T+6 期标签
 print(f"[{ts()}] 构建特征 (61d)...", flush=True)
 t0 = time.time()
 flat_list, y_lists, dates_list, inds_list = [], [[] for _ in range(6)], [], []
@@ -677,7 +677,7 @@ json.dump(summary, open(tracking_dir / 'summary.json', 'w'), indent=2)
 # Final Summary
 # ============================================================
 print(f"\n{'='*65}")
-print("Phase 4 鲁棒性检验 — done")
+print("Phase 4 Robustness check — done")
 print(f"{'='*65}")
 print(f"  Task 4.1 IC Decay:       {decay_df['horizon'].tolist()}")
 print(f"  Task 4.2 Noise Sens:     {noise_df['IC_decay_pct'].tolist()}")

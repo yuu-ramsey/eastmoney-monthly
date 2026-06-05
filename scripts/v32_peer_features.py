@@ -1,6 +1,6 @@
 """
 v32 + peer approximation features: add within-industry ranking/similarity features on top of 32d, check IC improvement
-新增4维:
+New 4 dimensions:
   - ind_rank_pct: 行业内月收益百分位 (0~1)
   - ind_zscore: 行业内月收益z-score
   - peer_dist_median: 32维特征向量到行业median的欧氏距离
@@ -87,7 +87,7 @@ def cross_sectional_neutralize(features, dates, neutralizer):
 
 def build_features():
     """一次构建32d和36d(含同业特征)"""
-    print(f"[{ts()}] 加载数据...", flush=True)
+    print(f"[{ts()}] Loaded数据...", flush=True)
     conn = sqlite3.connect(str(DB))
     codes = [r[0] for r in conn.execute(
         'SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
@@ -331,9 +331,9 @@ if __name__ == '__main__':
     delta_pct = delta_ic / abs(r32['IC']) * 100 if r32['IC'] != 0 else 0
     print(f"\nΔIC(36d-32d) = {delta_ic:+.4f} ({delta_pct:+.1f}%)")
 
-    # 同业特征重要性
+    # 同业Feature importance
     print(f"\n{'='*60}")
-    print("同业特征重要性 (LGB gain + XGB gain)")
+    print("同业Feature importance (LGB gain + XGB gain)")
     print(f"{'='*60}")
     lgb_gain = r36['lgb'].feature_importances_
     xgb_gain_dict = r36['xgb'].get_booster().get_score(importance_type='gain')
@@ -360,7 +360,7 @@ if __name__ == '__main__':
         c32 = r32['cv_details'][i]; c36 = r36['cv_details'][i]
         print(f"Fold {c32['fold']} ({c32['start']}~{c32['end']}): 32d={c32['IC']:+.4f}  36d={c36['IC']:+.4f}")
 
-    # 保存
+    # Save
     pd.DataFrame([{
         'horizon': r32['decay'][i]['horizon'],
         'IC_32d': r32['decay'][i]['IC'], 'ICIR_32d': r32['decay'][i]['ICIR'],

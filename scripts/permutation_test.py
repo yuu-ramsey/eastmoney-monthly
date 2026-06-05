@@ -1,5 +1,5 @@
 """Permutation test: verify statistical significance of monthly LightGBM IC=0.063.
-方法：截面打乱 fwd_ret（破坏 X→y 关系）+ 价格序列打乱（破坏时序结构）
+Method: cross-sectional shuffle fwd_ret（破坏 X→y 关系）+ price series shuffle（破坏时序结构）
 """
 import numpy as np, pandas as pd, sqlite3, time, json
 from pathlib import Path
@@ -84,7 +84,7 @@ def main():
     print(f"截面打乱: {N_PERM}次 | 价格打乱: {N_PRICE_PERM}次")
     print("="*60)
 
-    # 加载
+    # Loaded
     t0 = time.time()
     conn = sqlite3.connect(DB)
     codes = [r[0] for r in conn.execute('SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
@@ -92,7 +92,7 @@ def main():
     params = ','.join('?'*len(codes))
     df = pd.read_sql_query(f"SELECT code,date,open,high,low,close,volume,turnover_rate FROM monthly_klines WHERE code IN ({params}) AND date>='2010-01' ORDER BY code,date", conn, params=codes)
     conn.close()
-    print(f"[1/4] 数据: {len(codes)}只股票, {len(df):,}行 ({time.time()-t0:.0f}s)")
+    print(f"[1/4] 数据: {len(codes)}stocks, {len(df):,}行 ({time.time()-t0:.0f}s)")
 
     # 真实 IC
     print("[2/4] 真实 IC 基线...")

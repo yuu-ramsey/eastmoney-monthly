@@ -43,13 +43,13 @@ async function callLLM(prompt) {
 async function retry(p, n=3) { let e; for(let i=0;i<=n;i++){try{return await callLLM(p);}catch(e2){e=e2;if(i<n)await new Promise(r=>setTimeout(r,[1000,4000,16000][i]));}} throw e; }
 function parseSignal(t) { try { const m = t.match(/```json\s*([\s\S]*?)```/); if (m) return JSON.parse(m[1].trim()).signal || 'parse_failed'; } catch (_) {} return 'parse_failed'; }
 function buildPrompt(tp) {
-  return `你是A股技术分析师。以下是${tp.stockCode}近60+个月月线数据(前复权)。该股当前处于【低位】——收盘价处于过去12月区间底部20%且低于MA60。请判断未来6个月走势方向。
+  return `You are an A-share technical analyst. Below is ${tp.stockCode} 60+ months of monthly kline data (pre-adjusted). The stock is at a low position — close price in bottom 20% of past 12-month range and below MA60. Assess the 6-month forward direction.
 
-输出格式:分析正文后追加:
+Output format: append after analysis text:
 \`\`\`json
 {"signal":"strong_bull|bull|neutral|bear|strong_bear","confidence":"high|medium|low"}
 \`\`\`
-signal必须五选一。免责声明:不构成投资建议。`;
+Signal must be one of five options. Disclaimer: This does not constitute investment advice.`;
 }
 
 let ok=completed.size, fail=0, totalCost=0;

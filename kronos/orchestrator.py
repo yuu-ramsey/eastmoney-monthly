@@ -35,8 +35,8 @@ def run_analysis(
     Complete analysis pipeline for a single stock.
 
     Args:
-        code: 股票代码
-        predictor: 已加载模型的 KronosPredictor 实例
+        code: 股票code
+        predictor: 已Loaded模型的 KronosPredictor 实例
         x_timestamp: historical数据截止时间
         y_timestamp: 预测起始时间
         pred_len: 预测 K 线数量

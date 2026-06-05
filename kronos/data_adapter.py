@@ -4,7 +4,7 @@ Data adapter - reads monthly kline data from project SQLite, converts to Kronos 
 Input: Monthly kline records for a stock from SQLite
 Output: pandas DataFrame
   columns = ['open','high','low','close','volume','amount']
-  index 为 DatetimeIndex（月线日期）
+  index 为 DatetimeIndex（月线date）
 """
 
 # Reproduced from Kronos (https://github.com/shiyu-coder/Kronos)
@@ -34,10 +34,10 @@ def load_monthly_klines(
     min_records: int = 12,
 ) -> pd.DataFrame:
     """
-    从 SQLite 月线数据库加载单只股票的 OHLCV 数据。
+    从 SQLite 月线数据库Loaded单stocks的 OHLCV 数据。
 
     Args:
-        code: 股票代码，如 "600519"
+        code: 股票code，如 "600519"
         db_path: SQLite 数据库路径，默认使用项目 klines-v2.sqlite
         min_records: 最低记录数要求，不足则报错
 
@@ -45,8 +45,8 @@ def load_monthly_klines(
         DataFrame，columns 包含 OHLCV + timestamps，按时间升序排列
 
     Raises:
-        FileNotFoundError: 数据库文件不存在
-        ValueError: 股票代码无数据或记录数不足
+        FileNotFoundError: 数据库File not found
+        ValueError: 股票code无数据或记录数不足
     """
     if db_path is None:
         db_path = DEFAULT_DB_PATH
@@ -81,8 +81,8 @@ def load_monthly_klines(
     else:
         df["amount"] = df["amount"].fillna(0.0)
 
-    # 解析日期 → pandas datetime
-    # 月线格式 "YYYY-MM"，统一补 "-01" 转为月初日期
+    # 解析date → pandas datetime
+    # 月线格式 "YYYY-MM"，统一补 "-01" 转为月初date
     date_str = df["date"].astype(str).str.strip()
     df["timestamps"] = pd.to_datetime(
         date_str.apply(_normalize_date), format="%Y-%m-%d"
@@ -110,7 +110,7 @@ def load_monthly_klines(
 
 
 def _normalize_date(date_str: str) -> str:
-    """将 "YYYY-MM" 补全为 "YYYY-MM-DD"；已是完整日期则原样返回"""
+    """将 "YYYY-MM" 补全为 "YYYY-MM-DD"；已是完整date则原样返回"""
     date_str = date_str.strip()
     if len(date_str) == 7:  # "YYYY-MM"
         return date_str + "-01"

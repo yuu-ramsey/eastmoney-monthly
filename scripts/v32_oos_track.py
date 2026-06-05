@@ -216,7 +216,7 @@ def cmd_predict():
         tracker = {'version': 'v32', 'start_month': latest_month, 'records': []}
     for rec in tracker['records']:
         if rec['predict_month'] == latest_month:
-            print(f"  覆盖: {latest_month} 已存在")
+            print(f"  Covering: {latest_month} 已存在")
             tracker['records'].remove(rec); break
     tracker['records'].append({
         'predict_month': latest_month, 'generated_at': ts(), 'predictions': predictions,
@@ -224,7 +224,7 @@ def cmd_predict():
     with open(OOS_FILE, 'w') as f:
         json.dump(tracker, f, indent=2, ensure_ascii=False)
     top10 = sorted(predictions.items(), key=lambda x: x[1], reverse=True)[:10]
-    print(f"  当月: {latest_month}  |  {len(predictions)} 只股票")
+    print(f"  当月: {latest_month}  |  {len(predictions)} stocks")
     print(f"  Top 10: {top10}")
     print(f"  保存: {OOS_FILE}")
 

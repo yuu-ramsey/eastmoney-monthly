@@ -52,3 +52,5 @@ kronos/venv/
 *.swp
 kronos/venv/
 kronos/weights/
+temp_scripts/
+skills-lock.json

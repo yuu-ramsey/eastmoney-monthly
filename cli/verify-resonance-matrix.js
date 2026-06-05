@@ -70,7 +70,7 @@ function getSignal(r) {
   return 'neutral';
 }
 
-// 数据加载 (与主脚本相同)
+// Data loading (same as main script)
 const stockList = db.prepare("SELECT DISTINCT stock_code FROM stock_industry_mapping").all().map(r => r.stock_code);
 console.log(`Stock: ${stockList.length}`);
 
@@ -87,7 +87,7 @@ const weeklyData = loadKlines('weekly_klines');
 const dailyData = loadKlines('daily_klines');
 console.log(`M:${[...monthlyData.values()].reduce((s,v)=>s+v.length,0)} W:${[...weeklyData.values()].reduce((s,v)=>s+v.length,0)} D:${[...dailyData.values()].reduce((s,v)=>s+v.length,0)}`);
 
-// HS300 等权基准: 所有 HS300 股票的平均月收益
+// HS300 equal-weight benchmark: average monthly return of all HS300 stocks
 const evalMonths = [...new Set([...monthlyData.values()].flat().map(k => k.date))].filter(d => d >= '2018-01' && d <= '2024-12').sort();
 console.log(`Eval months: ${evalMonths.length}`);
 

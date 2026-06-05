@@ -15,7 +15,7 @@ const PROJECT_DIR = path.resolve(__dirname, '..');
 const RUNS_DIR = path.join(PROJECT_DIR, '.eastmoney-ai', 'eval', 'runs');
 
 const EVAL_MAX_TOKENS = 4000;
-const LLM_CONCURRENCY = 1;     // 每次 1 个 testPoint（5 agent 并发）
+const LLM_CONCURRENCY = 1;     // 1 testPoint at a time (5 agents concurrent)
 const LLM_DELAY_MS = 500;
 const FROZEN_BASELINE = 0.1966;
 const PROMPT_VERSION = 'phase15-multi-agent';
@@ -32,7 +32,7 @@ async function getLLM(prompt, apiKey) {
   return d.choices?.[0]?.message?.content || '';
 }
 
-// Agent LLM 调用的工厂函数
+// Factory function for Agent LLM calls
 function makeAgentOpts(apiKey) {
   return {
     provider: 'deepseek',
@@ -43,7 +43,7 @@ function makeAgentOpts(apiKey) {
   };
 }
 
-// 覆盖 runAgentLLM 使其使用我们的 fetch 函数
+// Override runAgentLLM to use our fetch function
 async function runLLM(prompt, apiKey) {
   const text = await getLLM(prompt, apiKey);
   return { role: 'agent', text, usage: null, cost: 0.022, durationMs: 0 };

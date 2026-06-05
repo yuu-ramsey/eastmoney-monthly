@@ -132,7 +132,7 @@ Full research documentation in `docs/`.
 
 ```bash
 # Clone
-git clone https://github.com/<your-username>/eastmoney-monthly-ai.git
+git clone https://github.com/yuu-ramsey/eastmoney-monthly.git
 cd eastmoney-monthly-ai
 
 # Node.js dependencies

@@ -72,9 +72,9 @@ async function main() {
   const total = testPoints.length * 4;
 
   console.log(`=== Phase 15 Multi-Agent ===`);
-  console.log(`模式: ${dryRun ? 'DRY-RUN' : 'FULL'}, stocks=${dataset.stocks.length}, testPoints=${testPoints.length}, calls=${total * 5}`);
+  console.log(`Mode: ${dryRun ? 'DRY-RUN' : 'FULL'}, stocks=${dataset.stocks.length}, testPoints=${testPoints.length}, calls=${total * 5}`);
   console.log(`Frozen baseline: ${FROZEN_BASELINE}`);
-  console.log(`成本估算: ¥${(total * 5 * 0.022).toFixed(0)}\n`);
+  console.log(`Cost estimate: ¥${(total * 5 * 0.022).toFixed(0)}\n`);
 
   const { getDb } = await import('../lib/db/connection.js');
   const { calcSectorAlpha } = await import('../lib/sector/alpha.js');
@@ -91,11 +91,11 @@ async function main() {
       if (!completed.has(`${tp.stockCode}_${tpl}`)) pending.push({ tp, tpl });
     }
   }
-  console.log(`待跑: ${pending.length}/${total}\n`);
+  console.log(`Pending: ${pending.length}/${total}\n`);
 
-  if (pending.length === 0) { console.log('全部完成'); printReport(outPath); return; }
+  if (pending.length === 0) { console.log('All done'); printReport(outPath); return; }
 
-  // K 线缓存
+  // K-line cache
   const klinesCache = new Map();
   for (const c of [...new Set(pending.map(j => j.tp.stockCode))]) {
     const rows = db.prepare('SELECT * FROM monthly_klines WHERE code=? ORDER BY date').all(c);
@@ -113,7 +113,7 @@ async function main() {
     const klines = klinesCache.get(tp.stockCode);
 
     if (!stock || !klines || tp.cutoffIndex >= klines.length || tp.cutoffIndex < 12) {
-      append(outPath, { stockCode: tp.stockCode, template: tpl, error: 'K线不足', score: null });
+      append(outPath, { stockCode: tp.stockCode, template: tpl, error: 'insufficient K-lines', score: null });
       fail++; completedCount++; continue;
     }
 
@@ -186,7 +186,7 @@ async function main() {
   }
 
   const elapsed = ((Date.now()-startTime)/60000).toFixed(1);
-  console.log(`\n[P15] 完成: ${ok}/${total} ok, ${fail} fail, ${elapsed}min, ¥${totalCost.toFixed(2)}\n`);
+  console.log(`\n[P15] Complete: ${ok}/${total} ok, ${fail} fail, ${elapsed}min, ¥${totalCost.toFixed(2)}\n`);
   printReport(outPath);
 }
 
@@ -195,7 +195,7 @@ function printReport(filePath) {
   const records = fs.readFileSync(filePath, 'utf-8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l));
   const valid = records.filter(r => r.score != null);
 
-  if (valid.length === 0) { console.log('无有效记录'); return; }
+  if (valid.length === 0) { console.log('No valid records'); return; }
 
   const sum = valid.reduce((s, r) => s + r.score, 0);
   const score = +(sum / valid.length).toFixed(4);
@@ -212,26 +212,26 @@ function printReport(filePath) {
   const totalCost = records.reduce((s, r) => s + (r.totalCost || 0), 0);
   const judgeOk = valid.filter(r => r.judgeText && !r.judgeError).length;
 
-  // Agent-level 一致率：Judge signal vs Bull/Bear raw signals
+  // Agent-level agreement: Judge signal vs Bull/Bear raw signals
   let bullAgree = 0, bearAgree = 0, totalAgreed = 0;
 
-  console.log('## Phase 15 Multi-Agent 结果\n');
-  console.log(`| 指标 | 值 |`);
-  console.log(`|------|-----|`);
-  console.log(`| 有效记录 | ${valid.length} |`);
-  console.log(`| **加权 score (全量)** | **${score}** |`);
+  console.log('## Phase 15 Multi-Agent Results\n');
+  console.log(`| Metric | Value |`);
+  console.log(`|--------|-------|`);
+  console.log(`| Valid records | ${valid.length} |`);
+  console.log(`| **Weighted score (all)** | **${score}** |`);
   console.log(`| parse_failed | ${pf} (${(pf/valid.length*100).toFixed(1)}%) |`);
   console.log(`| strong_bull | ${strongBull.length} (${(strongBull.length/valid.length*100).toFixed(1)}%) FP=${strongBull.length>0?(sbFp/strongBull.length*100).toFixed(0):'N/A'}% |`);
   console.log(`| strong_bear | ${strongBear.length} (${(strongBear.length/valid.length*100).toFixed(1)}%) FP=${strongBear.length>0?(sbearFp/strongBear.length*100).toFixed(0):'N/A'}% |`);
-  console.log(`| Judge 成功 | ${judgeOk}/${valid.length} |`);
-  console.log(`| 总成本 | ¥${totalCost.toFixed(2)} |`);
+  console.log(`| Judge success | ${judgeOk}/${valid.length} |`);
+  console.log(`| Total cost | ¥${totalCost.toFixed(2)} |`);
 
   const delta = score - FROZEN_BASELINE;
   console.log(`\nFrozen baseline: ${FROZEN_BASELINE}`);
   console.log(`Δ: ${delta >= 0 ? '+' : ''}${delta.toFixed(4)}`);
-  if (score > 0.22) console.log('结论: PASS — score > 0.22');
-  else if (score >= 0.20) console.log('结论: MARGINAL — score ∈ [0.20, 0.22]');
-  else console.log('结论: FAIL — score < 0.20');
+  if (score > 0.22) console.log('Conclusion: PASS — score > 0.22');
+  else if (score >= 0.20) console.log('Conclusion: MARGINAL — score ∈ [0.20, 0.22]');
+  else console.log('Conclusion: FAIL — score < 0.20');
 }
 
 main().catch(e => { console.error(e); process.exit(1); });

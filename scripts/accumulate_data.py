@@ -22,7 +22,7 @@ DB = PROJECT / '.eastmoney-ai' / 'db' / 'klines-v2.sqlite'
 LSTM_DIR = PROJECT / '.eastmoney-ai' / 'lstm'
 STORAGE_DIR = PROJECT / '.eastmoney-ai' / 'storage' / 'mc_dropout'
 DATA_DIR = PROJECT / 'data'
-PYTHON = r'D:\ClaudeProjects\eastmoney-monthly-ai\.venv\Scripts\python.exe'
+PYTHON = os.environ.get('PYTHON_PATH', sys.executable)
 
 # 文件路径
 HISTORY_PARQUET = LSTM_DIR / 'mc_dropout_history.parquet'

@@ -1,38 +1,38 @@
-# P3 Kronos 跳变确认
+# P3 Kronos Jump Confirmation
 
-> 分支: `p3-gru-resample` | 日期: 2026-05-30
+> Branch: `p3-gru-resample` | Date: 2026-05-30
 
-## 判定: (a) 样本/功效提升 — 真过
+## Verdict: (a) Sample/Power Increase — Genuine Pass
 
-## 两次对比
+## Two-Run Comparison
 
-| 维度 | 12tp | 24tp |
+| Dimension | 12tp | 24tp |
 |------|------|------|
 | Pairs | 1574 | 3103 |
 | Test pairs | 758 | 1583 |
-| Kronos 配置 | 完全相同 | 完全相同 |
+| Kronos config | Identical | Identical |
 | Train spread | +11.1% | +12.1% |
 | Test spread | +4.7% | +9.7% |
-| Decay | **0.43** ⚠ | **0.80** ✓ |
+| Decay | **0.43** Warning | **0.80** Pass |
 | Test CI | [-2.9,+13.2] | **[+5.1,+15.0]** |
 
-唯一变化: 时点数 12→24。零配置变更。
+Only change: timepoint count 12->24. Zero config changes.
 
-## 根因
+## Root Cause
 
-12tp decay=0.43 (过拟合) 是 6 个 test 时点太少——个别 regime 主导估算。24tp 的 12 个 test 时点恢复 0.80 (>0.5 健康)。不是反复调参: 24tp 扩张在 `docs/p3-gru-prereg.md` 预注册 (commit `c025081`), 只扩一次。
+12tp decay=0.43 (overfit) was due to too few test timepoints (6) — individual regimes dominated estimation. 24tp's 12 test timepoints restore 0.80 (>0.5 healthy). Not repeated parameter tuning: 24tp expansion was pre-registered in `docs/p3-gru-prereg.md` (commit `c025081`), expanded once only.
 
-## 辅助
+## Supporting
 
-- Kronos-LLM r=0.069 (零相关, 不冗余)
-- 预注册合规, 跑前 commit, 跑后不可改
-- 新时点全用 cutoff 前数据, 无泄漏
+- Kronos-LLM r=0.069 (zero correlation, not redundant)
+- Pre-registration compliant: committed before run; no changes after run
+- New timepoints all use cutoff-pre data, no leakage
 
-## 24tp 全信号
+## 24tp Full Signals
 
-| 信号 | Test CI | Decay | 判定 |
+| Signal | Test CI | Decay | Verdict |
 |------|---------|-------|------|
-| Kronos-24tp | [+5.1,+15.0] | 0.80 | **✓ 过** |
-| Reversal-24tp | [-23.3,-12.9] | 2.10 | ✗ 反转(更多上涨 regime) |
-| GRU-WF | [-0.9,+19.7] | 1.28 | ✗ (673覆盖不足) |
-| LSTM-old | [-8.8,+11.8] | -0.41 | ✗ |
+| Kronos-24tp | [+5.1,+15.0] | 0.80 | **Pass** |
+| Reversal-24tp | [-23.3,-12.9] | 2.10 | Fail: reversed (more rising regimes) |
+| GRU-WF | [-0.9,+19.7] | 1.28 | Fail (673 coverage insufficient) |
+| LSTM-old | [-8.8,+11.8] | -0.41 | Fail |

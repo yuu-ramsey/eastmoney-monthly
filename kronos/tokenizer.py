@@ -1,7 +1,7 @@
 """
-Kronos Tokenizer — K线数据 → BSQ 分层离散 token
+Kronos Tokenizer — K-line data → BSQ hierarchical discrete tokens
 
-核心流程：
+Core pipeline:
 1. 线性嵌入：OHLCV(6维) → d_model
 2. Encoder Transformer → 压缩到 codebook_dim
 3. BSQuantizer：L2归一化 → sign量化 → s1(粗粒度)+s2(细粒度) token

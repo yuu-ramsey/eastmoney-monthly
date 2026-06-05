@@ -1,7 +1,7 @@
 """
-信号生成器 — 将 Kronos 多次独立采样的预测 K 线聚合为交易信号
+Signal generator — aggregates multiple independent Kronos K-line predictions into trading signals
 
-输入: list of N 个预测 DataFrame（每次 sample_count=1 的独立采样结果）
+Input: list of N prediction DataFrames (independent samples, each sample_count=1)
 输出: dict { direction, predicted_change_pct, predicted_high,
              predicted_low, confidence, volatility }
 

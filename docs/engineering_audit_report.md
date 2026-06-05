@@ -1,8 +1,8 @@
-# 工程审计报告：17 次 LSTM 实验正确性审查
+# Engineering Audit Report: 17 LSTM Experiment Correctness Review
 
-## Task 1: HMM Regime Detection 根因
+## Task 1: HMM Regime Detection Root Cause
 
-### 代码段 (final_hmm_regime.py:31-72)
+### Code Section (final_hmm_regime.py:31-72)
 
 ```python
 features = compute_hmm_features(hs300_rets)  # trailing 12m return/vol/skew/sharpe
@@ -16,28 +16,28 @@ for i in range(60, len(features)):
     regime_map = {sorted_states[0]: 'panic', sorted_states[1]: 'bear', ...}
 ```
 
-### 工程错误
+### Engineering Errors
 
-1. **HMM 未收敛**：日志中大量 "Model is not converging" 警告。`n_iter=100` 不足，尤其对小样本（60 个月）。
-2. **状态映射纯机械**：`np.argsort(state_means)` 仅按均值排序。HMM 状态本身无经济含义，但映射逻辑假设"高均值=牛、低均值=恐慌"。当 HMM 不收敛时，state_means 接近随机，映射无意义。
-3. **训练窗口不足**：60 个月 trailing window 对 4-state HMM 严重不足。hmmlearn 官方推荐每个状态至少 50-100 个样本。
-4. **每月重训破坏连续性**：每月重新 fit 导致状态编号随机交换，regime 标签在相邻月份间剧烈跳变。
+1. **HMM not converged**: Logs show numerous "Model is not converging" warnings. `n_iter=100` is insufficient, especially for small samples (60 months).
+2. **State mapping purely mechanical**: `np.argsort(state_means)` only sorts by mean. HMM states themselves have no economic meaning, but the mapping logic assumes "high mean=bull, low mean=panic." When HMM does not converge, state_means are near-random; mapping is meaningless.
+3. **Training window insufficient**: 60-month trailing window is severely insufficient for a 4-state HMM. hmmlearn official recommendation: at least 50-100 samples per state.
+4. **Monthly retrain breaks continuity**: Re-fitting every month causes random state label swaps; regime labels jump wildly between adjacent months.
 
-### 2018 判"牛"的根因
+### Root Cause of 2018 Being Labeled "Bull"
 
-训练窗口（2013-2017）包含 2014-2015 大牛市。HMM 从该窗口学到的"高均值状态"远高于 2018 实际回报。2018 的下跌幅度（月均 -2%）在牛熊训练数据中不足以被分到低均值状态。
+Training window (2013-2017) includes 2014-2015 mega bull market. The "high mean state" HMM learned from this window is far higher than 2018 actual returns. 2018's decline magnitude (monthly avg -2%) is insufficient to be classified into the low-mean state given the bull/bear training data.
 
-### 2020 判"恐慌"的根因
+### Root Cause of 2020 Being Labeled "Panic"
 
-2020 年 3 月 COVID 暴跌（HS300 月跌 >6%）是训练窗口中前所未有的极端值。HMM 将其分配到最低均值状态 → 映射为 "panic"。但后续 4-12 月的复苏月份也继承了这个标签（因为状态是 persistent 的）。
+March 2020 COVID crash (HS300 monthly drop >6%) is an unprecedented extreme in the training window. HMM assigns it to the lowest mean state -> mapped to "panic." But subsequent recovery months (April-December) also inherit this label (since states are persistent).
 
-### 修复建议
+### Fix Recommendation
 
-改为简单规则：`sharpe > 1.0 → bull, 0~1.0 → sideways, -1~0 → bear, <-1 → panic` 反而比 HMM 更可靠。或换用 Markov Switching 回归（statsmodels）。
+Switch to simple rules: `sharpe > 1.0 -> bull, 0~1.0 -> sideways, -1~0 -> bear, <-1 -> panic` is actually more reliable than HMM. Or switch to Markov Switching regression (statsmodels).
 
-## Task 2: 月度聚合代码审查
+## Task 2: Monthly Aggregation Code Review
 
-### 代码段 (sprint1_distribution_features.py:30-61)
+### Code Section (sprint1_distribution_features.py:30-61)
 
 ```python
 daily['month'] = daily['date'].str[:7]  # YYYY-MM
@@ -45,27 +45,27 @@ monthly_feats = daily.groupby(['code', 'month']).apply(compute_features)
 # compute_features extracts: p5/p25/p50/p75/p95/mean/std/skew/trend/vol_decay/early_late
 ```
 
-### 工程验证
+### Engineering Verification
 
-| 检查项 | 结果 |
+| Check Item | Result |
 |--------|------|
-| daily_signals.parquet 866K 条 | ✅ 确认 |
-| score 字段 0 NaN | ✅ 确认 |
-| 月度聚合用 month 内所有交易日 | ✅ |
-| 时间对齐：月度特征 → 月线 forward return | ✅ key=(code, month) |
-| 月末停牌处理 | ❌ 未处理（停牌月份仍会输出） |
+| daily_signals.parquet 866K records | Pass: confirmed |
+| score field 0 NaN | Pass: confirmed |
+| Monthly aggregation uses all trading days in month | Pass |
+| Time alignment: monthly features -> monthly forward return | Pass: key=(code, month) |
+| Month-end suspension handling | Fail: not handled (suspended months still output) |
 
-### 工程错误
+### Engineering Errors
 
-**无严重错误。** 聚合逻辑正确。
+**No serious errors.** Aggregation logic is correct.
 
-### 信号质量
+### Signal Quality
 
-日线 LSTM 预测均值 = -0.72，标准差 = 0.86。非 NaN，非常量。月度聚合后均值 = -0.58，std = 0.62。
+Daily LSTM prediction mean = -0.72, std = 0.86. Not NaN, not constant. After monthly aggregation, mean = -0.58, std = 0.62.
 
-## Task 3: B2 EW Baseline 定义不一致
+## Task 3: B2 EW Baseline Definition Inconsistency
 
-### B2 alpha validation 中的 EW Baseline
+### EW Baseline in B2 Alpha Validation
 
 ```python
 # scripts/b2_alpha_validation.py:82-112
@@ -74,91 +74,91 @@ def evaluate_policy(policy, signals, returns, test_months, use_rl=True):
     w = pd.Series(1.0/TOP_K, index=codes)
 ```
 
-**B2 EW Baseline = LSTM 信号 Top-20 等权池**（不是 HS300 指数）
+**B2 EW Baseline = LSTM signal Top-20 equal-weight pool** (not HS300 index)
 
-### Phase 19 v2 中的 EW Baseline
+### EW Baseline in Phase 19 v2
 
 ```python
 # lib/backtest/engine_v2.py: v1 EW = Top-20 by combined signal (tech+res+sec+LSTM)
 ```
 
-**Phase 19 v2 EW = 4 信号加权 Top-20 等权池**
+**Phase 19 v2 EW = 4-signal weighted Top-20 equal-weight pool**
 
-### 工程错误
+### Engineering Error
 
-**两个 "EW Baseline" 是不同概念。** B2 报告中的 "EW SR=1.000 at 2024-25" 和 Phase 19 v2 "EW SR=0.615" 不可比。
+**The two "EW Baselines" are different concepts.** B2 report's "EW SR=1.000 at 2024-25" and Phase 19 v2 "EW SR=0.615" are not comparable.
 
 - B2 EW (LSTM only Top-20) vs HS300 index
 - Phase 19 v2 EW (4-signal Top-20) vs HS300 index
 
-**建议**：所有实验统一基线 = HS300 ETF 持有（无调仓）。用 `000300` 月线 close 直接计算。
+**Recommendation**: Unify baseline across all experiments = HS300 ETF buy-and-hold (no rebalancing). Compute directly from `000300` monthly close.
 
-## Task 4: Test Set 冻结状态
+## Task 4: Test Set Freeze Status
 
-### Test set 使用记录
+### Test Set Usage Record
 
-| # | 实验 | 文件 | Test 评估 |
+| # | Experiment | File | Test Evals |
 |---|------|------|----------|
-| 1 | v1 baseline | test.npz | 1 次 |
-| 2 | v2 arch | test.npz | 1 次 |
-| 3 | v3 data | test.npz (v3) | 1 次 |
-| 4 | v4 weekly | weekly_test.npz | 1 次 |
-| 5 | v4 csi500 | 动态生成 | 1 次 |
-| 6 | v5 daily | 动态生成 | 1 次 |
-| 7 | Sprint 1 | test.npz | 1 次 |
-| 8 | Sprint 3 | test.npz | 1 次 |
-| 9 | Sprint 4 | 动态生成 | 1 次 |
-| 10 | Sprint 5A | test.npz | 1 次 |
-| 11 | Sprint 5B | test.npz | 1 次 |
+| 1 | v1 baseline | test.npz | 1 |
+| 2 | v2 arch | test.npz | 1 |
+| 3 | v3 data | test.npz (v3) | 1 |
+| 4 | v4 weekly | weekly_test.npz | 1 |
+| 5 | v4 csi500 | dynamically generated | 1 |
+| 6 | v5 daily | dynamically generated | 1 |
+| 7 | Sprint 1 | test.npz | 1 |
+| 8 | Sprint 3 | test.npz | 1 |
+| 9 | Sprint 4 | dynamically generated | 1 |
+| 10 | Sprint 5A | test.npz | 1 |
+| 11 | Sprint 5B | test.npz | 1 |
 
-### 工程错误
+### Engineering Error
 
-**test.npz 被评估了 8 次。** 严格来说，只有第 1 次是真正的 "冻结评估"。后续 7 次虽然每次训练独立（Val 选超参，Test 只评估 1 次），但由于多次引用同一 Test 集来对比和决策，实际上已经形成了隐式数据污染——我们根据 Test 表现做出了 "切换方向/放弃/继续" 的决策，这些决策本身就是在使用 Test 信息。
+**test.npz was evaluated 8 times.** Strictly speaking, only the first time was a true "frozen evaluation." The subsequent 7 times, although each training was independent (Val selects hyperparams, Test evaluated only once), the repeated reference to the same Test set for comparison and decision-making has actually created implicit data contamination — we made "switch direction / abandon / continue" decisions based on Test performance, and those decisions themselves use Test information.
 
-**但**：Test IC 始终在 0.02 附近（从未突破 0.04），说明即使有隐式污染，Test 也没有被 "过拟合"。这个一致性本身是负面的——说明信号真不存在。
+**However**: Test IC has consistently been around 0.02 (never exceeded 0.04), indicating that even with implicit contamination, Test was not "overfit." This consistency itself is negative — it suggests the signal truly does not exist.
 
-## Task 5: Sprint 1 分布特征
+## Task 5: Sprint 1 Distribution Features
 
-### 代码段 (sprint1_distribution_features.py:50-78)
+### Code Section (sprint1_distribution_features.py:50-78)
 
 ```python
 daily = pd.read_parquet(OUT / 'daily_signals.parquet')
 daily['month'] = daily['date'].str[:7]
 monthly_feats = daily.groupby(['code', 'month']).apply(compute_features)
-# 然后与 21-dim 特征 merge...
+# Then merge with 21-dim features...
 dist_lookup = {}
 for _, r in monthly_feats.iterrows():
     key = (r['code'], r['month'])
     dist_lookup[key] = [r[f'lstm_p5'], ...]
 ```
 
-### 关键工程错误：**Look-ahead contamination**
+### Key Engineering Error: **Look-ahead contamination**
 
-`daily_signals.parquet` 由 `cli/export_daily_signals.py` 生成。该脚本训练 LSTM-7 模型使用了 **全部 train 数据（2015-2021）**，然后用训练好的模型预测所有日期（包括 2010-2026）。
+`daily_signals.parquet` is generated by `cli/export_daily_signals.py`. That script trains the LSTM-7 model using **all train data (2015-2021)**, then uses the trained model to predict all dates (including 2010-2026).
 
-当 Sprint 1 用 2015 年的 daily signals 做月度聚合时，这些 daily signals 是由一个在 2021 年数据上训练过的模型产生的。这是 **look-ahead bias**：2015 年的特征包含了来自 2021 年的模型知识。
+When Sprint 1 uses 2015 daily signals for monthly aggregation, those daily signals were produced by a model trained on data up to 2021. This is **look-ahead bias**: 2015 features contain model knowledge from 2021.
 
-### 正确做法
+### Correct Approach
 
-Walk-forward：对于 2015 年的月度聚合，应该只用 2015 年之前训练的日线 LSTM 模型来生成 daily signals。
+Walk-forward: For 2015 monthly aggregation, only use daily LSTM models trained on data before 2015 to generate daily signals.
 
-### 影响评估
+### Impact Assessment
 
-这解释了为什么 Sprint 1 的 Val IC3=0.155 但 Test IC3=-0.019——Val 包含了 look-ahead 信息，Test 没有。Val IC 虚高。
+This explains why Sprint 1 Val IC3=0.155 but Test IC3=-0.019 — Val contains look-ahead information; Test does not. Val IC is inflated.
 
-## 总结
+## Summary
 
-| 任务 | 严重程度 | 问题 | 影响 |
+| Task | Severity | Issue | Impact |
 |------|---------|------|------|
-| 1 HMM | 高 | 未收敛，状态映射无意义 | 2018/2020 标签错乱 |
-| 2 聚合 | 低 | 无严重错误 | — |
-| 3 Baseline | 中 | EW 定义不一致 | B2 vs Phase19 SR 不可比 |
-| 4 Test | 中 | 8 次评估同一 Test | 隐式污染，但 IC 一致性反而证明信号缺失 |
-| 5 Sprint1 | **高** | **Look-ahead bias** | Sprint 1 Val IC 虚高，Test 真值在 -0.02 |
+| 1 HMM | High | Not converged; state mapping meaningless | 2018/2020 labels scrambled |
+| 2 Aggregation | Low | No serious errors | — |
+| 3 Baseline | Medium | EW definition inconsistent | B2 vs Phase19 SR not comparable |
+| 4 Test | Medium | 8 evaluations on same Test | Implicit contamination, but IC consistency instead proves signal absence |
+| 5 Sprint1 | **High** | **Look-ahead bias** | Sprint 1 Val IC inflated; Test true value at -0.02 |
 
-### 建议
+### Recommendations
 
-1. **Sprint 1 重跑**（修复 look-ahead）——可能是关键突破点
-2. **统一 Baseline** 为 HS300 指数持有
-3. **HMM 换简单规则**，不追 4-state GaussianHMM
-4. **Test 集** 已 8 次评估，建议生成新的 Test split（用 2025-2027 数据）
+1. **Rerun Sprint 1** (fix look-ahead) — may be key breakthrough point
+2. **Unify Baseline** to HS300 index buy-and-hold
+3. **Replace HMM** with simple rules; do not pursue 4-state GaussianHMM
+4. **Test set** has been evaluated 8 times; recommend generating new Test split (using 2025-2027 data)

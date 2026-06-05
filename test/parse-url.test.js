@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseStockUrl } from '../lib/parse-url.js';
 
-test('parseStockUrl: 沪市标准 URL', () => {
+test('parseStockUrl: Shanghai standard URL', () => {
   assert.deepEqual(
     parseStockUrl('https://quote.eastmoney.com/sh600519.html'),
     { market: '1', code: '600519' },

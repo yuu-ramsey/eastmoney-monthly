@@ -1,4 +1,4 @@
-// get_money_flow handler 测试
+// get_money_flow handler test
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { getMoneyFlowTool } from '../../lib/tools/get-money-flow.js';

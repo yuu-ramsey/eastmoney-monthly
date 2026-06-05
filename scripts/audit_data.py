@@ -1,6 +1,6 @@
 # ============================================================
-# 数据审计：时间戳、幸存者偏差、IC稳定性
-# 不跑新模型，只检查现有数据和信号质量
+# Data audit: timestamps, survivorship bias, IC stability
+# Do not run new models, only check existing data and signal quality
 # ============================================================
 import warnings; warnings.filterwarnings('ignore')
 import numpy as np, pandas as pd, sqlite3, time

@@ -1,33 +1,33 @@
-# P1 功效分析：检出 strong_bull 效应需要多少样本
+# P1 Power Analysis: How Many Samples Needed to Detect strong_bull Effect
 
-> 分支: p0a-verify-3-4 | 日期: 2026-05-29
+> Branch: p0a-verify-3-4 | Date: 2026-05-29
 >
-> **结论：以当前 alpha std=33.7%，34 个 strong_bull 独立对只能检出 31.5% 以上的效应。
-> 当前点估计 12.5% 远在检测门槛之下——前面所有"不显著"不是模型问题，是 N 根本不够。
-> Winsorize + 效应=6% → 需 ~330 strong_bull ≈ 1660 total pairs。**
+> **Conclusion: With current alpha std=33.7%, 34 strong_bull independent pairs can only detect effects >31.5%.
+> The current point estimate 12.5% is far below the detection threshold — all prior "not significant" results are not due to model problems but insufficient N.
+> Winsorize + effect=6% -> need ~330 strong_bull approx 1660 total pairs.**
 
 ---
 
-## 数据基础
+## Data Foundation
 
-### 股票选取标准
+### Stock Selection Criteria
 
 **`scripts/build-frozen-dataset.js` + `lib/eval/seed-stocks.json`**:
-- 40 只股票，全标记 "hs300"，来自用户手工挑选的种子池（6 类形态各 5-8 只）
-- 选取标准：上市 ≥5 年、数据 ≥24 个月线 → **幸存者偏差**
-- 40/2247 A 股 = 1.8%，不具行业/市值代表性
+- 40 stocks, all marked "hs300", from user hand-picked seed pool (6 morphology categories, 5-8 each)
+- Selection criteria: listed >=5 years, data >=24 monthly bars -> **survivorship bias**
+- 40/2247 A-shares = 1.8%, no sector/market-cap representativeness
 
-### 关键参数
+### Key Parameters
 
 ```
-n_unique (股票,时点): 160
+n_unique (stock, timepoint): 160
 strong_bull unique:  34 (21.3%)
-alpha 横截面 std:    33.7%
-alpha 均值:          6.1%
-设计效应 deff:       1.90 (ICC=0.3, 4 records/pair)
+alpha cross-sectional std:    33.7%
+alpha mean:          6.1%
+design effect deff:       1.90 (ICC=0.3, 4 records/pair)
 ```
 
-**真实输出**:
+**Real output**:
 ```
 alpha std: 33.7 %
 avg records/pair: 4.0
@@ -36,23 +36,23 @@ design effect: 1.90
 
 ---
 
-## 1. MDE 曲线
+## 1. MDE Curve
 
-固定 power=0.8, α=0.05, 两独立组均值差，设计效应=1.90:
+Fixed power=0.8, alpha=0.05, two independent group mean difference, design effect=1.90:
 
-| n_sb | total pairs | MDE | 说明 |
+| n_sb | total pairs | MDE | Description |
 |------|------------|-----|------|
-| **34 (现状)** | ~170 | **31.5%** | 只能检出 >37.6% 的效应 |
-| 60 | ~300 | 23.7% | 检出 >29.8% |
-| 100 | ~500 | 18.4% | 检出 >24.5% |
-| 160 | ~800 | 14.5% | 检出 >20.6% |
-| 240 | ~1200 | 11.9% | 检出 >18.0% |
-| 360 | ~1800 | 9.7% | 检出 >15.8% |
-| 600 | ~3000 | 7.5% | 检出 >13.6% |
+| **34 (current)** | ~170 | **31.5%** | Can only detect effects >37.6% |
+| 60 | ~300 | 23.7% | Can detect >29.8% |
+| 100 | ~500 | 18.4% | Can detect >24.5% |
+| 160 | ~800 | 14.5% | Can detect >20.6% |
+| 240 | ~1200 | 11.9% | Can detect >18.0% |
+| 360 | ~1800 | 9.7% | Can detect >15.8% |
+| 600 | ~3000 | 7.5% | Can detect >13.6% |
 
-**当前 MDE=31.5%，点估计=12.5%**。点估计在 MDE 之下的意思是：即使真实效应确实是 12.5%，以现有样本也无法可靠检出（power < 0.8）。
+**Current MDE=31.5%, point estimate=12.5%**. That the point estimate is below MDE means: even if the true effect really is 12.5%, with current sample size it cannot be reliably detected (power < 0.8).
 
-**真实输出**:
+**Real output**:
 ```
   n_sb=  34  total~170  MDE=31.5%
   n_sb=  60  total~300  MDE=23.7%
@@ -62,79 +62,79 @@ design effect: 1.90
 
 ---
 
-## 2. 反向：给定效应 → 所需样本
+## 2. Reverse: Given Effect -> Required Sample
 
-| 效应大小 | n_sb 所需 | total pairs | 规模 (6 时点/股) |
+| Effect Size | n_sb Needed | total pairs | Scale (6 timepoints/stock) |
 |---------|----------|------------|-----------------|
-| 12.5% (点估计) | 216 | ~1080 | 180 只 × 6t |
-| 6.0% (一半) | 938 | ~4690 | 782 只 × 6t |
-| 4.2% (1/3) | 1913 | ~9565 | 1595 只 × 6t |
-| 3.0% (保守) | 3750 | ~18750 | 3125 只 × 6t |
+| 12.5% (point estimate) | 216 | ~1080 | 180 stocks x 6t |
+| 6.0% (half) | 938 | ~4690 | 782 stocks x 6t |
+| 4.2% (1/3) | 1913 | ~9565 | 1595 stocks x 6t |
+| 3.0% (conservative) | 3750 | ~18750 | 3125 stocks x 6t |
 
-**真实输出**:
+**Real output**:
 ```
-  12.5%  n_sb= 216  total~ 1080  180stocks×6t
-  6.0%   n_sb= 938  total~ 4690  782stocks×6t
-  4.2%   n_sb=1913  total~ 9565  1595stocks×6t
-  3.0%   n_sb=3750  total~18750  3125stocks×6t
+  12.5%  n_sb= 216  total~ 1080  180stocks x 6t
+  6.0%   n_sb= 938  total~ 4690  782stocks x 6t
+  4.2%   n_sb=1913  total~ 9565  1595stocks x 6t
+  3.0%   n_sb=3750  total~18750  3125stocks x 6t
 ```
 
-在 std=33.7% 下，即使只做"效应=点估计一半"，也需要 782 只股票 × 6 时点——远超合理范围。**先压下 std 是唯一路径。**
+At std=33.7%, even for "effect = half of point estimate", 782 stocks x 6 timepoints is needed — far beyond reasonable scope. **Reducing std first is the only path.**
 
 ---
 
-## 3. Winsorize 后 (trim p1/p99, std≈20%)
+## 3. After Winsorize (trim p1/p99, std approx 20%)
 
-6 个极端 alpha（≤-30% 或 ≥150%）贡献 ~60% 方差。Winsorize 可将 std 压到 ~20%。
+6 extreme alphas (<=-30% or >=150%) contribute ~60% of variance. Winsorize can reduce std to ~20%.
 
-| 效应大小 | n_sb 所需 | total pairs | 规模 (6 时点/股) |
+| Effect Size | n_sb Needed | total pairs | Scale (6 timepoints/stock) |
 |---------|----------|------------|-----------------|
-| 12.5% (点估计) | 77 | ~385 | 65 只 × 6t |
-| 6.0% (一半) | 332 | ~1660 | 277 只 × 6t |
-| 4.2% (1/3) | 676 | ~3380 | 564 只 × 6t |
-| 3.0% (保守) | 1325 | ~6625 | 1105 只 × 6t |
+| 12.5% (point estimate) | 77 | ~385 | 65 stocks x 6t |
+| 6.0% (half) | 332 | ~1660 | 277 stocks x 6t |
+| 4.2% (1/3) | 676 | ~3380 | 564 stocks x 6t |
+| 3.0% (conservative) | 1325 | ~6625 | 1105 stocks x 6t |
 
-**真实输出**:
+**Real output**:
 ```
-  12.5%  n_sb=  77  total~  385  65stocks×6t
-  6.0%   n_sb= 332  total~ 1660  277stocks×6t
+  12.5%  n_sb=  77  total~  385  65stocks x 6t
+  6.0%   n_sb= 332  total~ 1660  277stocks x 6t
 ```
 
 ---
 
-## 4. 规模建议
+## 4. Scale Recommendation
 
-**一句话：alpha std 从 33.7% 压到 20%（Winsorize），效应 ≥ 6% → 需 ~330 strong_bull ≈ 1660 total unique pairs ≈ 280 只股票 × 6 时点。**
+**One-liner: Reduce alpha std from 33.7% to 20% (Winsorize), effect >= 6% -> need ~330 strong_bull approx 1660 total unique pairs approx 280 stocks x 6 timepoints.**
 
-两个决策路径：
+Two decision paths:
 
-| 路径 | 方案 | 规模 | 优点 | 缺点 |
+| Path | Plan | Scale | Pros | Cons |
 |------|------|------|------|------|
-| A（推荐） | Winsorize + 扩到 100 股 × 12 时点 | 1200 pairs, ~240 sb | 覆盖牛熊，4 年跨度 | 需要更多历史数据 |
-| B | Winsorize + 扩到 200 股 × 4 时点 | 800 pairs, ~160 sb | 保持简单 | 时点太少，季节效应 |
+| A (Recommended) | Winsorize + expand to 100 stocks x 12 timepoints | 1200 pairs, ~240 sb | Covers bull/bear, 4-year span | Needs more historical data |
+| B | Winsorize + expand to 200 stocks x 4 timepoints | 800 pairs, ~160 sb | Keeps it simple | Too few timepoints, seasonal effects |
 
-**如果目标是效应=6%（点估计一半）在 power=0.8 下显著，路径 A 是最小可行方案。**
+**If the target is effect=6% (half point estimate) significant at power=0.8, Path A is the minimum viable plan.**
 
-当前 40 只 × 4 时点 = 160 pairs 只是探索性 pilot，不是可做统计推断的样本。
+Current 40 stocks x 4 timepoints = 160 pairs is only an exploratory pilot, not a sample capable of statistical inference.
 
 ---
 
-## 方法论说明
+## Methodology Notes
 
-- **MDE 公式**: 两独立组均值差 t-test, 双侧 α=0.05, power=0.8
-- **设计效应**: deff = 1 + (m - 1) × ICC, m=4 records/pair, ICC=0.3（保守估计 template 间相关性）
-- **strong_bull 占比**: 固定 20%（基于 v4 的 34/160 = 21.3%）
+- **MDE formula**: Two independent group mean difference t-test, two-sided alpha=0.05, power=0.8
+- **Design effect**: deff = 1 + (m - 1) x ICC, m=4 records/pair, ICC=0.3 (conservative estimate of template correlation)
+- **strong_bull proportion**: Fixed at 20% (based on v4's 34/160 = 21.3%)
 
-## 脚本
+## Script
 
 `cli/eval-power-analysis.js`:
 ```
 node cli/eval-power-analysis.js
 ```
 
-## 未改动
+## Untouched
 
-| 模块 | 状态 |
+| Module | Status |
 |------|------|
-| 任何 eval 逻辑 | 未碰 |
-| 任何 LLM 调用 | 未触发 |
+| Any eval logic | Untouched |
+| Any LLM call | Not triggered |

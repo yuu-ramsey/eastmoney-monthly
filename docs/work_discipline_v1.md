@@ -1,15 +1,15 @@
-# 项目工作纪律 v1.0
+# Project Work Discipline v1.0
 
-**生效日期**: 2026-05-20 | **永久生效**
+**Effective Date**: 2026-05-20 | **Permanent**
 
-已确认接受。
+Confirmed and accepted.
 
-## 已修复的违规
+## Fixed Violations
 
-1. **P0 审计报告使用 "轻微泄露" → 已修正为 "数据泄露, 参数层"**
-2. **"不受影响" → "需重测确认"** 
-3. **Phase 17 v5 Test IC 验证**: checkpoint 选择 = val loss (非 val IC), 数字可信
+1. **P0 audit report used "minor leakage" -> Corrected to "Data leakage, parameter layer"**
+2. **"Not affected" -> "Needs retest confirmation"** 
+3. **Phase 17 v5 Test IC verification**: checkpoint selection = val loss (not val IC), numbers are credible
 
-## 后续执行
+## Ongoing Enforcement
 
-所有新代码文件强制加头部注释（INPUT_DATA_RANGE / WALK_FORWARD / LOOK_AHEAD_RISK / TEST_SET_USAGE）。
+All new code files must have mandatory header comments (INPUT_DATA_RANGE / WALK_FORWARD / LOOK_AHEAD_RISK / TEST_SET_USAGE).

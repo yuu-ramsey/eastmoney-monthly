@@ -1,4 +1,4 @@
-// 批量扫描 + 日报测试
+// Batch scan + daily report test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -6,7 +6,7 @@ test('batch-scan: generateDailyReport 格式验证', async () => {
   const { generateDailyReport } = await import('../../lib/scanner/daily-report.js');
 
   const results = [
-    { code: '600519', name: '贵州茅台', judgment: 'bull', text: '突破前期高点，底部放量上涨，多头排列明显' },
+    { code: '600519', name: 'Kweichow Moutai', judgment: 'bull', text: '突破前期高点，底部放量上涨，多头排列明显' },
     { code: '600522', name: '中天科技', judgment: 'bear', text: '顶背离信号出现，天量见顶' },
     { code: '000001', name: '平安银行', judgment: 'neutral', text: '震荡' },
     { code: '600000', name: '浦发银行', judgment: 'bull', text: '金叉形成，反转信号' },

@@ -1,22 +1,22 @@
-# P3 信号门控 — 最终结果
+# P3 Signal Gating — Final Results
 
-> 分支: `p3-kronos-fix` | 日期: 2026-05-30
+> Branch: `p3-kronos-fix` | Date: 2026-05-30
 
-## 最终门控
+## Final Gate
 
-| 信号 | n | Spread | Train | Test | CI | 门控 |
+| Signal | n | Spread | Train | Test | CI | Gate |
 |------|---|--------|-------|------|-----|------|
-| LLM | 1608 | +8.94% | +10.1% | +6.4% | [+3.7,+14.1] | ✓ |
-| Kronos | 1574 | **+7.59%** | +11.1% | +4.7% | — | **✓** |
-| 反转 | 1608 | +6.63% | +0.9% | +13.0% | [+1.3,+11.2] | ✓ |
-| 动量 | 1608 | +0.44% | — | — | [-4.2,+5.1] | ✗ |
-| LSTM-old | 1583 | +0.91% | -2.7% | +1.5% | [-3.6,+5.3] | ✗ |
-| LSTM-WF | — | — | — | — | — | ✗ 训练失败 |
+| LLM | 1608 | +8.94% | +10.1% | +6.4% | [+3.7,+14.1] | Pass |
+| Kronos | 1574 | **+7.59%** | +11.1% | +4.7% | — | **Pass** |
+| Reversal | 1608 | +6.63% | +0.9% | +13.0% | [+1.3,+11.2] | Pass |
+| Momentum | 1608 | +0.44% | — | — | [-4.2,+5.1] | Fail |
+| LSTM-old | 1583 | +0.91% | -2.7% | +1.5% | [-3.6,+5.3] | Fail |
+| LSTM-WF | — | — | — | — | — | Fail: training failed |
 
-## Kronos 修复
+## Kronos Fix
 
-根因: `KronosPredictor(tok, model)` 参数顺序——`__init__(tokenizer, model)` tokenizer 在前，调用时 model 在前。一字未改源码。详见 `docs/p3-kronos-fixed.md`。
+Root cause: `KronosPredictor(tok, model)` parameter order — `__init__(tokenizer, model)` has tokenizer first, but call had model first. Not a single character of source modified. See `docs/p3-kronos-fixed.md` for details.
 
 ## LSTM-WF
 
-walk-forward 训练 (train≤2021, val 2022-23) 失败——月线 10 维特征 + LSTM-2 @64 未学到信号 (Val IC=NaN)。
+Walk-forward training (train <=2021, val 2022-23) failed — monthly 10-dim features + LSTM-2 @64 did not learn a signal (Val IC=NaN).

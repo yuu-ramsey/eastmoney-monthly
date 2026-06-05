@@ -1,4 +1,4 @@
-"""通过index_component_sw获取申万成分股, 交叉比对XLS内部代码建立映射"""
+"""Get Shenwan constituents via index_component_sw, cross-reference XLS internal codes to build mapping"""
 import ssl, urllib3
 urllib3.disable_warnings()
 import requests
@@ -10,15 +10,15 @@ from collections import Counter
 
 # 31 Shenwan L1 industries
 SW_INDUSTRIES = [
-    ('801010', '农林牧渔'), ('801030', '基础化工'), ('801040', '钢铁'),
-    ('801050', '有色金属'), ('801080', '电子'), ('801880', '汽车'),
-    ('801110', '家用电器'), ('801120', '食品饮料'), ('801130', '纺织服饰'),
-    ('801140', '轻工制造'), ('801150', '医药生物'), ('801160', '公用事业'),
-    ('801170', '交通运输'), ('801180', '房地产'), ('801200', '商贸零售'),
-    ('801210', '社会服务'), ('801780', '银行'), ('801790', '非银金融'),
-    ('801230', '综合'), ('801710', '建筑材料'), ('801720', '建筑装饰'),
-    ('801730', '电力设备'), ('801890', '机械设备'), ('801740', '国防军工'),
-    ('801750', '计算机'), ('801760', '传媒'), ('801770', '通信'),
+    ('801010', 'Agriculture, Forestry, Animal Husbandry & Fishery'), ('801030', 'Basic Chemicals'), ('801040', 'Steel'),
+    ('801050', 'Non-ferrous Metals'), ('801080', 'Electronics'), ('801880', 'Automobiles'),
+    ('801110', 'Home Appliances'), ('801120', 'Food & Beverage'), ('801130', '纺织服饰'),
+    ('801140', 'Light Manufacturing'), ('801150', 'Pharmaceutical & Biotech'), ('801160', 'Public Utilities'),
+    ('801170', 'Transportation'), ('801180', 'Real Estate'), ('801200', 'Commercial Retail'),
+    ('801210', '社会服务'), ('801780', 'Banking'), ('801790', 'Non-bank Financials'),
+    ('801230', '综合'), ('801710', 'Building Materials'), ('801720', 'Building Decoration'),
+    ('801730', 'Electrical Equipment'), ('801890', 'Mechanical Equipment'), ('801740', 'Defense & Military'),
+    ('801750', 'Computers'), ('801760', 'Media'), ('801770', 'Communications'),
     ('801950', '煤炭'), ('801960', '石油石化'), ('801970', '环保'),
     ('801980', '美容护理'),
 ]

@@ -1,4 +1,4 @@
-"""排列检验：验证月线 LightGBM IC=0.063 的统计显著性。
+"""Permutation test: verify statistical significance of monthly LightGBM IC=0.063.
 方法：截面打乱 fwd_ret（破坏 X→y 关系）+ 价格序列打乱（破坏时序结构）
 """
 import numpy as np, pandas as pd, sqlite3, time, json
@@ -77,7 +77,7 @@ def train_eval(train, test, feat_cols, seed=456):
         ics.append(spearmanr(pred[mask], test.loc[mask,'fwd_ret'].values)[0])
     return np.mean(ics) if ics else np.nan
 
-# ── 主流程 ─────────────────────────────────────────────────────────────
+# ── Main flow ─────────────────────────────────────────────────────────────
 def main():
     print("="*60)
     print("月线 LightGBM 排列检验")

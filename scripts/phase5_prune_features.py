@@ -1,5 +1,5 @@
 """
-Phase 5: 精简特征验证
+Phase 5: Pruned feature validation
 砍掉: G5全部(2) + G1全部(4) + G4中rsi14/bb_pos/amplitude(3) = 9维
 保留: atr14, vol_6m (来自G4)
 对比 61维 vs 52维 的IC/ICIR
@@ -226,7 +226,7 @@ if __name__ == '__main__':
 
     print(f"[{ts()}] 行业中性化...", flush=True); t0 = time.time()
     flat_ind = cross_sectional_neutralize(flat.copy(), dates_arr, inds_arr, 'categorical')
-    print(f"[{ts()}] 完成 ({time.time() - t0:.0f}s)", flush=True)
+    print(f"[{ts()}] done ({time.time() - t0:.0f}s)", flush=True)
 
     tr_m = (dates_arr >= '2010-01') & (dates_arr <= '2014-12')
     te_m = (dates_arr >= '2015-01')
@@ -316,4 +316,4 @@ if __name__ == '__main__':
     with open(OUT / 'prune_validation.json', 'w') as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
 
-    print(f"\n[{ts()}] 精简验证完成. 结果: {OUT / 'prune_validation.json'}")
+    print(f"\n[{ts()}] 精简验证done. 结果: {OUT / 'prune_validation.json'}")

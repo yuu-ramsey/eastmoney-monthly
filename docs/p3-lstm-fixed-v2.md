@@ -1,26 +1,26 @@
-# P3 LSTM 修复 v2 — 最终结果
+# P3 LSTM Fix v2 — Final Results
 
-> 分支: `p3-lstm-fix-v2` | 日期: 2026-05-30
+> Branch: `p3-lstm-fix-v2` | Date: 2026-05-30
 
-## 修复：对称 barrier + class weights
+## Fix: Symmetric Barriers + Class Weights
 
-| 改动 | 值 | 效果 |
+| Change | Value | Effect |
 |------|-----|------|
-| barriers | 2σ/1σ → **1.5σ/1.5σ** (对称) | bull 36%→51.5%, bear 64%→48.3% |
-| loss | CrossEntropy → **CrossEntropy(class_weight)** | 抵消 residual imbalance |
-| 一致 | GRU-1@32, 10dim features, 60d lookback, 126d horizon | — |
+| barriers | 2sigma/1sigma -> **1.5sigma/1.5sigma** (symmetric) | bull 36%->51.5%, bear 64%->48.3% |
+| loss | CrossEntropy -> **CrossEntropy(class_weight)** | Offset residual imbalance |
+| consistent | GRU-1@32, 10dim features, 60d lookback, 126d horizon | — |
 
-## Level 1: 通过
+## Level 1: Passed
 
-| 指标 | 第一次(失败) | 第二次(修复) |
+| Metric | First (Failed) | Second (Fixed) |
 |------|-----------|-----------|
 | Labels | bull 36%/bear 64% | **bull 52%/bear 48%** |
 | Smoke TL | 0.686 | 1.065 |
 | balanced acc | 0.500 | **0.511** |
 | always-majority | 0.500 | 0.500 |
-| 判定 | ✗ ≤ | **✓ > (PASSED)** |
+| Verdict | Fail <= | **Pass > (PASSED)** |
 
-混淆矩阵 (1 epoch): 不再全预测单类, bull/bear 均有分布。
+Confusion matrix (1 epoch): no longer predicts single class; both bull/bear have distribution.
 Best ba=0.527 (ep13), steady improvement from smoke.
 
 ## Level 2: inconclusive
@@ -30,15 +30,15 @@ Best ba=0.527 (ep13), steady improvement from smoke.
 | Full | 1583 | +5.47% | **[+1.2, +10.6]** |
 | Test | 767 | +6.70% | **[-0.2, +13.6]** |
 
-Full CI 排除 0 (显著)。Test CI 下界 -0.2% (仅差 0.2pp 含 0)。
+Full CI excludes 0 (significant). Test CI lower bound -0.2% (only 0.2pp short of excluding 0).
 
-## GRU vs 其他信号
+## GRU vs Other Signals
 
-| 信号 | Full CI | Test CI | hold-out |
+| Signal | Full CI | Test CI | hold-out |
 |------|---------|---------|----------|
-| LLM | [+3.7,+14.1] | — | ✓ |
-| 反转 | [+1.3,+11.2] | [+5.0,+19.8] | ✓ |
+| LLM | [+3.7,+14.1] | — | Pass |
+| Reversal | [+1.3,+11.2] | [+5.0,+19.8] | Pass |
 | **GRU-WF** | **[+1.2,+10.6]** | **[-0.2,+13.6]** | **marginally inconclusive** |
-| Kronos | [+3.1,+13.0] | [-2.9,+13.2] | ✗ |
+| Kronos | [+3.1,+13.0] | [-2.9,+13.2] | Fail |
 
-GRU-WF 是 P1-P3 中**唯一学到信号的 ML 模型**。Test CI 仅差 0.2pp 就排除 0，略扩样本/特征即可过。
+GRU-WF is **the only ML model among P1-P3 that learned a signal**. Test CI is only 0.2pp short of excluding 0; slightly expanding sample/features would pass.

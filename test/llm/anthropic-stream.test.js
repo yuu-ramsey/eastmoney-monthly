@@ -1,4 +1,4 @@
-// Anthropic streaming SSE 解析测试
+// Anthropic streaming SSE parsing test
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { getProvider } from '../../lib/llm/index.js';

@@ -11,7 +11,7 @@ import {
   checkCapacity,
 } from '../lib/history.js';
 
-// ---- 常量 ----
+// ---- Constants ----
 
 test('HISTORY_KEY 正确', () => {
   assert.equal(HISTORY_KEY, 'history');
@@ -83,7 +83,7 @@ test('formatHistoryDate: 单数月份补零', () => {
 
 test('historyToMarkdown: 基本字段正确', () => {
   const entry = {
-    name: '贵州茅台',
+    name: 'Kweichow Moutai',
     code: '600519',
     provider: 'anthropic',
     model: 'claude-sonnet-4-6',

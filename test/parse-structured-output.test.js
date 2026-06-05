@@ -1,4 +1,4 @@
-// 结构化输出 JSON 提取测试
+// Structured output JSON extraction test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { extractStructuredOutput } from '../lib/parse-structured-output.js';

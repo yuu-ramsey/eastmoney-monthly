@@ -1,4 +1,4 @@
-// eval 测试 — dataset builder / runner score / report / cache
+// eval test - dataset builder / runner score / report / cache
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -75,7 +75,7 @@ test('groundTruth: alpha阈值', async () => {
     }
     return { klines };
   };
-  const stocks = [{ code: '600519', market: '1', name: '贵州茅台', category: 'trend_strong', industry: '白酒' }];
+  const stocks = [{ code: '600519', market: '1', name: 'Kweichow Moutai', category: 'trend_strong', industry: '白酒' }];
 
   const result = await buildDataset(stocks, {
     fetchKlines: mockFetch,

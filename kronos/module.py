@@ -1,7 +1,7 @@
 """
-Kronos 核心模块 — BSQ 量化器、注意力机制、Transformer 块、嵌入层
+Kronos core modules — BSQ quantizer, attention mechanism, Transformer blocks, embedding layers
 
-参照 Kronos 原 repo (github.com/shiyu-coder/Kronos) model/module.py 复现。
+Reproduced from Kronos original repo (github.com/shiyu-coder/Kronos) model/module.py.
 为兼容 HuggingFace 预训练权重，类名和 __init__ 签名与原 repo 完全一致。
 """
 

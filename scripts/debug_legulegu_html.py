@@ -1,4 +1,4 @@
-"""调试 legulegu HTML 结构"""
+"""Debug legulegu HTML structure"""
 import ssl, urllib3
 urllib3.disable_warnings()
 import requests, re

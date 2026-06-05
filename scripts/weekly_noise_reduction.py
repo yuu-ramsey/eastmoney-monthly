@@ -1,4 +1,4 @@
-"""周线噪声诊断 + 降噪方案：系统性解决噪声大 + 复杂模型过拟合
+"""Weekly noise diagnosis + denoising plan: systematically solve high noise + complex model overfitting
 
 诊断维度：
   1. 目标噪声：13周收益的方差分解（市场β vs 个股α）
@@ -237,7 +237,7 @@ n_independent = n_stocks * (len(dates_sorted) / 13)  # 每13周≈独立样本
 print(f"  总样本数:     {n_weeks_total:,}")
 print(f"  独立样本估算: {n_independent:.0f} (每13周一次独立观测)")
 print(f"  每周期股票数: {n_stocks}")
-print(f"  → LSTM-7参数量: ~2M, 有效样本: ~{n_independent:.0f} — 严重过参数化")
+print(f"  → LSTM-7Parameters量: ~2M, 有效样本: ~{n_independent:.0f} — 严重过Parameters化")
 
 # ======== 2. 降噪方案A：截面rank归一化 ========
 print("\n" + "="*70)
@@ -283,10 +283,10 @@ configs = {
     'disc_target+rank_feat': ('fwd_disc', RANK_FEATS, df_rank),
 }
 
-# Ridge 参数扫小 → 大
+# Ridge Parameters扫小 → 大
 ridge_alphas = [0.01, 0.1, 1.0, 10.0, 100.0]
 
-# LGB 参数扫小 → 大
+# LGB Parameters扫小 → 大
 lgb_configs = {
     'tiny':  dict(n_estimators=30, max_depth=2, learning_rate=0.02, min_child_samples=50),
     'small': dict(n_estimators=50, max_depth=3, learning_rate=0.03, min_child_samples=30),

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeMA } from '../lib/compute-ma.js';
 
-test('computeMA: MA5 标准计算', () => {
+test('computeMA: MA5 standard calculation', () => {
   // [1,2,3,4,5,6,7] 的 MA5:i=4 时 (1+2+3+4+5)/5=3,i=5 时 (2+3+4+5+6)/5=4,i=6 时 5
   assert.deepEqual(computeMA([1, 2, 3, 4, 5, 6, 7], 5), [null, null, null, null, 3, 4, 5]);
 });

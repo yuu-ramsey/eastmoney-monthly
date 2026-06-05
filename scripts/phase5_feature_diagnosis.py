@@ -1,5 +1,5 @@
 """
-Phase 5: 特征诊断
+Phase 5: Feature diagnosis
 Step 1.1 — 特征重要性 (LightGBM gain/split, XGBoost gain/weight)
 Step 1.2 — 逐组消融实验 (7组, 每次去掉一组重训, 对比IC/ICIR)
 """
@@ -182,7 +182,7 @@ def build_features():
 
 
 def train_and_eval(X_train, y_train, X_test, y_test, dates_test, label="baseline"):
-    """训练LGB+XGB+Ridge集成, 返回IC和模型"""
+    """训练LGB+XGB+Ridge集成, ReturnsIC和模型"""
     sc = StandardScaler()
     Xt = sc.fit_transform(X_train)
     Xte = sc.transform(X_test)
@@ -223,7 +223,7 @@ if __name__ == '__main__':
     # 2. 行业中性化
     print(f"[{ts()}] 行业中性化...", flush=True); t0 = time.time()
     flat_ind = cross_sectional_neutralize(flat.copy(), dates_arr, inds_arr, 'categorical')
-    print(f"[{ts()}] 完成 ({time.time()-t0:.0f}s)", flush=True)
+    print(f"[{ts()}] done ({time.time()-t0:.0f}s)", flush=True)
 
     # 3. Split
     tr_m = (dates_arr >= '2010-01') & (dates_arr <= '2014-12')
@@ -346,4 +346,4 @@ if __name__ == '__main__':
     with open(OUT / 'diagnosis_summary.json', 'w') as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
 
-    print(f"\n[{ts()}] 诊断完成. 结果: {OUT}")
+    print(f"\n[{ts()}] 诊断done. 结果: {OUT}")

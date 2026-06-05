@@ -1,4 +1,4 @@
-"""尝试所有可能的行业分类数据源"""
+"""Try all possible industry classification data sources"""
 import ssl, urllib3
 urllib3.disable_warnings()
 import requests

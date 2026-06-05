@@ -1,4 +1,4 @@
-"""周线GPU深度学习 v2：时间安全版本
+"""Weekly GPU deep learning v2: time-safe version
 修复：
   - 日线信号 ds_* 特征已弃用（v5 比例分割泄漏，v6 仅在 2022+ 有效）
   - 使用 16 维安全特征（动量 + MA + 波动率 + 成交量）

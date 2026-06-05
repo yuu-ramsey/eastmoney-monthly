@@ -1,4 +1,4 @@
-/* 注入到 Shadow DOM 内的样式，与东财页面 CSS 隔离 */
+/* Styles injected into Shadow DOM, isolated from Eastmoney page CSS */
 
 .fab {
   position: fixed;

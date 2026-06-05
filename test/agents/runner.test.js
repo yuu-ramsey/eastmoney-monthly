@@ -1,4 +1,4 @@
-// Agent runner 并发调度测试（含 checkpoint 续跑）
+// Agent runner concurrent dispatch test (with checkpoint resume)
 import { test, afterEach, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { runDebate } from '../../lib/agents/runner.js';
@@ -31,7 +31,7 @@ globalThis.chrome = globalThis.chrome || {
 before(() => { storageMap.clear(); });
 
 const sampleCtx = {
-  name: '贵州茅台',
+  name: 'Kweichow Moutai',
   code: '600519',
   period: 'monthly',
   periodLabel: '月线',

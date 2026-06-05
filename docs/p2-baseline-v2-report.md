@@ -1,10 +1,10 @@
-# P2 无偏池基线 v2 — Baostock 全集
+# P2 Unbiased Pool Baseline v2 — Baostock Full Set
 
-> 分支: `p2-rebuild-unbiased-pool` | 日期: 2026-05-30 | 单源: Baostock
+> Branch: `p2-rebuild-unbiased-pool` | Date: 2026-05-30 | Single-source: Baostock
 
 ---
 
-## 1. 动量 (v1 vs v2)
+## 1. Momentum (v1 vs v2)
 
 | Pool | v1 spread | v1 CI | v2 spread | v2 CI |
 |------|----------|-------|----------|-------|
@@ -12,11 +12,11 @@
 | Train | -24.1% | [-57.4,+5.5] | +0.4% | [-5.8,+8.1] |
 | Test | -8.1% | [-47.3,+18.1] | -0.7% | [-8.2,+6.2] |
 
-**动量归零。CI 紧凑（±5pp），完全排除 >5% 效应。**
+**Momentum goes to zero. CI tight (+/-5pp), completely excludes effects >5%.**
 
 ---
 
-## 2. 反转 (v1 vs v2)
+## 2. Reversal (v1 vs v2)
 
 | Pool | v1 spread | v2 spread | v2 CI |
 |------|----------|----------|-------|
@@ -24,16 +24,16 @@
 | Train | — | +0.9% | [-6.6,+6.9] |
 | Test | — | **+13.0%** | **[+5.0,+19.8]** |
 
-**反转翻正且显著。** v1 的 -32.5% 是幸存者偏差 artifact。
+**Reversal flips positive and significant.** v1's -32.5% was a survivorship bias artifact.
 
 ---
 
-## 3. 判读
+## 3. Judgment
 
-| 发现 | 结论 |
+| Finding | Conclusion |
 |------|------|
-| 幸存者偏差翻转了反转符号 | -32.5% → +6.6% |
-| 动量归零 | 无偏池上无预测力 |
-| 反转是唯一显著因子 | Full CI[1.4,11.3], Test CI[5.0,19.8] |
+| Survivorship bias flipped reversal sign | -32.5% -> +6.6% |
+| Momentum goes to zero | No predictive power on unbiased pool |
+| Reversal is the only significant factor | Full CI[1.4,11.3], Test CI[5.0,19.8] |
 
-C 的 LLM 对照应变：主指标 = (LLM spread − 反转 spread) 差值 CI。
+C's LLM comparison should change: primary metric = (LLM spread - Reversal spread) difference CI.

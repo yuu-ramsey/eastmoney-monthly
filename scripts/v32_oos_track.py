@@ -1,6 +1,6 @@
 """
-v32 OOS (Out-of-Sample) 跟踪: 每月记录预测+实现收益, 滚动计算IC
-用法:
+v32 OOS (Out-of-Sample) tracking: record monthly predictions+realized returns, rolling IC calculation
+Usage:
   每月初:  python scripts/v32_oos_track.py predict   # 生成当月预测
   下月初:  python scripts/v32_oos_track.py realize   # 填写上月实现收益
   随时查:  python scripts/v32_oos_track.py report    # 滚动IC报告
@@ -48,7 +48,7 @@ def wd(s):
 
 
 def build_latest_features():
-    """构建最新一个月的特征(仅当月截面)"""
+    """构建latest一个月的特征(仅当月截面)"""
     conn = sqlite3.connect(str(DB))
     codes = [r[0] for r in conn.execute(
         'SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
@@ -64,7 +64,7 @@ def build_latest_features():
     conn.close()
     df['month'] = df['date'].str[:7]
     latest_month = df['month'].max()
-    print(f"[{ts()}] 最新月线: {latest_month}")
+    print(f"[{ts()}] latest月线: {latest_month}")
     X_list, meta_list = [], []
     for code in sorted(codes_with_ind):
         g = df[df['code'] == code].sort_values('date').reset_index(drop=True)
@@ -118,7 +118,7 @@ def build_latest_features():
 
 
 def retrain_model():
-    """用历史数据重训LGB+XGB+Ridge"""
+    """用History data重训LGB+XGB+Ridge"""
     print(f"[{ts()}] 重训模型...", flush=True)
     conn = sqlite3.connect(str(DB))
     codes = [r[0] for r in conn.execute(
@@ -195,7 +195,7 @@ def retrain_model():
                              random_state=456, verbosity=0, n_jobs=4)
     xgb_m.fit(Xs, y)
     ridge_m = Ridge(alpha=1.0); ridge_m.fit(Xs, y)
-    print(f"[{ts()}] 训练完成 ({len(y):,} 样本)", flush=True)
+    print(f"[{ts()}] 训练done ({len(y):,} 样本)", flush=True)
     return sc, lgb_m, xgb_m, ridge_m
 
 

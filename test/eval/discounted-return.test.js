@@ -1,4 +1,4 @@
-// 折扣多月回报计算单测
+// Discounted multi-month return unit test
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { computeDiscountedReturn, discretizeDiscountedReturn, mapSignalToNumber } from '../../lib/eval/discounted-return.js';

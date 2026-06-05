@@ -1,8 +1,8 @@
-"""从申万XLS + 已有映射构建完整的股票→行业映射"""
+"""Build complete stock→industry mapping from Shenwan XLS + existing mappings"""
 import json
 import pandas as pd
 
-# 1. 加载已有映射（403只股票的行业名称）
+# 1. Load existing mapping (industry names for 403 stocks)
 with open('data/industry-map.json', 'r', encoding='utf-8') as f:
     old_map = json.load(f)
 stock_to_name = old_map.get('stockToIndustry', {})
@@ -21,7 +21,7 @@ df['inclusion_date'] = pd.to_datetime(df['计入日期'])
 print(f'\nXLS: {len(df)} rows, {df["stock_code"].nunique()} unique stocks')
 print(f'Unique L3 industry codes: {df["industry_code"].nunique()}')
 
-# 3. 每只股票取最新行业
+# 3. 每只股票取latest行业
 latest = df.sort_values('inclusion_date').groupby('stock_code').last().reset_index()
 latest_map = dict(zip(latest['stock_code'], latest['industry_code']))
 print(f'Latest industry per stock: {len(latest_map)}')

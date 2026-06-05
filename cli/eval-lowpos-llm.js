@@ -1,5 +1,5 @@
 // Phase C1/C2: LLM eval on low-position pool
-// 用法: node cli/eval-lowpos-llm.js [--resume]
+// Usage: node cli/eval-lowpos-llm.js [--resume]
 import { readFileSync, appendFileSync, existsSync, mkdirSync } from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'node:url';

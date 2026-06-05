@@ -1,131 +1,131 @@
-# P1 strong_bull 验证：LLM 唯一 edge vs 朴素动量基线
+# P1 strong_bull Validation: LLM's Only Edge vs Naive Momentum Baseline
 
-> 分支: p0a-verify-3-4 | 日期: 2026-05-29
+> Branch: p0a-verify-3-4 | Date: 2026-05-29
 >
-> **判读: C — strong_bull 自身不显著。unique-pair 层级 CI 下界 (5.02%) < 无条件均值 (6.07%)。
-> 34 个独立样本的误差棒覆盖一切。下任何结论前必须先扩样本。**
+> **Judgment: C — strong_bull itself is not significant. unique-pair level CI lower bound (5.02%) < unconditional mean (6.07%).
+> Error bars from 34 independent samples cover everything. Must expand sample before drawing any conclusions.**
 
 ---
 
-## 前置：40 只股票如何选出
+## Prerequisite: How 40 Stocks Were Selected
 
-**`scripts/build-frozen-dataset.js:1-10`** — frozen dataset 从 runA eval JSONL 提取：
+**`scripts/build-frozen-dataset.js:1-10`** — frozen dataset extracted from runA eval JSONL:
 
 ```js
 stocks.set(r.stockCode, { category: r.category || 'hs300' });
 ```
 
-**`lib/eval/seed-stocks.json`** — 种子股票 6 类形态各 5-8 只，上市 ≥5 年。用户手工挑选。
+**`lib/eval/seed-stocks.json`** — seed stocks in 6 morphology categories, 5-8 each, listed >=5 years. User hand-picked.
 
-40 只股票来自手工选的种子池 + 数据可用性过滤（≥24 个月 K 线）。**幸存者偏差**明显：能活到 2024 年且有 15+ 年连续月线的股票本身偏强（无条件 alpha 均值 6.07%/6 个月）。
-
----
-
-## 方法
-
-**`cli/eval-strongbull-vs-momentum.js`** — 在 unique (股票, 时点) 粒度上分析：
-
-1. 对每对 (stock, cutoffDate)，用 cutoff 前的月线数据计算朴素动量（trailing 6m/12m 收益 + MA60 偏离，Z-score 等权复合）
-2. 取与 strong_bull 同数量的 top 动量对
-3. 所有 CI 按 block bootstrap（block = (stock, cutoffDate)）
-4. 不重跑 LLM
+40 stocks come from hand-picked seed pool + data availability filter (>=24 monthly K-lines). **Survivorship bias** is obvious: stocks that survived to 2024 with 15+ years of continuous monthly data are inherently stronger (unconditional alpha mean 6.07%/6 months).
 
 ---
 
-## 1. strong_bull 自身显著性
+## Method
 
-| 指标 | 值 |
+**`cli/eval-strongbull-vs-momentum.js`** — Analysis at unique (stock, cutoffDate) granularity:
+
+1. For each pair (stock, cutoffDate), compute naive momentum from monthly data before cutoff (trailing 6m/12m return + MA60 deviation, Z-score equal-weight composite)
+2. Take same number of top momentum pairs as strong_bull count
+3. All CIs via block bootstrap (block = (stock, cutoffDate))
+4. No LLM rerun
+
+---
+
+## 1. strong_bull Self-Significance
+
+| Metric | Value |
 |------|-----|
-| 全样本 unique pairs | 160 |
+| Full sample unique pairs | 160 |
 | strong_bull unique pairs | 34 (21.3%) |
-| strong_bull alpha 均值 | 20.13% |
-| 无条件 alpha 均值 | 6.07% |
+| strong_bull alpha mean | 20.13% |
+| Unconditional alpha mean | 6.07% |
 | **95% CI (block bootstrap)** | **[5.02%, 41.06%]** |
 
-**真实命令输出**:
+**Real command output**:
 ```
-alpha 均值: 20.13% (无条件: 6.07%)
+alpha mean: 20.13% (unconditional: 6.07%)
 95% CI: [5.02%, 41.06%]
-→ CI含/低于无条件 → 不显著 ✗
+-> CI lower bound below unconditional -> not significant (Fail)
 ```
 
-CI 下界 5.02% < 无条件 6.07%。即使 strong_bull 均值高达 20%，只有 34 个独立样本时，无法拒绝 null。
+CI lower bound 5.02% < unconditional 6.07%. Even though strong_bull mean is a high 20%, with only 34 independent samples, null cannot be rejected.
 
 ---
 
-## 2. 动量基线
+## 2. Momentum Baseline
 
-| 指标 | 值 |
+| Metric | Value |
 |------|-----|
-| 动量 top-34 alpha 均值 | 12.72% |
+| Momentum top-34 alpha mean | 12.72% |
 | **95% CI** | **[4.32%, 22.58%]** |
 
-**真实命令输出**:
+**Real command output**:
 ```
-alpha 均值: 12.72%
+alpha mean: 12.72%
 95% CI: [4.32%, 22.58%]
 ```
 
-动量本身也不显著（CI 含无条件均值）。160 pairs 上取 top-34，任何排序指标的 CI 都会很宽。
+Momentum itself is also not significant (CI contains unconditional mean). For top-34 out of 160 pairs, any ranking metric's CI will be wide.
 
 ---
 
-## 3. 重叠度
+## 3. Overlap
 
-| 指标 | 值 |
+| Metric | Value |
 |------|-----|
 | LLM strong_bull | 34 |
-| 动量 top-34 | 34 |
-| 交集 | 16 |
+| Momentum top-34 | 34 |
+| Intersection | 16 |
 | **Jaccard** | **0.308** |
 
-**真实命令输出**: `LLM: 34  动量: 34  交集: 16  Jaccard: 0.308`
+**Real command output**: `LLM: 34  Momentum: 34  Intersection: 16  Jaccard: 0.308`
 
-重叠不高。LLM 和动量只有 ~1/3 的共同选择。说明即使都不显著，它们选的股票也不同。
+Low overlap. LLM and momentum only share ~1/3 of picks. Even though both are insignificant, they select different stocks.
 
 ---
 
-## 4. 差值显著性
+## 4. Difference Significance
 
-| 指标 | 值 |
+| Metric | Value |
 |------|-----|
 | strong_bull alpha | 20.13% |
-| 动量 alpha | 12.72% |
-| 差值 (sb − mom) | +7.40% |
+| Momentum alpha | 12.72% |
+| Difference (sb - mom) | +7.40% |
 | **95% CI** | **[-7.01%, +27.52%]** |
 
-**真实命令输出**: `差值: 7.40%, 95% CI: [-7.01%, 27.52%]`
+**Real command output**: `Difference: 7.40%, 95% CI: [-7.01%, 27.52%]`
 
-差值 CI 跨零，跨度 34pp。无法说 strong_bull 显著优于动量。
+Difference CI crosses zero, span 34pp. Cannot say strong_bull is significantly better than momentum.
 
 ---
 
-## 判读
+## Judgment
 
 ```
-→ C) strong_bull 自身不显著 → 先扩样本再下结论
+-> C) strong_bull itself not significant -> expand sample before drawing conclusions
 ```
 
-| 判读条件 | 结果 |
+| Judgment Condition | Result |
 |----------|------|
-| strong_bull CI 下界 > 无条件 6.07%? | **否** (5.02% < 6.07%) |
-| 差值 CI > 0? | **否** (含 0) |
+| strong_bull CI lower bound > unconditional 6.07%? | **No** (5.02% < 6.07%) |
+| Difference CI > 0? | **No** (contains 0) |
 
-**不是 A 也不是 B。** strong_bull 桶在 unique-pair 层级没有统计显著的 alpha 优势。problem not in model — in sample.
+**Not A and not B.** The strong_bull bucket has no statistically significant alpha advantage at the unique-pair level. The problem is not in the model — it is in the sample.
 
 ---
 
-## 脚本
+## Script
 
 `cli/eval-strongbull-vs-momentum.js`:
 ```
 node cli/eval-strongbull-vs-momentum.js
 ```
 
-## 未改动
+## Untouched
 
-| 模块 | 状态 |
+| Module | Status |
 |------|------|
-| 任何 eval 逻辑 | 未碰 |
-| prompt/LLM | 未碰 |
-| frozen dataset | 只读 |
+| Any eval logic | Untouched |
+| prompt/LLM | Untouched |
+| frozen dataset | Read-only |

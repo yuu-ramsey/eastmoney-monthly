@@ -1,4 +1,4 @@
-// HARD_CONSTRAINTS 第 4/5/6 条 + buildTemplatePrompt 参数透传测试
+// HARD_CONSTRAINTS clauses 4/5/6 + buildTemplatePrompt parameter pass-through test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildTemplatePrompt, DEFAULT_TEMPLATE } from '../lib/prompt-templates.js';

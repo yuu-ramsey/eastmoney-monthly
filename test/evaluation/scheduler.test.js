@@ -1,4 +1,4 @@
-// 调度路由 + 安全开关测试
+// Scheduling router + safety switch test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { getScheduleForDate } from '../../lib/scanner/scheduler.js';

@@ -1,7 +1,7 @@
 """
-Phase 5: FFT重构 — 30维→10维（仅保留振幅谱）
+Phase 5: FFT reconstruction — 30d→10d (keep only amplitude spectrum)
 对比: 61维 baseline vs 41维 (FFT振幅10维)
-输出: T+1~T+6 IC decay + 特征重要性
+Output: T+1~T+6 IC decay + 特征重要性
 """
 import warnings; warnings.filterwarnings('ignore')
 import numpy as np, pandas as pd, sqlite3, time, json
@@ -53,7 +53,7 @@ def cs_hit(pred, true, dates):
 
 
 def fft_amplitudes(p):
-    """返回前N_FFT个频峰的振幅(10维), 不做频率/相位"""
+    """Returns前N_FFT个频峰的振幅(10维), 不做频率/相位"""
     x = np.arange(len(p))
     t = np.polyfit(x, p, 1)
     d = p - np.polyval(t, x)
@@ -304,7 +304,7 @@ if __name__ == '__main__':
     print(f"[{ts()}] 行业中性化...", flush=True); t0 = time.time()
     flat61_ind = cross_sectional_neutralize(flat61.copy(), dates_arr, inds_arr, 'categorical')
     flat41_ind = cross_sectional_neutralize(flat41.copy(), dates_arr, inds_arr, 'categorical')
-    print(f"[{ts()}] 完成 ({time.time() - t0:.0f}s)", flush=True)
+    print(f"[{ts()}] done ({time.time() - t0:.0f}s)", flush=True)
 
     tr_m = (dates_arr >= '2010-01') & (dates_arr <= '2014-12')
     te_m = (dates_arr >= '2015-01')
@@ -406,4 +406,4 @@ if __name__ == '__main__':
     with open(OUT / 'fft10_summary.json', 'w') as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
 
-    print(f"\n[{ts()}] 完成. 结果: {OUT}")
+    print(f"\n[{ts()}] done. 结果: {OUT}")

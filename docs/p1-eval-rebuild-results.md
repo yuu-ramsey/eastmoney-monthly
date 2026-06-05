@@ -1,54 +1,54 @@
-# P1 Eval 重建结果 — Phase C3
+# P1 Eval Rebuild Results — Phase C3
 
-> 分支: `p1-eval-lowpos-run` | 日期: 2026-05-29
+> Branch: `p1-eval-lowpos-run` | Date: 2026-05-29
 >
-> ⚠ 存活-only ⚠ 探索性 ⚠ Test-MDE 受限 (31.7%)
+> ⚠ Survivors-only ⚠ Exploratory ⚠ Test-MDE limited (31.7%)
 
 ---
 
-## 主指标: (LLM − 动量) spread 差值 CI
+## Primary Metric: (LLM - Momentum) Spread Difference CI
 
-| 指标 | 值 |
+| Metric | Value |
 |------|-----|
 | LLM Winsorize spread | -7.64% |
-| 动量 Winsorize spread | -13.09% |
-| **差值 (LLM − 动量)** | **+5.45%** |
-| **差值 95% CI** | **[-39.0%, +56.2%]** |
-| CI 宽度 | **95.2pp** |
+| Momentum Winsorize spread | -13.09% |
+| **Difference (LLM - Momentum)** | **+5.45%** |
+| **Difference 95% CI** | **[-39.0%, +56.2%]** |
+| CI width | **95.2pp** |
 
-### 判读: **INCONCLUSIVE — CI 含 0，功效受限**
+### Judgment: **INCONCLUSIVE — CI contains 0, power-limited**
 
-差值 +5.45% 但 CI 跨度 95pp。与预注册的 Test MDE=31.7% 一致——此功效下任何合理效应的 CI 都会跨零。**非阴性结论（不等同于"LLM 不增值"），是功效不足。**
-
----
-
-## 关键发现: LLM 结构性 bullish 偏差
-
-```
-Signal分布: bull=490 (67%) | neutral=234 (32%) | bear=8 (1%)
-```
-
-LLM 在低位池中几乎从不预测 bearish。与反转因子落入同一陷阱——看到"便宜"就喊买，不区分价值陷阱 vs 真机会。动量因子则正确追涨杀跌。
+Difference +5.45% but CI spans 95pp. Consistent with pre-registered Test MDE=31.7% — any reasonable effect's CI would cross zero at this power. **Not a negative conclusion (not equivalent to "LLM adds no value"); it is insufficient power.**
 
 ---
 
-## 四条基线参照系
+## Key Finding: LLM Structural Bullish Bias
 
-| 基线 | Spread | 95% CI | 说明 |
+```
+Signal distribution: bull=490 (67%) | neutral=234 (32%) | bear=8 (1%)
+```
+
+LLM almost never predicts bearish in the low-position pool. Falls into the same trap as the reversal factor — seeing "cheap" means "buy," not distinguishing value traps from real opportunities. The momentum factor correctly follows the trend.
+
+---
+
+## Four Baseline Reference System
+
+| Baseline | Spread | 95% CI | Description |
 |------|--------|--------|------|
-| 动量因子 | +29.5% | [+19.6, +40.7] | **显著为正 ✓** |
-| 反转因子 | -32.5% | [-65.5, -15.1] | 显著反向 |
+| Momentum factor | +29.5% | [+19.6, +40.7] | **Significantly positive (Pass)** |
+| Reversal factor | -32.5% | [-65.5, -15.1] | Significantly contrarian |
 | **LLM** | **-7.6%** | **[-51.8, +30.1]** | **inconclusive** |
 | Always-bullish | N/A | — | 100% bull |
 
 ---
 
-## 结论（预注册措辞）
+## Conclusion (pre-registered language)
 
-> LLM 相对动量因子的增量 edge **无法检出**（差值 CI 含 0，功效受限）。
-> 一行动量因子（+29.5% spread, CI 全正）已是该 universe 的最优免费信号。
-> 在扩样本前，继续烧 LLM 无意义。
+> LLM's incremental edge relative to the momentum factor **cannot be detected** (difference CI contains 0, power-limited).
+> A one-line momentum factor (+29.5% spread, CI entirely positive) is already the optimal free signal for this universe.
+> Before expanding sample, continuing to burn LLM is meaningless.
 
-## 成本
+## Cost
 
 - LLM calls: 732 | Parse failed: 0

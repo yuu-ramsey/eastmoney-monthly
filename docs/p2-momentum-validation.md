@@ -1,58 +1,58 @@
-# P2 动量因子验证：hold-out + regime + 可交易性
+# P2 Momentum Factor Validation: Hold-Out + Regime + Tradability
 
-> 分支: `p2-momentum-validate` | 日期: 2026-05-29
+> Branch: `p2-momentum-validate` | Date: 2026-05-29
 >
-> ⚠ 存活-only；退市股缺失（`docs/p1-survivorship-stress.md`）；绝对收益受幸存者偏差污染
+> ⚠ Survivors-only; delisted stocks missing (`docs/p1-survivorship-stress.md`); absolute returns contaminated by survivorship bias
 >
-> **⚠ B4 修正：Phase B4 的 +29.5% 经复算确认为 bug（排序数组共享对象引用）。正确全样本动量 spread = −13.1%，CI 含 0。**
+> **⚠ B4 Correction: Phase B4's +29.5% confirmed as bug upon recalculation (sort array shared object reference). Correct full-sample momentum spread = -13.1%, CI contains 0.**
 
 ---
 
-## V1: Hold-out
+## V1: Hold-Out
 
-| Pool | n | spread | 95% CI | 薄 |
+| Pool | n | spread | 95% CI | Thin |
 |------|---|--------|--------|-----|
 | Full | 573 | -13.1% | [-44.7, +4.8] | — |
 | Train | 242 | -24.1% | [-57.4, +5.5] | 4/6 |
 | Test | 331 | -8.1% | [-47.3, +18.1] | 2/6 |
 
-**Train/Test 均 CI 含 0 → 不通过。** Test 量级缩水到全样本 1/3。
+**Train/Test both CI contain 0 -> Not passed.** Test magnitude shrinks to 1/3 of full sample.
 
 ---
 
 ## V2: Regime
 
-| Regime | 时点 | n | spread | 95% CI |
+| Regime | Timepoints | n | spread | 95% CI |
 |--------|------|---|--------|--------|
-| Up | 2018-06~2020-09 (5个, CSI300 +7~+90%) | 260 | **-42.2%** | **[-94.5, -2.5]** |
-| Down | 2021-06~2024-02 (5个, CSI300 -6~-15%) | 193 | **+20.6%** | **[+10.8, +32.4]** |
-| Sway | 2022-10, 2024-10 (2个) | 120 | -9.1% | [-30.9, +12.5] |
+| Up | 2018-06~2020-09 (5, CSI300 +7~+90%) | 260 | **-42.2%** | **[-94.5, -2.5]** |
+| Down | 2021-06~2024-02 (5, CSI300 -6~-15%) | 193 | **+20.6%** | **[+10.8, +32.4]** |
+| Sway | 2022-10, 2024-10 (2) | 120 | -9.1% | [-30.9, +12.5] |
 
-**动量是 beta 暴露，非独立 alpha。** 涨市大亏、跌市小赚——盈亏方向由市场 regime 决定。
+**Momentum is beta exposure, not independent alpha.** Loses big in up markets, gains small in down markets — profit/loss direction determined by market regime.
 
 ---
 
-## V3: 可交易性
+## V3: Tradability
 
-| 指标 | 值 |
+| Metric | Value |
 |------|-----|
-| 只做多超额 | **-2.79%** |
+| Long-only excess | **-2.79%** |
 | Winsorize spread | -13.1% |
-| 极值贡献 | -4.3pp |
-| 换手率 | 91%/period |
-| 扣 0.2% 净多头 | -3.15% |
-| 扣 0.3% 净多头 | -3.33% |
+| Extreme contribution | -4.3pp |
+| Turnover | 91%/period |
+| Net long after 0.2% cost | -3.15% |
+| Net long after 0.3% cost | -3.33% |
 
-**买动量 top20% 跑输等权持有；换手极高；扣成本全面亏损。**
+**Buy momentum top 20% underperforms equal-weight hold; extremely high turnover; net costs = total loss.**
 
 ---
 
-## 总判读
+## Overall Judgment
 
-| 维度 | 结论 |
+| Dimension | Conclusion |
 |------|------|
-| V1 hold-out | 不通过 — CI 含 0 |
-| V2 regime | beta 暴露 — 涨市亏/跌市赚 |
-| V3 可交易 | 不可交易 — 净超额为负 |
+| V1 hold-out | Not passed — CI contains 0 |
+| V2 regime | Beta exposure — loses in up markets/wins in down markets |
+| V3 tradability | Not tradable — net excess negative |
 
-**+29.5% 为 B4 bug。动量非免费信号。产品化前置：扩样本 + 补退市 + regime 预注册。**
+**+29.5% was a B4 bug. Momentum is not a free signal. Prerequisites for productization: expand sample + add delisted stocks + pre-register regime.**

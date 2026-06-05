@@ -1,7 +1,7 @@
 """
-Kronos 预测模型单元测试 — 权重加载 + forward pass 验证
+Kronos prediction model unit test — weight loading + forward pass validation
 
-验证标准：加载 HuggingFace 预训练权重后，forward / decode_s1 / decode_s2
+Validation: after loading HuggingFace pretrained weights, forward / decode_s1 / decode_s2
 输出维度正确，logits 值在合理范围。
 """
 

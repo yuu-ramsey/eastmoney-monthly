@@ -1,4 +1,4 @@
-"""多数据集 × 多模型对比（无需 Qlib，纯 sklearn+LightGBM）
+"""Multi-dataset × multi-model comparison (no Qlib needed, pure sklearn+LightGBM)
 数据集: A股月线(2247只) + SPY月线(Yahoo) + Fama-French 3/5因子(Ken French)
 模型: Ridge / Linear / LightGBM / MLP / RandomForest
 指标: IC / ICIR / Hit Rate
@@ -193,7 +193,7 @@ def eval_model(train, test, feat_cols, ds_name):
     return results
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 主流程
+# Main flow
 # ═══════════════════════════════════════════════════════════════════════════
 
 def main():
@@ -213,7 +213,7 @@ def main():
             print(f'  {label} | 训练{len(train):,} 测试{len(test):,} 特征{len(feats)}')
             datasets[key] = (train, test, feats, label)
         except Exception as e:
-            print(f'  失败: {e}')
+            print(f'  failed: {e}')
 
     all_results = {}
     for ds_key, (train, test, feats, ds_label) in datasets.items():
@@ -222,7 +222,7 @@ def main():
         r = eval_model(train, test, feats, ds_key)
         all_results[ds_key] = r
         for name, m in r.items():
-            if 'error' in m: print(f'  {name:<15s} 错误: {m[\"error\"]}')
+            if 'error' in m: print(f'  {name:<15s} ERROR: {m[\"error\"]}')
             else: print(f'  {name:<15s} IC={m[\"IC\"]:+.4f} ICIR={m[\"ICIR\"]:+.4f} hit={m[\"hit_rate\"]:.3f} ({m[\"time_s\"]}s)')
 
     # 汇总

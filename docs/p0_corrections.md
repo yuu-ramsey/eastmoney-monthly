@@ -1,25 +1,25 @@
-# P0 Spin 措辞修正
+# P0 Spin Language Corrections
 
-## 原始措辞（docs/p0_daily_signals_audit.md）→ 修正后
+## Original Language (docs/p0_daily_signals_audit.md) -> Corrected
 
-| 原始措辞 | 修正后 | 原因 |
+| Original Language | Corrected | Reason |
 |---------|--------|------|
-| "泄露程度有限" | "数据泄露: 参数层 (模型从 2015-2021 训练中学到的模式用于 2015 年预测)" | 禁止淡化泄露 |
-| "Phase 17 v5 不受影响" | "Phase 17 v5 Test IC=0.114 待验证 (checkpoint 选择策略需确认)" | 禁止未验证声明 |
-| "可能部分虚高" | "Sprint 1 Val IC 虚高 (参数泄露导致), 需重测确认" | 禁止不确定性措辞 |
-| "轻微参数泄露" | "数据泄露 (参数包含未来数据), 影响 Sprint 1 Val" | 禁止"轻微" |
-| "应该是对" | "已对照代码行 131-136: val loss 选 checkpoint, 非 val IC" | 禁止模糊 |
+| "Leakage is limited" | "Data leakage: parameter layer (patterns learned by model from 2015-2021 training used for 2015 predictions)" | Prohibit downplaying leakage |
+| "Phase 17 v5 not affected" | "Phase 17 v5 Test IC=0.114 pending verification (checkpoint selection strategy needs confirmation)" | Prohibit unverified claims |
+| "May be partially inflated" | "Sprint 1 Val IC inflated (parameter leakage caused), needs retest confirmation" | Prohibit uncertainty language |
+| "Minor parameter leakage" | "Data leakage (parameters contain future data), affects Sprint 1 Val" | Prohibit "minor" |
+| "Should be correct" | "Verified against code lines 131-136: val loss selects checkpoint, not val IC" | Prohibit ambiguity |
 
-## 已确认的数字
+## Confirmed Numbers
 
-| 声明 | 验证状态 |
+| Claim | Verification Status |
 |------|---------|
-| Phase 17 v5 Test IC=0.114 | ✅ checkpoint = val loss (代码行 131), 无 IC cherry-pick |
-| daily_signals.parquet 866K 条 | ✅ 已验证 |
-| Sprint 1 12-feature 无 NaN | ✅ 已验证 |
-| 月度聚合逻辑 | ✅ 无工程错 |
+| Phase 17 v5 Test IC=0.114 | Confirmed: checkpoint = val loss (code line 131), no IC cherry-pick |
+| daily_signals.parquet 866K records | Verified |
+| Sprint 1 12-feature no NaN | Verified |
+| Monthly aggregation logic | No engineering errors |
 
-## 待重测
+## Pending Retest
 
-- Sprint 1 33-dim: 用正确 walk-forward daily signals 重跑
-- Phase 19 v3 LSTM 信号: 用修正后月度信号重跑 backtest
+- Sprint 1 33-dim: Rerun with correct walk-forward daily signals
+- Phase 19 v3 LSTM signal: Rerun backtest with corrected monthly signals

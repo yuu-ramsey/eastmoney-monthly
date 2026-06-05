@@ -1,4 +1,4 @@
-"""调试swsresearch.com返回内容"""
+"""Debug swsresearch.com response content"""
 import ssl, urllib3
 urllib3.disable_warnings()
 import requests, re

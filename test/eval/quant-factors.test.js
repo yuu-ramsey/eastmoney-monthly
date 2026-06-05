@@ -1,4 +1,4 @@
-// quant-factors + score-fusion 测试
+// quant-factors + score-fusion test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 

@@ -1,24 +1,24 @@
-# P1 低位池基线报告 — Phase B 硬停
+# P1 Low-Position Pool Baseline Report — Phase B Hard Stop
 
-> 分支: `p1-eval-lowpos-run` | 日期: 2026-05-29
+> Branch: `p1-eval-lowpos-run` | Date: 2026-05-29
 >
-> **存活-only。绝对收益受幸存者偏差污染、不可作结论。主结论仅看相对 spread。**
+> **Survivors-only. Absolute returns contaminated by survivorship bias; not for conclusions. Main conclusions only from relative spread.**
 >
-> **判读：池子分辨率勉强够用（全样本 MDE=24.0%），反转因子自身 spread=-32% 且 CI 跨 50pp。**
-> **LLM-vs-反转的对比依赖 spread 差值 CI，进 C 可行但仍属探索性。**
+> **Judgment: Pool resolution barely sufficient (full-sample MDE=24.0%); reversal factor itself has spread=-32% with CI spanning 50pp.**
+> **LLM-vs-reversal comparison depends on spread difference CI; entering C is feasible but remains exploratory.**
 
 ---
 
-## 1. 池子概要
+## 1. Pool Overview
 
-| 指标 | 值 |
+| Metric | Value |
 |------|-----|
-| 总 testPoints | 732 |
-| 有效反转因子对 | 573 (unique) |
-| Unique 股票 | 268 |
-| Total (股票,时点) | 573 |
+| Total testPoints | 732 |
+| Valid reversal factor pairs | 573 (unique) |
+| Unique stocks | 268 |
+| Total (stock, timepoint) | 573 |
 
-### 每时点入选数
+### Per-Timepoint Inclusion Counts
 
 ```
 2018-06:  76 (Train)    2020-03:  84 (Test)
@@ -29,60 +29,60 @@
 2022-06:  44 (Train)    2024-10:  12 ⚠ THIN
 ```
 
-4 个薄时点 < 30。牛市/复苏期低位股自然少。
+4 thin timepoints < 30. Low-position stocks naturally scarce during bull/recovery periods.
 
 ---
 
-## 2. 反转因子基线
+## 2. Reversal Factor Baseline
 
 ```
-bullish (跌最深20%):  WinsMean =   6.14%
-bearish (跌最浅20%):  WinsMean =  38.60%
+bullish (deepest 20% decline):  WinsMean =   6.14%
+bearish (shallowest 20% decline):  WinsMean =  38.60%
 spread:                        -32.46%
 95% CI:              [-65.54%, -15.08%]
 nBlocks:             573
 ```
 
-**反转因子是反向的。** 在低位池中"越跌越买"的股票表现远逊于"跌得不深"的。这与价值 trap 假说一致——最深的折扣往往对应基本面问题，不是买入机会。
+**The reversal factor is contrarian.** In the low-position pool, "buy the deepest dips" stocks perform far worse than "did not decline deeply" stocks. This is consistent with the value trap hypothesis — the deepest discounts often correspond to fundamental problems, not buying opportunities.
 
 ---
 
-## 3. Alpha 分布
+## 3. Alpha Distribution
 
-| Pool | n | Mean | WinsMean | WinsStd | α>0% |
+| Pool | n | Mean | WinsMean | WinsStd | alpha>0% |
 |------|---|------|---------|---------|------|
 | Full | 573 | 17.13% | 15.35% | 47.1% | — |
 | Train | 242 | 20.93% | 20.21% | 53.9% | 64% |
 | Test | 331 | 14.35% | 10.48% | 36.0% | 56% |
 
-Train 偏牛市（熊底+复苏初），Test 含转折（bull top → bear, crash recovery）。
+Train is bull-skewed (bear bottom + early recovery), Test includes turning points (bull top -> bear, crash recovery).
 
 ---
 
-## 4. 功效复核
+## 4. Power Recheck
 
-| Pool | n_unique | n_sb≈20% | MDE |
+| Pool | n_unique | n_sb approx 20% | MDE |
 |------|---------|----------|-----|
 | Full | 573 | 115 | **24.0%** |
 | Train | 242 | 48 | 37.1% |
 | Test | 331 | 66 | 31.7% |
 
-全样本 MDE=24.0%：只能检出 >24pp 的 spread 差异。Test 单独不可用（31.7%）。
+Full-sample MDE=24.0%: can only detect spread differences >24pp. Test alone is unusable (31.7%).
 
-**反转因子 spread=-32% 绝对值大**，效应量大到可能被 MDE 捕获。LLM 只需跑赢 -32% 的反转 spread。
+**Reversal factor spread=-32% in absolute value is large** — the effect size is big enough to potentially be captured by MDE. LLM only needs to beat reversal's -32% spread.
 
 ---
 
-## 5. 硬停判读
+## 5. Hard Stop Judgment
 
-| 条件 | 状态 |
+| Condition | Status |
 |------|------|
-| 反转因子有可测 spread | ✓ (-32%, CI 跨 50pp 但排除 0) |
-| Test 时点跨 regime | ✓ (crash/reversal/bear/sideways) |
-| 进 C 风险 | 差值 CI 会很宽, 可能 inconclusive |
+| Reversal factor has measurable spread | Pass (-32%, CI spans 50pp but excludes 0) |
+| Test timepoints cross regimes | Pass (crash/reversal/bear/sideways) |
+| Risk of entering C | Difference CI will be very wide, may be inconclusive |
 
-**建议：进 C（探索性）**。反转 spread 绝对值大，¥38 LLM 成本极低。但必须遵守：test CI 宽 → 不下强结论。替代方案：先扩时点 >12 个压低 MDE，再跑 LLM。
+**Recommendation: Enter C (exploratory).** Reversal spread has large absolute value; 38 CNY LLM cost is extremely low. But must follow: if test CI is wide -> do not draw strong conclusions. Alternative: first expand timepoints >12 to reduce MDE, then run LLM.
 
 ---
 
-**等人工决策：进 C / 先扩时点 / 停。**
+**Awaiting human decision: Enter C / Expand timepoints first / Stop.**

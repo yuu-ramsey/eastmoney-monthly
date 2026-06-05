@@ -1,4 +1,4 @@
-// 自我回测函数测试
+// Self-backtest function test
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { calculateActualReturn, buildSelfCalibrationBlock } from '../lib/self-backtest.js';

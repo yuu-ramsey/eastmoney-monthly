@@ -1,4 +1,4 @@
-// Native Messaging Host —— 接收 Chrome 扩展发来的数据，写入 .eastmoney-ai/storage/
+// Native Messaging Host - receives data from Chrome extension, writes to .eastmoney-ai/storage/
 // 协议：stdin 读 4 字节长度前缀 + JSON，stdout 写相同格式响应
 // Chrome 按需启动此进程，不常驻
 

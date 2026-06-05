@@ -1,4 +1,4 @@
-// collector 测试 — extractJudgment / evaluateOneAnalysis / evaluateBatch
+// collector test - extractJudgment / evaluateOneAnalysis / evaluateBatch
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { extractJudgment, evaluateOneAnalysis, evaluateBatch } from '../../lib/evaluation/collector.js';

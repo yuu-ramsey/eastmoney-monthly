@@ -1,14 +1,14 @@
 """
-v32_final_eval.py — 32维最终版因子评估（全修复合并）
+v32_final_eval.py — 32d final factor evaluation (all fixes merged)
 ======================================================
 修复清单（全部来自验证流程确认）：
-  1. 收益口径：单月 (c[i+1]-c[i])/c[i]，非累积
+  1. 收益口径：单月 (c[i+1]-c[i])/c[i]，非accumulated
   2. 日期分组：统一截断 YYYY-MM，同月股票归入同一截面
   3. 特征版本：32维（FFT振幅10 + G7全14 + 均线偏离3 + MACD3 + G4精选2）
   4. 回测窗口：2015-01 ~ 数据末尾
   5. 行业中性化：CSRC L2
 
-输出：
+Output:
   - T+1~T+6 单月IC / ICIR / Hit Rate
   - 5-Fold 时间序列CV
   - 纯多头回测（Q5组，等权，月频调仓）
@@ -333,7 +333,7 @@ def build_cross_sections(stock_data, industry_map):
             if feat is None:
                 continue
 
-            # 单月收益（修复#1：跨期减前值，非累积）
+            # 单月收益（修复#1：跨期减前值，非accumulated）
             rets = {}
             for lag in range(1, MAX_HORIZONS + 1):
                 future_idx = idx + lag
@@ -697,7 +697,7 @@ def print_results(ic_results, cv_results, backtest_stats, cost_results):
 
 
 # ============================================================
-# 主流程
+# Main flow
 # ============================================================
 def main():
     print("=" * 70)

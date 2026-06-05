@@ -1,4 +1,4 @@
-"""调试 legulegu - 获取JS文件找API"""
+"""Debug legulegu - fetch JS files to find API"""
 import ssl, urllib3
 urllib3.disable_warnings()
 import requests, re

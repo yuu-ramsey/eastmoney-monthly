@@ -1,41 +1,41 @@
-# P1 LSTM 训练/评估时间窗泄漏检查
+# P1 LSTM Training/Eval Time Window Leakage Check
 
-> 分支: p0a-verify-3-4 (只读审计) | 日期: 2026-05-29
+> Branch: p0a-verify-3-4 (read-only audit) | Date: 2026-05-29
 >
-> **结论先行：`daily_lstm7.pt` 训练数据无时间切分，2024-2025 全在训练集内。
-> 所有 eval 时点 (2024-05, 2024-11, 2025-05, 2025-11) 均被泄漏。
-> mc-dropout eval 结果不可用，且运行时注入的 LSTM 信号同样受影响。**
+> **Conclusion first: `daily_lstm7.pt` training data has no time split; 2024-2025 is entirely in the training set.
+> All eval timepoints (2024-05, 2024-11, 2025-05, 2025-11) are leaked.
+> mc-dropout eval results are unusable, and runtime-injected LSTM signal is equally affected.**
 
 ---
 
-## 1. 证据链
+## 1. Evidence Chain
 
-### 1a. 模型训练：无时间切分
+### 1a. Model Training: No Time Split
 
-**`scripts/daily_to_monthly_aggr.py:25-91`** — 这是训练 `daily_lstm7.pt` 的脚本:
+**`scripts/daily_to_monthly_aggr.py:25-91`** — This is the script that trains `daily_lstm7.pt`:
 
 ```python
-# Line 31-35: 选前 150 只 data-rich 股票
+# Line 31-35: Select first 150 data-rich stocks
 for c in stocks:
     g = d_df[d_df['code'] == c]
     if len(g) >= LOOKBACK + 504: train_codes.append(c)
     if len(train_codes) >= 150: break
 
-# Line 37-62: 对每只股票的【全部历史】生成训练序列
+# Line 37-62: Generate training sequences for each stock's [full history]
 for c in train_codes:
     g = d_df[d_df['code'] == c].sort_values('date').reset_index(drop=True)
     ...
-    for i in range(LOOKBACK-1, n-252):  # n = 股票的全部历史长度
+    for i in range(LOOKBACK-1, n-252):  # n = stock's full history length
         ...
         all_seqs.append(feats[i-LOOKBACK+1:i+1]); all_y3.append(y3d)
 
-# Line 64: 取前 250K 条作为训练集
+# Line 64: Take first 250K sequences as training set
 Xtr = np.array(all_seqs[:250000], dtype=np.float32)
 ```
 
-**没有 train/val/test 时间切分。** 第 64 行只取了前 250K 条序列（按股票顺序+时间顺序），未按日期筛选。包含全部 2010-2025 数据。
+**No train/val/test time split.** Line 64 only takes the first 250K sequences (by stock order + time order), not filtered by date. Contains all 2010-2025 data.
 
-**`lib/lstm/dataset.py:17-19,308-310`** — 月线训练数据明确有测试集覆盖 eval 时点:
+**`lib/lstm/dataset.py:17-19,308-310`** — Monthly training data explicitly has test set covering eval timepoints:
 
 ```python
 TRAIN_END = '2021-12'
@@ -44,12 +44,12 @@ TEST_END = '2026-05'
 
 train_mask = (seq_dates >= '2015-01') & (seq_dates <= '2021-12')
 val_mask = (seq_dates >= '2022-01') & (seq_dates <= '2023-12')
-test_mask = (seq_dates >= '2024-01') & (seq_dates <= '2026-05')  # ← 覆盖所有 eval 时点
+test_mask = (seq_dates >= '2024-01') & (seq_dates <= '2026-05')  # <- covers all eval timepoints
 ```
 
-**但月线模型 (LSTMBaseline) 未被 mc_dropout_predict.py 使用**，且 v4 eval 中也未注入。
+**But the monthly model (LSTMBaseline) is not used by mc_dropout_predict.py**, and v4 eval also does not inject it.
 
-### 1b. MC Dropout 推理：全量数据
+### 1b. MC Dropout Inference: Full Data
 
 **`cli/mc_dropout_predict.py:128`**:
 
@@ -57,16 +57,16 @@ test_mask = (seq_dates >= '2024-01') & (seq_dates <= '2026-05')  # ← 覆盖所
 WHERE code IN (...) AND date >= '2010-01-01'
 ```
 
-加载所有股票的完整日线历史 (2010-01 至今)，第 157 行为每个交易日生成序列:
+Loads full daily history for all stocks (2010-01 to present); line 157 generates sequences for every trading day:
 
 ```python
-for i in range(LOOKBACK - 1, n):  # n = 全部交易日
+for i in range(LOOKBACK - 1, n):  # n = all trading days
     seqs.append(feats[i - LOOKBACK + 1:i + 1])
 ```
 
-输出每个日期的预测到 `mc_dropout_signals.parquet`。
+Outputs predictions for every date to `mc_dropout_signals.parquet`.
 
-### 1c. 运行时注入
+### 1c. Runtime Injection
 
 **`cli/eval-mc-dropout.js:135-137,208`**:
 
@@ -75,61 +75,61 @@ const mcCache = await loadMcDropoutCache();
 ...
 const prompt = await buildPromptByTemplate({
     ...,
-    lstmSignalData,   // ← LSTM 信号注入 prompt
+    lstmSignalData,   // <- LSTM signal injected into prompt
 });
 ```
 
-**`cli/mc_export_json.py:22`** — mc_dropout JSON 导出:
+**`cli/mc_export_json.py:22`** — mc_dropout JSON export:
 
 ```python
 latest = df.sort_values('date').groupby('code').last()
 ```
 
-每个股票取最新一条信号 → 存入 `.eastmoney-ai/storage/mc_dropout/<code>.json` → Chrome 扩展通过 native-host 读取。
+Each stock takes its latest signal -> stored to `.eastmoney-ai/storage/mc_dropout/<code>.json` -> Chrome extension reads via native-host.
 
 ---
 
-## 2. 受影响时点
+## 2. Affected Timepoints
 
-| Eval 时点 | v4-signals eval | MC-dropout eval | 运行时间入 |
+| Eval Timepoint | v4-signals eval | MC-dropout eval | Runtime inject |
 |-----------|----------------|-----------------|-----------|
-| 2024-05 | 不受影响 (无 LSTM) | **泄漏** | **泄漏** |
-| 2024-11 | 不受影响 (无 LSTM) | **泄漏** | **泄漏** |
-| 2025-05 | 不受影响 (无 LSTM) | **泄漏** | **泄漏** |
-| 2025-11 | 不受影响 (无 LSTM) | **泄漏** | **泄漏** |
+| 2024-05 | Not affected (no LSTM) | **Leaked** | **Leaked** |
+| 2024-11 | Not affected (no LSTM) | **Leaked** | **Leaked** |
+| 2025-05 | Not affected (no LSTM) | **Leaked** | **Leaked** |
+| 2025-11 | Not affected (no LSTM) | **Leaked** | **Leaked** |
 
-**v4-signals eval (0.187) 不受 LSTM 泄漏影响** — 已确认 prompt 中不含 LSTM 信号。
+**v4-signals eval (0.187) not affected by LSTM leakage** — confirmed prompt contains no LSTM signal.
 
-**mc-dropout eval (mc-dropout-*.jsonl) 全部受泄漏影响** — 模型训练用了 2024+ 数据，且推理在 2024+ 时点生成了信号。
+**mc-dropout eval (mc-dropout-*.jsonl) all affected by leakage** — model training used 2024+ data, and inference generated signals at 2024+ timepoints.
 
-**运行时系统受影响** — 用户在实际使用时，LSTM 信号注入到 prompt 中，该信号来自一个在 2024+ 数据上训练的模型。
+**Runtime system affected** — when users actually use it, LSTM signal is injected into prompt, and that signal comes from a model trained on 2024+ data.
 
 ---
 
-## 3. 泄漏严重程度
+## 3. Leakage Severity
 
-| 项目 | 严重度 | 说明 |
+| Item | Severity | Description |
 |------|--------|------|
-| v4 eval (0.187) | 无影响 | 未使用 LSTM |
-| MC dropout eval | **高** | 结果不可用，信号包含未来信息 |
-| 运行时 LSTM 信号 | **高** | 用户看到的 LSTM 信心度/不确定性来自泄漏模型 |
-| Frozen baseline (0.1966) | 无影响 | runA-no-sector 未使用 LSTM |
+| v4 eval (0.187) | No impact | Did not use LSTM |
+| MC dropout eval | **High** | Results unusable; signals contain future information |
+| Runtime LSTM signal | **High** | LSTM confidence/uncertainty users see is from a leaked model |
+| Frozen baseline (0.1966) | No impact | runA-no-sector did not use LSTM |
 
 ---
 
-## 4. 修复建议（不实施，仅记录）
+## 4. Fix Recommendations (not implemented, recorded only)
 
-若要修复:
-1. 用严格 walk-forward split (e.g., train ≤2021-12, val 2022-2023, test 2024+) 重新训练 daily_lstm7
-2. mc_dropout_predict.py 只对 train/val 日期做推理，test 日期严格留出
-3. 重新生成 mc_dropout_signals.parquet 和 mc_dropout/*.json
+To fix:
+1. Retrain daily_lstm7 with strict walk-forward split (e.g., train <=2021-12, val 2022-2023, test 2024+)
+2. mc_dropout_predict.py only infers on train/val dates; test dates strictly held out
+3. Regenerate mc_dropout_signals.parquet and mc_dropout/*.json
 
 ---
 
-## 未改动
+## Untouched
 
-| 模块 | 状态 |
+| Module | Status |
 |------|------|
-| 任何 .py 训练脚本 | 只读 |
-| 任何 .js eval 脚本 | 只读 |
-| mc_dropout_signals.parquet | 未重新生成 |
+| Any .py training scripts | Read-only |
+| Any .js eval scripts | Read-only |
+| mc_dropout_signals.parquet | Not regenerated |

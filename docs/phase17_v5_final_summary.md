@@ -1,44 +1,44 @@
-# Phase 17 v5 三轨汇总
+# Phase 17 v5 Three-Track Summary
 
-## 轨道 1: 月度聚合
+## Track 1: Monthly Aggregation
 
-**✅ 完成。** 最佳策略 `mean`，IC=-0.050（反向）。43K 月度信号已保存。
+**Complete.** Best strategy `mean`, IC=-0.050 (contrarian). 43K monthly signals saved.
 
-## 轨道 2: Phase 19 v3 Backtest
+## Track 2: Phase 19 v3 Backtest
 
-**✅ 完成。** LSTM 信号改善 EW LT Sharpe 从 0.615→0.698 (+0.08)。最佳=0.698 < 0.7 → marginal。
+**Complete.** LSTM signal improved EW LT Sharpe from 0.615->0.698 (+0.08). Best=0.698 < 0.7 -> marginal.
 
-## 轨道 3: LLM Eval
+## Track 3: LLM Eval
 
-**⏸ 推迟。** 代码就绪但 LSTM 月度 IC=-0.05 太弱，注入 LLM 大概率不改善 score。¥14 预算保留。
+**Deferred.** Code ready but LSTM monthly IC=-0.05 too weak; injection into LLM highly unlikely to improve score. 14 CNY budget reserved.
 
-## Phase 17 v5 全局结论
+## Phase 17 v5 Global Conclusions
 
-### 成功
+### Successes
 
-1. **日线 LSTM 模型**: Test IC3=0.114，在 22 架构 + 4 频率 + 2 universe 搜索中唯一通过 Test
-2. **月度聚合 pipeline**: 866K 日线预测 → 43K 月度信号，可复用
-3. **Backtest 集成**: LSTM 信号在 backtest 中产生 +0.08 Sharpe 改善
+1. **Daily LSTM model**: Test IC3=0.114, only architecture that passed Test out of 22 architectures + 4 frequencies + 2 universes searched
+2. **Monthly aggregation pipeline**: 866K daily predictions -> 43K monthly signals, reusable
+3. **Backtest integration**: LSTM signal produced +0.08 Sharpe improvement in backtest
 
-### 局限
+### Limitations
 
-1. **月度信号太弱**: IC=-0.05，不足以成为主导信号
-2. **Phase 19 backtest 未突破**: LT Sharpe 0.698 < 0.7 kill switch
-3. **日线→月线信息丢失**: 聚合策略导致信噪比退化
+1. **Monthly signal too weak**: IC=-0.05, insufficient to be dominant signal
+2. **Phase 19 backtest did not break through**: LT Sharpe 0.698 < 0.7 kill switch
+3. **Daily->monthly information loss**: Aggregation strategy causes signal-to-noise degradation
 
-### 建议
+### Recommendations
 
-1. **保留 LSTM 信号在 Phase 19 信号源中**（已验证有正向贡献）
-2. **寻找更强的 alpha 源**（资金流/基本面/另类数据）
-3. **日线 backtest 路径**: 直接做日线频率的组合优化，跳过月度聚合
+1. **Retain LSTM signal in Phase 19 signal sources** (verified positive contribution)
+2. **Search for stronger alpha sources** (fund flows/fundamentals/alternative data)
+3. **Daily backtest path**: Directly optimize portfolio at daily frequency, skip monthly aggregation
 
-## 文件清单
+## File Checklist
 
-| 文件 | 用途 |
+| File | Purpose |
 |------|------|
-| `cli/export_daily_signals.py` | 日线预测导出 |
-| `.eastmoney-ai/lstm/daily_signals.parquet` | 866K 日线预测 |
-| `.eastmoney-ai/lstm/monthly_lstm_signals_v2.parquet` | 43K 月度信号 |
-| `lib/backtest/engine_v2.py` | 已接入 LSTM 信号 |
-| `lib/prompt-templates.js` | #14 约束 + buildLstmSignalBlock |
-| `lib/build-prompt.js` | lstmSignalData 参数 |
+| `cli/export_daily_signals.py` | Daily prediction export |
+| `.eastmoney-ai/lstm/daily_signals.parquet` | 866K daily predictions |
+| `.eastmoney-ai/lstm/monthly_lstm_signals_v2.parquet` | 43K monthly signals |
+| `lib/backtest/engine_v2.py` | Connected to LSTM signal |
+| `lib/prompt-templates.js` | #14 constraint + buildLstmSignalBlock |
+| `lib/build-prompt.js` | lstmSignalData parameter |

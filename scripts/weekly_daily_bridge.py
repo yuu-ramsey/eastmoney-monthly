@@ -1,4 +1,4 @@
-"""周线IC提升方案：日线信号聚合桥接 + 丰富特征 + 多模型对比
+"""Weekly IC improvement plan: daily signal aggregation bridge + enriched features + multi-model comparison
 核心假设：日线LSTM (IC=0.141) 已有预测能力，聚合到周级别可迁移信号
 
 方案：

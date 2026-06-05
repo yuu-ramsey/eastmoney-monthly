@@ -1,4 +1,4 @@
-// parseScoreBlock / validateScoreData / computeWeightedScore 测试
+// parseScoreBlock / validateScoreData / computeWeightedScore test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseScoreBlock, validateScoreData, computeWeightedScore } from '../../lib/dashboard/parse-score.js';

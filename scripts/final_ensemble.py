@@ -188,7 +188,7 @@ lstm=LSTMReg(seqs.shape[2]).to(DEV); ema_lstm=copy.deepcopy(lstm)
 for p in ema_lstm.parameters(): p.requires_grad=False
 opt_l=torch.optim.AdamW(lstm.parameters(),lr=3e-4,weight_decay=1e-5)
 
-# LR Warmup: 前 10% steps 从 1e-6 线性升到 LR
+# LR Warmup: first 10% steps linearly increase from 1e-6 to LR
 total_steps = 70 * (len(Xl_tr)//BATCH + 1)
 warmup_steps = total_steps // 10
 def get_lr(step):

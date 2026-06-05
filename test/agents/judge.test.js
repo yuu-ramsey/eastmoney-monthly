@@ -1,10 +1,10 @@
-// Judge Agent 测试
+// Judge Agent test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { judgeAgent } from '../../lib/agents/judge.js';
 
 const sampleCtx = {
-  name: '贵州茅台',
+  name: 'Kweichow Moutai',
   code: '600519',
   period: 'monthly',
   periodLabel: '月线',

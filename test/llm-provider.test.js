@@ -1,4 +1,4 @@
-// LLM provider 层 + 定价测试
+// LLM provider layer + pricing test
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { getProvider, listProviders } from '../lib/llm/index.js';

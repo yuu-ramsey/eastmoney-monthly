@@ -1,4 +1,4 @@
-// 跨级别一致性校验测试
+// Cross-level consistency check test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { checkCrossLevelConsistency } from '../lib/cross-level-check.js';

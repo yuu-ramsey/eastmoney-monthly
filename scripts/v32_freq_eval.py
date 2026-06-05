@@ -1,9 +1,9 @@
 """
-v32_freq_eval.py — 32维因子月/周/日三频率评估（基于 v32_final_eval.py 逻辑）
+v32_freq_eval.py — 32d factor monthly/weekly/daily three-frequency evaluation (based on v32_final_eval.py logic)
 ============================================================
 统一修复：单期收益 + 日期分组 + 32维 + CSRC L2 中性化
 
-频率参数化：
+频率Parameters化：
   月线: YYYY-MM, MA(5,20,60),  FFT60,  训练60月
   周线: YYYY-Www,  MA(12,48,96), FFT104, 训练156周
   日线: YYYY-MM-DD,MA(20,60,120),FFT252, 训练504日
@@ -152,7 +152,7 @@ def calc_fft_amplitudes(close_segment, n_peaks=10):
     return [float(a) / max_amp for a in amps]
 
 # ============================================================
-# 32维特征提取（频率参数化）
+# 32维特征提取（频率Parameters化）
 # ============================================================
 def extract_features_32d(records, idx, cfg):
     if idx < cfg["min_bars"]:
@@ -341,7 +341,7 @@ def build_cross_sections(stock_data, period):
             if feat is None:
                 continue
 
-            # 用全局 period 日历计算单期收益（非累积）
+            # 用全局 period 日历计算单期收益（非accumulated）
             # T+N: 取 all_keys[pi+N] 的收盘 vs all_keys[pi+N-1] 的收盘
             # 关键：必须两只股票都有数据才能算（停牌则跳过该期的收益）
             rets = {}
@@ -885,14 +885,14 @@ def main():
         try:
             all_results[period] = run_period(period)
         except Exception as e:
-            print(f"\n  {period} 失败: {e}")
+            print(f"\n  {period} failed: {e}")
             import traceback
             traceback.print_exc()
 
     if len(all_results) >= 2:
         print_summary_table(all_results)
 
-    print(f"\n全部完成: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"\n全部done: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 if __name__ == '__main__':

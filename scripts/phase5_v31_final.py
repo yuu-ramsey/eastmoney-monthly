@@ -1,5 +1,5 @@
 """
-Phase 5: 31维最终版 vs 61维baseline
+Phase 5: 31d final vs 61d baseline
 FFT: Peak1(3d)+Peak2(3d)+Peaks3-10统计(4d) = 10d
 删: G1(4d)+G5(2d)+G4×3(rsi14/bb_pos/amplitude)+G7×1(above_ma5) = 10d
 保留: G2(3d)+G3(3d)+G4精选(2d)+G7精简(13d) = 21d + FFT(10d) = 31d
@@ -316,7 +316,7 @@ if __name__ == '__main__':
     print(f"[{ts()}] 行业中性化...", flush=True); t0 = time.time()
     flat61_ind = cross_sectional_neutralize(flat61.copy(), dates_arr, inds_arr, 'categorical')
     flat31_ind = cross_sectional_neutralize(flat31.copy(), dates_arr, inds_arr, 'categorical')
-    print(f"[{ts()}] 完成 ({time.time()-t0:.0f}s)", flush=True)
+    print(f"[{ts()}] done ({time.time()-t0:.0f}s)", flush=True)
 
     tr_m = (dates_arr>='2010-01') & (dates_arr<='2014-12')
     te_m = (dates_arr>='2015-01')
@@ -427,4 +427,4 @@ if __name__ == '__main__':
     with open(OUT / 'v31_summary.json', 'w') as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
 
-    print(f"\n[{ts()}] 31维对比完成. ΔIC={delta_ic:+.4f} ({delta_ic_pct:+.1f}%). 结果: {OUT}")
+    print(f"\n[{ts()}] 31维对比done. ΔIC={delta_ic:+.4f} ({delta_ic_pct:+.1f}%). 结果: {OUT}")

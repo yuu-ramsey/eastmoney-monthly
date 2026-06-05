@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { estimateCost } from '../lib/llm/pricing.js';
 
-test('estimateCost: Anthropic sonnet 正确计算', () => {
+test('estimateCost: Anthropic sonnet correct calculation', () => {
   const cost = estimateCost('anthropic', 'claude-sonnet-4-6', {
     inputTokens: 1_000_000,
     outputTokens: 1_000_000,

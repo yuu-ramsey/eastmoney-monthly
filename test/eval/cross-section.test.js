@@ -1,13 +1,13 @@
-// 横截面分析 + 行业映射测试
+// Cross-section analysis + industry mapping test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 // ---- industry-map ----
 test('industry-map: getIndustry 正常查询', async () => {
   const { getIndustry } = await import('../../lib/industry-map.js');
-  assert.equal(getIndustry('600519'), '食品饮料');
-  assert.equal(getIndustry('300750'), '电力设备');
-  assert.equal(getIndustry('000002'), '房地产');
+  assert.equal(getIndustry('600519'), 'Food & Beverage');
+  assert.equal(getIndustry('300750'), 'Electrical Equipment');
+  assert.equal(getIndustry('000002'), 'Real Estate');
 });
 
 test('industry-map: 未知code返回null', async () => {
@@ -18,7 +18,7 @@ test('industry-map: 未知code返回null', async () => {
 
 test('industry-map: getIndustryStocks', async () => {
   const { getIndustryStocks } = await import('../../lib/industry-map.js');
-  const stocks = getIndustryStocks('食品饮料');
+  const stocks = getIndustryStocks('Food & Beverage');
   assert.ok(stocks.length >= 5);
   assert.ok(stocks.includes('600519'));
 });
@@ -89,9 +89,9 @@ test('cs: analyzeAll 多行业分组', async () => {
     { code: '300750', score: 80, name: '宁德' },  // 仅1只电力设备，不够5只
   ];
   const result = analyzeAll(scores);
-  assert.ok(result.industries['食品饮料']);
-  assert.ok(result.industries['银行']);
-  assert.equal(result.industries['电力设备'], undefined); // <5只
+  assert.ok(result.industries['Food & Beverage']);
+  assert.ok(result.industries['Banking']);
+  assert.equal(result.industries['Electrical Equipment'], undefined); // <5只
   assert.ok(result.ranking.length >= 2);
   assert.ok(result.rotation_signals.length >= 1);
 });

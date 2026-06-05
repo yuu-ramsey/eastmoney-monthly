@@ -1,5 +1,5 @@
 """
-Phase 5: 32维最终版 vs 31维 vs 61维baseline 三方对比
+Phase 5: 32d final vs 31d vs 61d baseline three-way comparison
 32维 = FFT振幅10d + G7全14d(含above_ma5) + 均线偏离3d + MACD3d + G4精选2d(ATR+vol_6m)
 31维 = FFTv31(10d freq+amp+phase hybrid) + G7精简13d(删above_ma5) + 同上
 统一: 5-Fold CV + T+1~T+6衰减 + IC_IR + 行业中性化
@@ -359,7 +359,7 @@ if __name__ == '__main__':
     flat61_ind = cross_sectional_neutralize(flat61.copy(), dates_arr, inds_arr, 'categorical')
     flat31_ind = cross_sectional_neutralize(flat31.copy(), dates_arr, inds_arr, 'categorical')
     flat32_ind = cross_sectional_neutralize(flat32.copy(), dates_arr, inds_arr, 'categorical')
-    print(f"[{ts()}] 完成 ({time.time()-t0:.0f}s)", flush=True)
+    print(f"[{ts()}] done ({time.time()-t0:.0f}s)", flush=True)
 
     tr_m = (dates_arr>='2010-01') & (dates_arr<='2014-12')
     te_m = (dates_arr>='2015-01')
@@ -518,7 +518,7 @@ if __name__ == '__main__':
     delta_31 = r31['IC'] - r61['IC']
     delta_32 = r32['IC'] - r61['IC']
     delta_32_vs_31 = r32['IC'] - r31['IC']
-    print(f"\n[{ts()}] 三方对比完成.")
+    print(f"\n[{ts()}] 三方对比done.")
     print(f"  31d vs 61d: ΔIC={delta_31:+.4f} ({delta_31/abs(r61['IC'])*100:+.1f}%)")
     print(f"  32d vs 61d: ΔIC={delta_32:+.4f} ({delta_32/abs(r61['IC'])*100:+.1f}%)")
     print(f"  32d vs 31d: ΔIC={delta_32_vs_31:+.4f}")

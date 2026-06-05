@@ -1,4 +1,4 @@
-// nightly 测试
+// nightly test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 

@@ -1,7 +1,7 @@
 """
-数据适配层 — 从项目 SQLite 月线数据库读取数据，转换为 Kronos Predictor 输入格式
+Data adapter — reads monthly kline data from project SQLite, converts to Kronos Predictor input format
 
-输入: SQLite 中某只股票的月线记录
+Input: Monthly kline records for a stock from SQLite
 输出: pandas DataFrame
   columns = ['open','high','low','close','volume','amount']
   index 为 DatetimeIndex（月线日期）

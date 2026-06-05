@@ -1,29 +1,29 @@
-# P2 sort 参考扩散 bug 排查与修复
+# P2 Sort Reference Spread Bug Investigation and Fix
 
-> 分支: `p2-fix-sort-ref-bug` | 日期: 2026-05-29
+> Branch: `p2-fix-sort-ref-bug` | Date: 2026-05-29
 
-## 结论
+## Conclusion
 
-**无 sort 信号覆盖 bug。B4 +29.5% 的真正根因：内联 Z-score 方差计算退化。**
+**No sort signal contamination bug. B4 +29.5% true root cause: inline Z-score variance computation degenerated.**
 
-`Math.pow(b - ref?.mean || 0, 2)` 中 `ref?.mean` 对 `{mean:{}, std:{}}` 返回 `undefined`，`(b-0)^2` = RMS，非方差。所有 Z-score 压缩至零附近，巧合显示相同 spread。该脚本未存文件。
+`Math.pow(b - ref?.mean || 0, 2)` where `ref?.mean` for `{mean:{}, std:{}}` returns `undefined`, `(b-0)^2` = RMS, not variance. All Z-scores compressed near zero, coincidentally displaying the same spread. That script was not saved to file.
 
 ---
 
-## 全仓审计（70+ 处 .sort()）
+## Full Codebase Audit (70+ .sort() sites)
 
-| 文件 | 行 | 模式 | 判定 |
+| File | Line | Pattern | Verdict |
 |------|-----|------|------|
-| `rulers.js` | 26/34/133 | `[...arr].sort()` | ✓ |
-| `eval-momentum-validate.js` | 52/114 | `[...pairs].sort()` | ✓ |
-| `eval-strongbull-vs-momentum.js` | 22/48/150 | `[...arr].sort()` | ✓ |
-| `sector/alpha.js` | 107 | `items.sort()` | ✓ 新数组 |
-| `sector/alpha.js` | 115 | `results.sort()` | ✓ 函数内创建 |
-| 其余 ~65 处 | — | filter/spread 后 sort | ✓ |
+| `rulers.js` | 26/34/133 | `[...arr].sort()` | Pass |
+| `eval-momentum-validate.js` | 52/114 | `[...pairs].sort()` | Pass |
+| `eval-strongbull-vs-momentum.js` | 22/48/150 | `[...arr].sort()` | Pass |
+| `sector/alpha.js` | 107 | `items.sort()` | Pass: new array |
+| `sector/alpha.js` | 115 | `results.sort()` | Pass: created in function |
+| Remaining ~65 sites | — | filter/spread then sort | Pass |
 
-## 修正值
+## Corrected Values
 
-| 指标 | B4 错误 | 修正 |
+| Metric | B4 Wrong | Corrected |
 |------|---------|------|
-| 动量 spread | +29.5% | -13.1% |
-| 动量 CI | 全正 | 含 0 |
+| Momentum spread | +29.5% | -13.1% |
+| Momentum CI | All positive | Contains 0 |

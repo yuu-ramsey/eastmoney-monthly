@@ -1,36 +1,36 @@
-# Phase 17 v5 轨道 3: LLM Eval 报告
+# Phase 17 v5 Track 3: LLM Eval Report
 
-## 状态: 待执行
+## Status: Pending Execution
 
-### 准备就绪
+### Ready
 
-- `lib/prompt-templates.js`: HARD_CONSTRAINTS #14（LSTM 信号约束）
-- `lib/build-prompt.js`: `buildLstmSignalBlock` + `lstmSignalData` 参数注入
-- `monthly_lstm_signals_v2.parquet`: 43K 月度信号就绪
-- `cli/eval_lstm_signal.py`: eval 框架就绪
-- Frozen dataset: `data/frozen-eval-dataset-v1.json`（40 stocks, 640 samples）
+- `lib/prompt-templates.js`: HARD_CONSTRAINTS #14 (LSTM signal constraint)
+- `lib/build-prompt.js`: `buildLstmSignalBlock` + `lstmSignalData` parameter injection
+- `monthly_lstm_signals_v2.parquet`: 43K monthly signals ready
+- `cli/eval_lstm_signal.py`: eval framework ready
+- Frozen dataset: `data/frozen-eval-dataset-v1.json` (40 stocks, 640 samples)
 
-### 对照设计
+### Control Design
 
 | | Run A | Run B |
 |---|---|---|
-| LSTM 信号 | 无 | 有（#14 约束） |
+| LSTM signal | None | Present (#14 constraint) |
 | Baseline score | 0.1966 | TBD |
-| LLM 调用 | 0 | 640 |
-| 成本 | ¥0 | ~¥14 |
+| LLM calls | 0 | 640 |
+| Cost | 0 CNY | ~14 CNY |
 
 ### Kill Switch
 
-- Δ score > +0.02 → ENABLE_LSTM_SIGNAL=true
-- Δ ∈ [-0.01, +0.02] → marginal, 关闭
-- Δ < -0.01 → LLM 用 LSTM 信号困惑, 关闭
+- Delta score > +0.02 -> ENABLE_LSTM_SIGNAL=true
+- Delta in [-0.01, +0.02] -> marginal, disabled
+- Delta < -0.01 -> LLM confused by LSTM signal, disabled
 
-### 风险
+### Risks
 
-- LSTM 信号 IC=-0.05 很可能不足以让 LLM 做出更好的判断
-- Phase 11/12 经验: 弱信号注入 LLM 反而不如不注入
-- 成本 ¥14，但可能产生零或负收益
+- LSTM signal IC=-0.05 likely insufficient for LLM to make better judgments
+- Phase 11/12 experience: weak signal injection into LLM is worse than no injection
+- Cost 14 CNY but may produce zero or negative return
 
-### 建议
+### Recommendation
 
-在 LSTM 信号 IC 提升到 >0.10 之前，推迟 LLM eval。¥14 预算留给更高 ROI 的实验。
+Defer LLM eval until LSTM signal IC improves to >0.10. Reserve 14 CNY budget for higher-ROI experiments.

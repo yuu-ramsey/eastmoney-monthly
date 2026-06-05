@@ -1,4 +1,4 @@
-"""调试 legulegu - 检查原始HTML中是否已有数据"""
+"""Debug legulegu - check if data already in raw HTML"""
 import ssl, urllib3
 urllib3.disable_warnings()
 import requests, re

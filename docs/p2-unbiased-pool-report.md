@@ -1,23 +1,23 @@
-# P2 无偏低位池 — Baostock 单源重建
+# P2 Unbiased Low-Position Pool — Baostock Single-Source Rebuild
 
-> 分支: `p2-rebuild-unbiased-pool` | 日期: 2026-05-30
+> Branch: `p2-rebuild-unbiased-pool` | Date: 2026-05-30
 >
-> 单源戳: Baostock (adjustflag=2 前复权), 3294 codes
+> Single-source stamp: Baostock (adjustflag=2 pre-adjusted), 3294 codes
 
 ---
 
-## 1. 池子对比
+## 1. Pool Comparison
 
-| 指标 | v1 存活-only | v2 Baostock | Δ |
+| Metric | v1 Survivors-only | v2 Baostock | Delta |
 |------|-------------|------------|----|
-| Pairs | 732 | **1568** | +2.1× |
-| Thin (<30) | 4/12 | **0/12** | 全部消除 |
+| Pairs | 732 | **1568** | +2.1x |
+| Thin (<30) | 4/12 | **0/12** | All eliminated |
 | Alpha mean | 15.54% | **7.11%** | **-8.43pp** |
 | Winsorize mean | 13.95% | 6.49% | -7.46pp |
 | Std | 61.3% | 31.0% | -49% |
 | Winsorize std | — | 26.2% | — |
 
-### 每时点 (全 ≥70)
+### Per-Timepoint (all >=70)
 
 ```
 2018-06:140  2018-12:140  2019-06:140  2020-03:140
@@ -27,9 +27,9 @@
 
 ---
 
-## 2. 幸存者偏差量化
+## 2. Survivorship Bias Quantified
 
-**存活池 alpha 高估 8.4pp。** 退市股缺失系统性排除最差后续表现。
+**Survivor pool overstates alpha by 8.4pp.** Missing delisted stocks systematically exclude the worst subsequent performance.
 
 ---
 
@@ -42,10 +42,10 @@
 | v2 Train | 835 | — | 11.1% |
 | v2 Test | 733 | — | 11.8% |
 
-**MDE 3× 改善（24% → 8.1%）。** Test MDE=11.8%，个位数 edge 可在全样本检出。
+**MDE improved 3x (24% -> 8.1%).** Test MDE=11.8%; single-digit edges detectable on full sample.
 
 ---
 
-## 4. 待续
+## 4. To Be Continued
 
-动量/反转基线重算需 Baostock klines cache 持久化后跑。
+Momentum/reversal baseline recalculation needs Baostock klines cache persisted before running.

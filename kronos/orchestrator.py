@@ -1,7 +1,7 @@
 """
-编排器 — 串联数据适配 → 预测 → 信号生成的完整分析流程
+Orchestrator — chains data adapter → prediction → signal generation into a complete analysis pipeline
 
-纯本地离线：读取 SQLite → 模型推理 → 信号聚合，不涉及任何网络 IO。
+Fully local offline: read SQLite -> model inference -> signal aggregation, no network IO.
 """
 
 # Reproduced from Kronos (https://github.com/shiyu-coder/Kronos)

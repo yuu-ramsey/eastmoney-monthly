@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>K线 AI 分析</title>
+  <title>K-line AI Analysis</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
@@ -36,7 +36,7 @@
     .hint { font-size: 11px; color: #999; margin-top: 4px; }
     .hint a { color: #3498db; }
 
-    /* Tab 切换 */
+    /* Tab switching */
     .tab-bar {
       display: flex; gap: 0; margin-bottom: 14px;
       border-bottom: 2px solid #e8ecf1;
@@ -54,7 +54,7 @@
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
-    /* 成本面板 */
+    /* Cost panel */
     .cost-panel {
       background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px;
       padding: 10px 12px; margin-bottom: 8px; cursor: pointer;
@@ -71,7 +71,7 @@
     .cost-detail .other-link { font-size: 11px; color: #3498db; cursor: pointer; margin-top: 4px; display: inline-block; }
     .cost-detail .other-link:hover { text-decoration: underline; }
 
-    /* 使用模式 */
+    /* Usage presets */
     .preset-bar {
       display: flex; gap: 0; margin-bottom: 8px;
       border: 1px solid #dee2e6; border-radius: 6px; overflow: hidden;
@@ -92,7 +92,7 @@
       padding: 6px 10px; margin-bottom: 10px;
     }
 
-    /* 详细设置折叠 */
+    /* Detail settings collapse */
     .settings-toggle {
       font-size: 11px; color: #3498db; cursor: pointer;
       display: flex; align-items: center; gap: 4px;
@@ -103,7 +103,7 @@
     .settings-group.open { display: block; }
     .opt-hidden { display: none; }
 
-    /* 容量横幅 / 历史 / 调试 */
+    /* Capacity bar / History / Debug */
     .capacity-bar {
       background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 4px;
       padding: 6px 10px; margin-bottom: 10px; font-size: 11px; color: #888;
@@ -199,55 +199,55 @@
   </style>
 </head>
 <body>
-  <h1>K线 AI 分析</h1>
+  <h1>K-line AI Analysis</h1>
 
   <div class="tab-bar">
-    <button class="tab-btn active" data-tab="settings">设置</button>
-    <button class="tab-btn" data-tab="history">历史</button>
-    <button class="tab-btn" data-tab="debug">调试</button>
+    <button class="tab-btn active" data-tab="settings">Settings</button>
+    <button class="tab-btn" data-tab="history">History</button>
+    <button class="tab-btn" data-tab="debug">Debug</button>
   </div>
 
-  <!-- ====== 设置 Tab ====== -->
+  <!-- ====== Settings Tab ====== -->
   <div class="tab-content active" id="tab-settings">
 
     <div class="cost-panel" id="costPanel">
       <div class="cost-summary">
-        <span class="label"><span class="cost-nav" id="costNavPrev">◂</span><span id="costLabel">本月使用情况</span><span class="cost-nav" id="costNavNext">▸</span></span>
-        <span class="value" id="costValue">加载中...</span>
+        <span class="label"><span class="cost-nav" id="costNavPrev">Previous</span><span id="costLabel">This Month Usage</span><span class="cost-nav" id="costNavNext">Next</span></span>
+        <span class="value" id="costValue">Loading...</span>
       </div>
       <div class="cost-detail" id="costDetail">
         <div id="costDetailContent"></div>
-        <span class="other-link" id="costOtherLink" style="display:none;">查看其他 provider →</span>
+        <span class="other-link" id="costOtherLink" style="display:none;">View other provider</span>
       </div>
     </div>
 
-    <!-- 快速导航 -->
+    <!-- Quick nav -->
     <div style="display:flex; gap:6px; margin-bottom:8px;">
-      <input type="text" id="navCode" placeholder="输入股票代码，如 600522" autocomplete="off" style="flex:1;">
-      <button id="navOpenBtn" style="flex:0;padding:6px 10px;background:#f7931e;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;white-space:nowrap;">打开</button>
+      <input type="text" id="navCode" placeholder="Enter stock code, e.g. 600519" autocomplete="off" style="flex:1;">
+      <button id="navOpenBtn" style="flex:0;padding:6px 10px;background:#f7931e;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;white-space:nowrap;">Open</button>
     </div>
     <div class="hint" id="navHint" style="margin-top:-6px;margin-bottom:6px;"></div>
 
-    <!-- 使用模式 -->
-    <h2>使用模式</h2>
+    <!-- Usage presets -->
+    <h2>Presets</h2>
     <div class="preset-bar" id="presetBar">
-      <button class="preset-btn" data-preset="quick">快速</button>
-      <button class="preset-btn active" data-preset="deep">深度</button>
-      <button class="preset-btn" data-preset="debate">辩论</button>
-      <button class="preset-btn" data-preset="custom">自定义</button>
+      <button class="preset-btn" data-preset="quick">Quick</button>
+      <button class="preset-btn active" data-preset="deep">Deep</button>
+      <button class="preset-btn" data-preset="debate">Debate</button>
+      <button class="preset-btn" data-preset="custom">Custom</button>
     </div>
     <div class="preset-summary" id="presetSummary"></div>
 
-    <!-- 详细设置折叠入口 -->
+    <!-- Detail settings toggle -->
     <div class="settings-toggle" id="settingsToggle">
-      <span id="settingsToggleIcon">▶</span> <span id="settingsToggleLabel">展开详细设置</span>
+      <span id="settingsToggleIcon">></span> <span id="settingsToggleLabel">Show Advanced Settings</span>
     </div>
 
-    <!-- 详细设置 -->
+    <!-- Detail settings -->
     <div class="settings-group" id="settingsGroup">
-      <h2>设置</h2>
+      <h2>Settings</h2>
 
-      <label for="provider">模型提供商</label>
+      <label for="provider">Model Provider</label>
       <select id="provider">
         <option value="anthropic">Anthropic (Claude)</option>
         <option value="deepseek">DeepSeek</option>
@@ -257,52 +257,52 @@
       <input type="password" id="apiKey" autocomplete="off">
       <div class="hint" id="apiKeyHint"></div>
 
-      <label for="model">模型</label>
+      <label for="model">Model</label>
       <input type="text" id="model" autocomplete="off">
-      <div class="hint" id="modelHint">手动填写模型 ID，留空则跟随"分析深度"自动选择</div>
+      <div class="hint" id="modelHint">Manually enter model ID. Leave blank to auto-select based on "Analysis Depth".</div>
 
       <div id="rowDepth">
-        <label>分析深度（仅 Anthropic Claude）</label>
+        <label>Analysis Depth (Anthropic Claude only)</label>
         <div style="display:flex; gap:16px; margin:6px 0;">
           <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-weight:400;">
-            <input type="radio" name="analysisDepth" value="standard" checked> 标准 (Sonnet)
+            <input type="radio" name="analysisDepth" value="standard" checked> Standard (Sonnet)
           </label>
           <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-weight:400;">
-            <input type="radio" name="analysisDepth" value="deep"> 深度 (Opus)
+            <input type="radio" name="analysisDepth" value="deep"> Deep (Opus)
           </label>
         </div>
-        <div class="hint" style="color:#d97706;" id="depthHint">深度模式约 4-5 倍价格，但分析质量更高。仅 Anthropic 有效，DeepSeek 始终用 deepseek-chat。</div>
+        <div class="hint" style="color:#d97706;" id="depthHint">Deep mode costs ~4-5x more but produces higher quality analysis. Anthropic only; DeepSeek always uses deepseek-chat.</div>
       </div>
 
-      <label for="period">分析周期</label>
+      <label for="period">Analysis Period</label>
       <select id="period">
-        <option value="monthly">月线</option>
-        <option value="weekly">周线</option>
-        <option value="daily">日线</option>
-        <option value="multi">多周期共振（月+周+日）</option>
+        <option value="monthly">Monthly</option>
+        <option value="weekly">Weekly</option>
+        <option value="daily">Daily</option>
+        <option value="multi">Multi-Period Resonance (M+W+D)</option>
       </select>
       <div class="hint" id="multiHint" style="display:none; color:#d97706;">
-        ⚠️ 多周期共振模式会在一次 LLM 调用中分析三个周期的 K 线，prompt 体积约为单周期的 3 倍，建议使用 Anthropic Sonnet 或 Opus 以保证大上下文准确度。多周期模式下辩论模式自动禁用。
+        Multi-period mode analyzes three timeframes in a single LLM call. Prompt size is ~3x single period. Use Anthropic Sonnet or Opus for accuracy with large context. Debate mode is auto-disabled in multi-period mode.
       </div>
 
       <div id="rowTemplate">
-        <label for="template">分析维度（单次分析）</label>
+        <label for="template">Analysis Dimension (single mode)</label>
         <select id="template">
-          <option value="technical">技术面</option>
-          <option value="trend">趋势判断</option>
-          <option value="valuation">估值面</option>
-          <option value="sentiment">情绪面</option>
+          <option value="technical">Technical</option>
+          <option value="trend">Trend</option>
+          <option value="valuation">Valuation</option>
+          <option value="sentiment">Sentiment</option>
         </select>
-        <div class="hint">仅在单次分析模式下生效</div>
+        <div class="hint">Only applies in single analysis mode</div>
       </div>
 
       <div id="rowAnalysisStyle">
-        <label for="analysisStyle">分析风格</label>
+        <label for="analysisStyle">Analysis Style</label>
         <select id="analysisStyle">
-          <option value="technical">技术分析</option>
-          <option value="chanlun">缠论</option>
-          <option value="value">价值视角</option>
-          <option value="comprehensive">综合</option>
+          <option value="technical">Technical Analysis</option>
+          <option value="chanlun">Chanlun</option>
+          <option value="value">Value Perspective</option>
+          <option value="comprehensive">Comprehensive</option>
         </select>
         <div class="hint" id="styleHint" style="display:none; color:#d97706;"></div>
       </div>
@@ -310,109 +310,109 @@
       <div id="rowDebateMode" style="margin:12px 0 8px;">
         <label style="display:flex; align-items:center; gap:6px; font-weight:500; cursor:pointer;">
           <input type="checkbox" id="debateMode">
-          启用辩论模式（多智能体）
+          Enable Debate Mode (multi-agent)
         </label>
         <div class="hint">
-          ⚠️ 辩论模式会调用 4 次 LLM，成本约为单次分析的 4 倍。
+          Debate mode calls the LLM 4 times, costing ~4x a single analysis.
         </div>
       </div>
 
       <div id="rowSelfBacktest" style="margin:12px 0 8px;">
         <label style="display:flex; align-items:center; gap:6px; font-weight:500; cursor:pointer;">
           <input type="checkbox" id="enableSelfBacktest" checked>
-          自我回测（增强判断质量，成本 +200%）
+          Self-Backtest (improves judgment quality, +200% cost)
         </label>
-        <div class="hint">仅单次分析模式 + K 线 ≥36 根时生效。</div>
+        <div class="hint">Only applies in single mode + >=36 K-lines.</div>
       </div>
 
       <div id="rowThinking" style="margin:12px 0 8px;">
         <label style="display:flex; align-items:center; gap:6px; font-weight:500; cursor:pointer;">
           <input type="checkbox" id="enableThinking">
-          启用扩展思考（仅 Opus，成本 +20%）
+          Enable Extended Thinking (Opus only, +20% cost)
         </label>
-        <div class="hint">仅在 Anthropic Opus 模型下生效。</div>
+        <div class="hint">Only effective with Anthropic Opus model.</div>
       </div>
 
       <div style="margin:12px 0 8px;">
         <label style="display:flex; align-items:center; gap:6px; font-weight:500; cursor:pointer;">
           <input type="checkbox" id="enableDebugLog">
-          启用调试日志（占用 storage）
+          Enable Debug Logging (uses storage)
         </label>
-        <div class="hint">每次分析后保存完整 prompt / 工具调用 / LLM 原始输出到调试面板。</div>
+        <div class="hint">Saves full prompt / tool calls / LLM raw output for each analysis to the Debug panel.</div>
       </div>
 
       <div style="margin:12px 0 8px;">
         <label style="display:flex; align-items:center; gap:6px; font-weight:500; cursor:pointer;">
           <input type="checkbox" id="decisionMode">
-          个人决策模式（输出明确操作建议）
+          Personal Decision Mode (outputs explicit trading suggestions)
         </label>
         <div class="hint" style="color:#d97706;">
-          ⚠️ 仅供工具持有者本人研究使用，不构成对外投资建议。
+          For the tool owner's personal research use only. Does not constitute investment advice to any third party.
         </div>
       </div>
 
-      <label for="klineLimit">K线根数</label>
+      <label for="klineLimit">K-line Count</label>
       <input type="number" id="klineLimit" min="12" max="240" placeholder="60" autocomplete="off">
 
       <div class="row">
-        <button class="save" id="saveBtn">保存</button>
-        <button class="clear" id="clearBtn">清除 Key</button>
+        <button class="save" id="saveBtn">Save</button>
+        <button class="clear" id="clearBtn">Clear Key</button>
       </div>
       <div class="status" id="status"></div>
 
       <div id="structuredDebug" style="margin-top:12px; border-top:1px solid #eee; padding-top:8px;">
-        <span class="other-link" id="structuredDebugLink" style="font-size:11px; cursor:pointer;">📋 查看结构化数据</span>
+        <span class="other-link" id="structuredDebugLink" style="font-size:11px; cursor:pointer;">View Structured Data</span>
         <div id="structuredDebugContent" style="display:none;"></div>
       </div>
     </div>
   </div>
 
-  <!-- ====== 调试 Tab ====== -->
+  <!-- ====== Debug Tab ====== -->
   <div class="tab-content" id="tab-debug">
-    <div id="debugEmpty" class="history-empty">暂无调试数据（需在设置中开启"启用调试日志"后运行一次分析）</div>
+    <div id="debugEmpty" class="history-empty">No debug data yet. Enable "Debug Logging" in Settings and run an analysis first.</div>
     <div id="debugContent" style="display:none;">
       <div id="debugSummary" style="font-size:12px;color:#555;margin-bottom:10px;"></div>
       <div class="debug-section">
         <div class="debug-section-header" data-action="toggle-debug" data-target="debugPrompt">
-          📝 完整 Prompt <button class="debug-copy-btn" data-copy="debugPromptContent">复制</button>
+          Full Prompt <button class="debug-copy-btn" data-copy="debugPromptContent">Copy</button>
         </div>
         <pre class="debug-pre" id="debugPrompt" style="display:none;"><code id="debugPromptContent"></code></pre>
       </div>
       <div class="debug-section">
         <div class="debug-section-header" data-action="toggle-debug" data-target="debugToolCalls">
-          🔧 工具调用日志
+          Tool Call Log
         </div>
         <div id="debugToolCalls" style="display:none;"></div>
       </div>
       <div class="debug-section">
         <div class="debug-section-header" data-action="toggle-debug" data-target="debugRawResponse">
-          📄 LLM 原始输出 <button class="debug-copy-btn" data-copy="debugRawResponseContent">复制</button>
+          LLM Raw Output <button class="debug-copy-btn" data-copy="debugRawResponseContent">Copy</button>
         </div>
         <pre class="debug-pre" id="debugRawResponse" style="display:none;"><code id="debugRawResponseContent"></code></pre>
       </div>
       <div class="debug-section">
         <div class="debug-section-header" data-action="toggle-debug" data-target="debugUsage">
-          📊 Token 用量明细
+          Token Usage Details
         </div>
         <div id="debugUsage" style="display:none;padding:8px 10px;font-size:12px;"></div>
       </div>
       <div style="margin-top:12px; text-align:right;">
-        <button id="clearDebugBtn" style="font-size:11px;padding:4px 12px;background:#e74c3c;color:#fff;border:none;border-radius:4px;cursor:pointer;">🗑 清空调试日志</button>
+        <button id="clearDebugBtn" style="font-size:11px;padding:4px 12px;background:#e74c3c;color:#fff;border:none;border-radius:4px;cursor:pointer;">Clear Debug Log</button>
       </div>
     </div>
   </div>
 
-  <!-- ====== 历史 Tab ====== -->
+  <!-- ====== History Tab ====== -->
   <div class="tab-content" id="tab-history">
     <div class="capacity-bar" id="capacityBar" style="display:none;">
       <span id="capacityText"></span>
     </div>
     <div id="historyList">
-      <div class="history-empty">暂无保存的分析记录</div>
+      <div class="history-empty">No saved analysis records</div>
     </div>
     <div class="history-actions-global" id="historyGlobalActions" style="display:none;">
-      <button class="h-btn-global h-btn-export-all" id="exportAllBtn">📥 导出全部</button>
-      <button class="h-btn-global h-btn-clear-all" id="clearAllHistoryBtn">🗑 清空全部</button>
+      <button class="h-btn-global h-btn-export-all" id="exportAllBtn">Export All</button>
+      <button class="h-btn-global h-btn-clear-all" id="clearAllHistoryBtn">Clear All</button>
     </div>
   </div>
 

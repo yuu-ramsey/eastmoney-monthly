@@ -1,4 +1,4 @@
-// sector/alpha.js 测试 — 手工构造数据库验证 alpha 计算
+// sector/alpha.js test - manually construct DB to verify alpha computation
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,7 +14,7 @@ function setupDb() {
 
 function seedMapping(db) {
   // 食品饮料行业：3只成分股，不同市值
-  db.prepare('INSERT INTO industries (industry_code, industry_name) VALUES (?, ?)').run('801120.SI', '食品饮料');
+  db.prepare('INSERT INTO industries (industry_code, industry_name) VALUES (?, ?)').run('801120.SI', 'Food & Beverage');
   db.prepare('INSERT INTO stock_industry_mapping (stock_code, industry_code, stock_name, market_cap) VALUES (?,?,?,?)').run('600519', '801120.SI', '贵州茅台', 25000);
   db.prepare('INSERT INTO stock_industry_mapping (stock_code, industry_code, stock_name, market_cap) VALUES (?,?,?,?)').run('000858', '801120.SI', '五粮液', 8000);
   db.prepare('INSERT INTO stock_industry_mapping (stock_code, industry_code, stock_name, market_cap) VALUES (?,?,?,?)').run('600809', '801120.SI', '山西汾酒', 5000);
@@ -67,7 +67,7 @@ test('calcSectorAlpha: 茅台 12 月 alpha 与手工计算结果一致', () => {
   const result = calcSectorAlpha(db, '600519', 'monthly', 12);
   assert.ok(result);
   assert.equal(result.code, '600519');
-  assert.equal(result.sector_name, '食品饮料');
+  assert.equal(result.sector_name, 'Food & Beverage');
   assert.equal(result.sector_code, '801120.SI');
 
   // 茅台：首月 1600 → 末月 1450，涨幅 = (1450-1600)/1600*100 = -9.375%

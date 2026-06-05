@@ -1,19 +1,19 @@
-# P3 GRU 扩样本终测
+# P3 GRU Expanded Sample Final Test
 
-> 分支: `p3-gru-resample` | 日期: 2026-05-30
+> Branch: `p3-gru-resample` | Date: 2026-05-30
 
-## 按预注册执行
+## Executed per Pre-Registration
 
-12→24 时点。只扩一次。CI 含 0 = 终结论。
+12->24 timepoints. Expanded once only. CI contains 0 = final conclusion.
 
-## 结果
+## Results
 
-| 指标 | v2(12tp) | v2-24tp |
+| Metric | v2(12tp) | v2-24tp |
 |------|---------|---------|
 | Pairs | 1608 | 3190 |
-| GRU coverage | 1583 | 673 (瓶颈:500训练股) |
+| GRU coverage | 1583 | 673 (bottleneck: 500 training stocks) |
 | **GRU test CI** | **[-0.2,+13.6]** | **[-1.2,+19.8]** |
 
-## 终结论
+## Final Conclusion
 
-**GRU test CI 含 0 → 边界信号，当前数据测不实。按预注册终结论，不再扩。**
+**GRU test CI contains 0 -> boundary signal; current data cannot verify. Per pre-registration final conclusion, no further expansion.**

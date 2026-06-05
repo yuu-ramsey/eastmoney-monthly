@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "东方财富月线 AI 分析助手",
+  "name": "Eastmoney K-line AI Analysis Assistant",
   "version": "0.1.0",
-  "description": "在东方财富个股页面注入悬浮按钮,一键调用 Anthropic Claude 分析月线走势",
+  "description": "Injects a floating button on Eastmoney stock pages for one-click AI analysis of K-line trends via Anthropic Claude",
   "permissions": ["storage", "alarms"],
   "host_permissions": [
     "*://push2his.eastmoney.com/*",
@@ -31,6 +31,6 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "月线 AI 分析 - 设置"
+    "default_title": "K-line AI Analysis - Settings"
   }
 }

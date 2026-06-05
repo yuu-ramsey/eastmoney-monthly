@@ -1,7 +1,7 @@
 """
-KronosTokenizer 单元测试 — 权重加载 + encode/decode 验证
+KronosTokenizer unit test — weight loading + encode/decode validation
 
-验证标准：加载 HuggingFace 预训练权重后，encode→decode 输出维度正确，
+Validation: after loading HuggingFace pretrained weights, encode->decode output dimensions correct,
 重建数据在合理量级范围内。
 """
 

@@ -1,5 +1,5 @@
 """
-Phase 5 Step 2: FFT特征深度诊断
+Phase 5 Step 2: FFT feature deep diagnosis
 Step 2.1 — FFT内部消融: 低频峰(1-3) / 中频峰(4-6) / 高频峰(7-10)
 Step 2.2 — FFT稳定性检验: 滑动窗口58/60/62根K线的频峰变化
 """
@@ -19,7 +19,7 @@ N_FFT = 10
 DATE_FMT = '%Y-%m-%d %H:%M:%S'
 
 # FFT特征在61维中的位置: 索引 17-46 (30维)
-# fft_f() 返回 10个峰 × 3值(频率/振幅/相位), 按振幅降序排列
+# fft_f() Returns 10个峰 × 3值(频率/振幅/相位), 按振幅降序排列
 # Peak 1-3 (最强振幅峰): fft_0..fft_8  → 索引 17-25 (9维)
 # Peak 4-6:               fft_9..fft_17 → 索引 26-34 (9维)
 # Peak 7-10 (最弱振幅峰): fft_18..fft_29 → 索引 35-46 (12维)
@@ -62,7 +62,7 @@ def fft_f(p):
 
 
 def fft_f_raw(p):
-    """返回未截断的完整频峰列表 [(freq, amp, phase), ...] 按振幅降序"""
+    """Returns未截断的完整频峰列表 [(freq, amp, phase), ...] 按振幅降序"""
     x = np.arange(len(p))
     t = np.polyfit(x, p, 1)
     d = p - np.polyval(t, x)
@@ -390,7 +390,7 @@ if __name__ == '__main__':
     print(f"[{ts()}] 行业中性化...", flush=True)
     t0 = time.time()
     flat_ind = cross_sectional_neutralize(flat.copy(), dates_arr, inds_arr, 'categorical')
-    print(f"[{ts()}] 完成 ({time.time() - t0:.0f}s)", flush=True)
+    print(f"[{ts()}] done ({time.time() - t0:.0f}s)", flush=True)
 
     # 3. Split
     tr_m = (dates_arr >= '2010-01') & (dates_arr <= '2014-12')
@@ -472,4 +472,4 @@ if __name__ == '__main__':
     with open(OUT / 'step2_summary.json', 'w') as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
 
-    print(f"\n[{ts()}] Step 2 诊断完成. 结果: {OUT}")
+    print(f"\n[{ts()}] Step 2 诊断done. 结果: {OUT}")

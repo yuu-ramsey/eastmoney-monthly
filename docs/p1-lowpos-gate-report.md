@@ -1,66 +1,66 @@
-# P1 低位样本池 — 闸1 报告：退市数据不可得
+# P1 Low-Position Sample Pool — Gate 1 Report: Delisted Data Unavailable
 
-> 分支: `p1-eval-lowpos-build` | 日期: 2026-05-29
+> Branch: `p1-eval-lowpos-build` | Date: 2026-05-29
 >
-> **闸1: 不通过。SQLite 不含已退市股票的月线历史数据。**
+> **Gate 1: Not passed. SQLite does not contain monthly historical data for delisted stocks.**
 
 ---
 
-## 证据
+## Evidence
 
-### stocks 表
+### stocks Table
 
 ```sql
-SELECT DISTINCT delisted FROM stocks → [0]
-SELECT * FROM stocks WHERE delisted != 0 → 0 rows
+SELECT DISTINCT delisted FROM stocks -> [0]
+SELECT * FROM stocks WHERE delisted != 0 -> 0 rows
 ```
 
-- 仅 300 行，全部 `delisted=0`
-- 无退市日期或摘牌状态字段
+- Only 300 rows, all `delisted=0`
+- No delisting date or delisting status fields
 
-### monthly_klines 表
+### monthly_klines Table
 
 ```
-4 个已知退市股票实测：
-  000033 (新都退):  0 条月线
-  000511 (*ST烯碳): 0 条月线
-  002070 (*ST众和): 0 条月线
-  000018 (神城A退): 0 条月线
+4 known delisted stocks tested:
+  000033 (Xindutong):  0 monthly bars
+  000511 (*ST Xitan): 0 monthly bars
+  002070 (*ST Zhonghe): 0 monthly bars
+  000018 (ShenchengA Tui): 0 monthly bars
 ```
 
-- 3265 个 unique code，其中 2965（91%）不在 `stocks` 表 → 无状态
-- `stock_industry_mapping` 中 1942 个 code 在 monthly/daily klines 均无数据 → 历史退市股无 K 线留存
+- 3265 unique codes, of which 2965 (91%) not in `stocks` table -> no status
+- 1942 codes in `stock_industry_mapping` have no data in monthly/daily klines -> delisted stocks have no K-line history preserved
 
-### 判定
+### Verdict
 
-**库仅含当前在册 3265 只股票的月线。已退市股票无历史 K 线。**
+**Database only contains monthly data for currently listed 3265 stocks. Delisted stocks have no historical K-lines.**
 
 ---
 
-## 影响
+## Impact
 
-| 指标 | 现状 (3265 只存活) | 含退市 |
+| Metric | Current (3265 survivors) | With Delisted |
 |------|-------------------|--------|
-| 无条件 alpha 均值 | 偏高 | 真实 |
-| 低位池尾部质量 | 被美化 | 包含真实最差 |
-| 结论可推广性 | 不可用于实盘 | 可用 |
+| Unconditional alpha mean | Biased upward | True |
+| Low-position pool tail quality | Beautified | Contains truly worst |
+| Conclusion generalizability | Not usable for live trading | Usable |
 
 ---
 
-## 选项
+## Options
 
-### A: 接受偏差，继续建池（标注已知局限）
-- 成本: ¥0（本次），后续 LLM ¥38
-- 风险: eval 虚高，结论不可推广
+### A: Accept bias, continue building pool (document known limitation)
+- Cost: 0 CNY (this time), subsequent LLM 38 CNY
+- Risk: eval inflated, conclusions not generalizable
 
-### B: 先补齐退市数据，再建池
-- 需要外部数据源（Wind/JoinQuant/Tushare）
-- 成本: 可能付费 + 数天
+### B: First supplement delisted data, then build pool
+- Requires external data source (Wind/JoinQuant/Tushare)
+- Cost: possibly paid + several days
 
-### C: 换 UNIVERSE = "general"
-- 退市偏差在全体截面上被稀释
-- 但低位 edge 可能更微弱
+### C: Switch UNIVERSE = "general"
+- Delisting bias diluted in full cross-section
+- But low-position edge may be weaker
 
 ---
 
-**未进入闸2、未建池、未烧 LLM。等决策。**
+**Not entered Gate 2, not built pool, not burned LLM. Awaiting decision.**

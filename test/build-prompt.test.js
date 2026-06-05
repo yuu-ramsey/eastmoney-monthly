@@ -7,8 +7,8 @@ const sampleKlines = [
   { date: '2024-02-29', open: 2, close: 2.5, high: 3.5, low: 1.5, volume: 200, changePercent: 25, ma5: 2.25, ma20: null, ma60: null, dif: -0.5, dea: null, hist: null, turnoverRate: 2.5 },
 ];
 
-test('buildPrompt: 包含股票名、代码、日期、表头、收尾要求', () => {
-  const out = buildPrompt({ name: '贵州茅台', code: '600519', klines: sampleKlines });
+test('buildPrompt: includes stock name, code, date, headers, end requirements', () => {
+  const out = buildPrompt({ name: 'Kweichow Moutai', code: '600519', klines: sampleKlines });
   assert.match(out, /贵州茅台/);
   assert.match(out, /600519/);
   assert.match(out, /2024-01-31/);

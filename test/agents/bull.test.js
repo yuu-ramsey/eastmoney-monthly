@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { bullAgent } from '../../lib/agents/bull.js';
 
 const sampleCtx = {
-  name: '贵州茅台',
+  name: 'Kweichow Moutai',
   code: '600519',
   period: 'monthly',
   periodLabel: '月线',

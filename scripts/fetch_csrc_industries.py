@@ -1,4 +1,4 @@
-"""从Baostock获取CSRC行业分类（L1+L2），写入data/industry-map.json"""
+"""Fetch CSRC industry classification (L1+L2) from Baostock, write to data/industry-map.json"""
 import baostock as bs
 import json
 import re

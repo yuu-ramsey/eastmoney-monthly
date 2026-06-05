@@ -1,4 +1,4 @@
-// klines-repo 测试 — 读写 + fallback + 源锁定
+// klines-repo test - read/write + fallback + source lock
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';

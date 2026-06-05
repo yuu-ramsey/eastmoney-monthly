@@ -1,10 +1,10 @@
-// Predictor Agent 测试
+// Predictor Agent test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { predictorAgent } from '../../lib/agents/predictor.js';
 
 const sampleCtx = {
-  name: '贵州茅台',
+  name: 'Kweichow Moutai',
   code: '600519',
   period: 'monthly',
   periodLabel: '月线',

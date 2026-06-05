@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-// collectPageEvents 的纯逻辑副本（与 content.js 同款,便于测试）
+// collectPageEvents pure logic copy (same as content.js, for testing)
 function collectPageEvents(root) {
   const doc = root || globalThis;
   const rows = doc.querySelectorAll('.siderstockcalendarcontent table tbody tr');

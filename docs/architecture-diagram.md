@@ -1,438 +1,457 @@
-# 东财月线 AI 分析助手 — 架构图 & 功能图
+# Eastmoney Monthly AI Analysis Assistant — Architecture & Function Diagram
 
-> 生成日期: 2026-05-29
-> 最后更新: 2026-05-29（p0 审计修正：补 Native Messaging 桥、研究层连通性重标、score-fusion 权重来源标注）
-
----
-
-## 一、系统架构图
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         用户交互层 (UI Layer)                         │
-├───────────────┬──────────────────┬──────────────────────────────────┤
-│  popup.html   │   content.js     │        viewer.html               │
-│  popup.js     │  (Shadow DOM)    │        viewer.js                 │
-│  设置/成本/    │  FAB按钮+侧面板   │       分析查看器                  │
-│  历史/调试     │  "大事提醒"抓取   │       (URL参数加载)              │
-└───────┬───────┴────────┬─────────┴─────────────┬────────────────────┘
-        │ chrome.runtime │ chrome.runtime        │ URL参数
-        │ .sendMessage() │ .sendMessage()        │
-        ▼                ▼                        ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                    Service Worker 编排层 (background.js)              │
-│                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                    三种分析模式                               │   │
-│  │  ┌──────────┐  ┌──────────────────┐  ┌──────────────────┐   │   │
-│  │  │ 单次分析  │  │  多Agent辩论模式   │  │  多周期共振模式    │   │   │
-│  │  │ Single   │  │ Bull+Bear+       │  │ 月线+周线+日线    │   │   │
-│  │  │          │  │ Predictor→Judge  │  │ resonance分析     │   │   │
-│  │  └──────────┘  └──────────────────┘  └──────────────────┘   │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                                                                     │
-│  Native Messaging 桥 (chrome.runtime.sendNativeMessage):             │
-│    ┌─ query_sector_alpha(code,period,lookback) → 行业alpha         │
-│    └─ read(mc_dropout/{code}) → LSTM MC Dropout 预计算JSON         │
-└──────────────┬──────────────────────────────────────────────────────┘
-               │ chrome.runtime.sendNativeMessage("com.eastmoney_ai.sync", ...)
-               ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│            Native Messaging Host (native-host/server.js)              │
-│            独立 Node 进程，Chrome 按需启动，stdio 协议                  │
-│                                                                      │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │ 消息路由 (handleMessage):                                      │   │
-│  │  query_sector_alpha → import lib/sector/alpha.js → calcSectorAlpha(db)  │
-│  │  read(mc_dropout/{code}) → fs.readFileSync(JSON) → 返回LSTM信号  │
-│  │  sync/sync_batch → fs.writeFileSync → .eastmoney-ai/storage/   │
-│  └──────────────────────────────────────────────────────────────┘   │
-│                                                   │                  │
-│                        动态 import('../lib/db/connection.js')        │
-│                                                   ▼                  │
-│                    ┌──────────────────────────────┐                  │
-│                    │   lib/db/connection.js        │                  │
-│                    │   better-sqlite3 (Node原生)   │                  │
-│                    └──────────────┬───────────────┘                  │
-│                                   │                                  │
-└───────────────────────────────────┼──────────────────────────────────┘
-                                    ▼
-                    ┌──────────────────────────────┐
-                    │      SQLite 数据库            │
-                    │  .eastmoney-ai/db/            │
-                    │  klines-v2.sqlite             │
-                    │  月线/周线/日线/60分K线        │
-                    │  行业映射 / 复权因子           │
-                    └──────────────────────────────┘
-        │                              │
-        ▼                              ▼
-┌──────────────────────┐   ┌──────────────────────────────┐
-│   lib/ 核心引擎层     │   │      缓存 & 持久化层           │
-│  (静态 import 闭包,   │   │                              │
-│   不含 Node 原生模块)  │   │ chrome.storage.local         │
-│                      │   │  (分析缓存/历史/设置)         │
-│ ┌──────────────────┐ │   │                              │
-│ │ build-prompt.js  │ │   └──────────────────────────────┘
-│ │ (Prompt拼接引擎) │ │
-│ └────────┬─────────┘ │
-│          │           │
-│ ┌────────┴─────────┐ │
-│ │ lib/agents/      │ │
-│ │ (多Agent系统)    │ │
-│ └────────┬─────────┘ │
-│          │           │
-│ ┌────────┴─────────┐ │
-│ │ lib/indicators/  │ │   ┌──────────────────────────────┐
-│ │ (技术指标库)     │ │   │   lib/data-sources/           │
-│ │ MA/MACD/RSI/     │ │   │   多源K线获取+降级            │
-│ │ KDJ/BOLL/OBV/ATR │ │   │                              │
-│ └────────┬─────────┘ │   │ 东财→百度→新浪→腾讯           │
-│          │           │   │ (超时+限流降级)               │
-│ ┌────────┴─────────┐ │   └──────────────┬───────────────┘
-│ │ lib/signals/     │ │                  │
-│ │ (信号工厂)       │ │   ┌──────────────┴───────────────┐
-│ │ 15个多/空信号    │ │   │ lib/data-validation/         │
-│ └────────┬─────────┘ │   │ K线质量校验(字段/时序/自洽)   │
-│          │           │   └──────────────────────────────┘
-│ ┌────────┴─────────┐ │
-│ │ lib/quant-factors│ │
-│ │ 5维量化因子      │ │   ┌──────────────────────────────┐
-│ │ (纯计算,无外部) │ │   │  lib/eval/ + lib/evaluation/  │
-│ └──────────────────┘ │   │  评估框架 + 夜间流水线        │
-│                      │   │  (仅 CLI,不在运行时闭包)      │
-│ ┌──────────────────┐ │   └──────────────────────────────┘
-│ │ lib/self-backtest│ │
-│ │ (自我回测校准)   │ │
-│ └──────────────────┘ │
-│                      │
-│ ┌──────────────────┐ │
-│ │ lib/score-fusion │ │  ← regime权重硬编码 (score-fusion.js:29-34)
-│ │ (LLM+量化融合)   │ │    不读任何配置文件或研究产物
-│ └──────────────────┘ │
-└──────────────────────┘
-        │
-        ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                      LLM Provider 抽象层 (lib/llm/)                   │
-│                                                                     │
-│  ┌─────────────────┐    ┌─────────────────┐                         │
-│  │ Anthropic       │    │ DeepSeek        │                         │
-│  │ claude-sonnet-4 │    │ deepseek-chat   │                         │
-│  │ (SSE流式+Tool   │    │ (OpenAI兼容     │                         │
-│  │  Use+扩展思考)  │    │  无Tool Use)    │                         │
-│  └─────────────────┘    └─────────────────┘                         │
-└─────────────────────────────────────────────────────────────────────┘
-        │
-        ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                     外部数据源 & API                                  │
-│                                                                     │
-│  东方财富API       百度股市通        新浪财经          腾讯财经         │
-│  push2his.         finance.pae.     hq.sinajs.cn     web.ifzq.      │
-│  eastmoney.com     baidu.com                          gtimg.cn      │
-└─────────────────────────────────────────────────────────────────────┘
-
-
-┌─────────────────────────────────────────────────────────────────────┐
-│                  离线研究层 (Python / Node CLI)                       │
-│                                                                     │
-│  ╔═══════════════════════════════════════════════════════════════╗  │
-│  ║  已接入运行时 (经 Native Messaging 读预计算产物)              ║  │
-│  ╠═══════════════════════════════════════════════════════════════╣  │
-│  ║                                                               ║  │
-│  ║  lib/lstm/  深度学习                                          ║  │
-│  ║  ┌─────────────────────────────────────────────────────┐     ║  │
-│  ║  │ mc_dropout.py (MC Dropout 不确定性量化)             │     ║  │
-│  ║  │   ↓ 50次前向传播 → y3_mean/y3_std/overall_confidence │     ║  │
-│  ║  │ cli/mc_export_json.py                               │     ║  │
-│  ║  │   ↓ 导出 JSON → .eastmoney-ai/storage/mc_dropout/{code}.json│║  │
-│  ║  │ native-host/server.js (read handler)                │     ║  │
-│  ║  │   ↓ sendNativeMessage('read', 'mc_dropout/{code}')  │     ║  │
-│  ║  │ background.js:325-358                               │     ║  │
-│  ║  │   ↓ 不确定性门控: high=跳过, low+medium=注入prompt     │     ║  │
-│  ║  │ buildLstmSignalBlock() → prompt                     │     ║  │
-│  ║  └─────────────────────────────────────────────────────┘     ║  │
-│  ║  Native host 不可用或数据未生成时: 静默降级, 不影响正常分析     ║  │
-│  ╚═══════════════════════════════════════════════════════════════╝  │
-│                                                                     │
-│  ╔═══════════════════════════════════════════════════════════════╗  │
-│  ║  独立 R&D (运行时 0 引用, 不产出运行时消费的配置/产物)      ║  │
-│  ╠═══════════════════════════════════════════════════════════════╣  │
-│  ║                                                               ║  │
-│  ║  kronos/  Transformer 预测 (BSQ+自回归)                       ║  │
-│  ║  lib/backtest/  回测引擎 (Walk-Forward/行业中性化)             ║  │
-│  ║  lib/portfolio/  投资组合优化 (Black-Litterman/风险平价)        ║  │
-│  ║  lib/scanner/  批量扫描 (沪深300+自选股, 仅 CLI)              ║  │
-│  ║  lib/uncertainty/  不确定性量化 (仅 CLI eval 使用)            ║  │
-│  ║                                                               ║  │
-│  ║  这些模块的研究结果记录在 docs/*.md 和 PROGRESS.md 中,         ║  │
-│  ║  运行时不做任何读取。                                         ║  │
-│  ╚═══════════════════════════════════════════════════════════════╝  │
-│                                                                     │
-│  ┌──────────────────────────────────────────────────────────┐      │
-│  │ cli/ CLI 工具链 (Node)                                    │      │
-│  │ 数据库初始化 │ 批量评估 │ 夜间批处理 │ eval 脚本             │      │
-│  └──────────────────────────────────────────────────────────┘      │
-│                                                                     │
-│  ┌──────────────────────────────────────────────────────────┐      │
-│  │ scripts/ Python 研究实验 (~100+)                          │      │
-│  │ 特征工程 │ LSTM实验 │ XGBoost集成 │ IC分析 │ 因子研究     │      │
-│  └──────────────────────────────────────────────────────────┘      │
-└─────────────────────────────────────────────────────────────────────┘
-```
+> Generated: 2026-05-29
+> Last updated: 2026-05-29 (p0 audit correction: added Native Messaging bridge, re-labeled research layer connectivity, annotated score-fusion weight source)
 
 ---
 
-## 二、功能模块图 (数据流)
+## 1. System Architecture Diagram
 
 ```
-                        用户点击分析
-                             │
-                             ▼
-              ┌──────────────────────────┐
-              │     解析页面URL和代码      │
-              │    parse-url.js           │
-              └────────────┬─────────────┘
-                           │
-                           ▼
-              ┌──────────────────────────┐
-              │     获取K线数据           │
-              │  lib/data-sources/        │
-              │  多源降级获取              │
-              │  ┌─东财(主)               │
-              │  ├─百度(备1)              │
-              │  ├─新浪(备2)              │
-              │  └─腾讯(备3)              │
-              └────────────┬─────────────┘
-                           │
-                           ▼
-              ┌──────────────────────────┐
-              │     数据质量校验           │
-              │  lib/data-validation/      │
-              │  字段完整性/时序/自洽       │
-              └────────────┬─────────────┘
-                           │
-       ┌───────────────────┼───────────────────┐
-       ▼                   ▼                   ▼
-┌────────────┐    ┌───────────────┐    ┌───────────────┐
-│ 行业alpha   │    │ LSTM信号      │    │  K线数据      │
-│ (异步)     │    │ (异步,可选)    │    │  (主路径)     │
-│            │    │               │    │               │
-│ sendNative │    │ sendNative    │    │               │
-│ Message(   │    │ Message(      │    │               │
-│  query_    │    │  read,        │    │               │
-│  sector_   │    │  mc_dropout/  │    │               │
-│  alpha)    │    │  {code})      │    │               │
-│    ↓       │    │    ↓          │    │               │
-│ native-    │    │ MC Dropout    │    │               │
-│ host →     │    │ JSON → 不确   │    │               │
-│ lib/sector │    │ 定性门控      │    │               │
-│ /alpha.js  │    │ (high=跳过)   │    │               │
-│    ↓       │    │    ↓          │    │               │
-│ sectorAlpha│    │ lstmSignal    │    │               │
-│ Data       │    │ Data          │    │               │
-└────┬───────┘    └───────┬───────┘    └───────┬───────┘
-     │                    │                    │
-     └────────────────────┼────────────────────┘
-                          │
-           ┌──────────────┼──────────────┐
-           ▼              ▼              ▼
-    ┌────────────┐  ┌────────────┐  ┌────────────┐
-    │ 月线方向    │  │ 周线方向    │  │ 日线方向    │
-    │ MA60斜率    │  │ MA20斜率    │  │ MA20斜率    │
-    │ +MACD      │  │ +MACD      │  │ +MACD      │
-    └─────┬──────┘  └─────┬──────┘  └─────┬──────┘
-          │               │               │
-          └───────────────┼───────────────┘
-                          │
-                          ▼
-              ┌──────────────────────────┐
-              │   多周期共振分析           │
-              │   lib/multi-period/       │
-              │   strong/partial/divergent│
-              └────────────┬─────────────┘
-                           │
-           ┌───────────────┼───────────────┐
-           ▼               ▼               ▼
-    ┌────────────┐  ┌────────────┐  ┌────────────┐
-    │ 技术指标    │  │ 信号检测    │  │ 量化因子    │
-    │ MA/MACD/   │  │ 15个信号    │  │ 5维因子     │
-    │ RSI/KDJ/   │  │ 多+空工厂   │  │ 趋势/位置/  │
-    │ BOLL/OBV   │  │             │  │ 波动/量/    │
-    │            │  │             │  │ 一致性      │
-    └─────┬──────┘  └─────┬──────┘  └─────┬──────┘
-          │               │               │
-          └───────────────┼───────────────┘
-                          │
-                          ▼
-              ┌──────────────────────────────────────┐
-              │         Prompt 拼装                   │
-              │       lib/build-prompt.js             │
-              │                                       │
-              │  输入: K线表格 + 指标 + 信号           │
-              │       + sectorAlphaData (可选)        │
-              │       + lstmSignalData   (可选)       │
-              │       + resonance (纯函数格式化)       │
-              │                                       │
-              │  4风格: 技术/缠论/价值/综合            │
-              │  3模式: 单次/辩论/共振                 │
-              └────────────┬─────────────────────────┘
-                           │
-            ┌──────────────┴──────────────┐
-            ▼                             ▼
-    ┌──────────────┐             ┌──────────────┐
-    │  单次分析     │             │  辩论模式     │
-    │  直接调LLM    │             │  并发3Agent   │
-    │              │             │  ↓           │
-    │              │             │  Judge综合    │
-    └──────┬───────┘             └──────┬───────┘
-           │                            │
-           └────────────┬───────────────┘
-                        │
-                        ▼
-              ┌──────────────────────────┐
-              │    LLM Provider 调用      │
-              │    lib/llm/              │
-              │    Anthropic │ DeepSeek  │
-              └────────────┬─────────────┘
-                           │
-                           ▼
-              ┌──────────────────────────┐
-              │    结构化输出解析         │
-              │   parse-structured-output│
-              │   提取JSON 验证字段       │
-              └────────────┬─────────────┘
-                           │
-                           ▼
-              ┌──────────────────────────┐
-              │    评分融合 (可选)        │
-              │   lib/score-fusion.js    │
-              │   LLM评分 × 量化评分     │
-              │                          │
-              │   自适应Regime权重        │
-              │   (硬编码常量             │
-              │   score-fusion.js:29-34) │
-              │   - strong_trend: L30%+Q70%│
-              │   - sideways:     L92%+Q8%│
-              │   - high_vol:     L85%+Q15%│
-              │   - mixed:        L50%+Q50%│
-              │   不读配置/研究产物       │
-              └────────────┬─────────────┘
-                           │
-                           ▼
-              ┌──────────────────────────┐
-              │    缓存写入 + 返回        │
-              │   chrome.storage.local   │
-              │   analysis:market.code:  │
-              │   period:bucket:style:   │
-              │   mode:decision           │
-              └──────────────────────────┘
++---------------------------------------------------------------------+
+|                         UI Layer                                     |
++---------------+------------------+----------------------------------+
+|  popup.html   |   content.js     |        viewer.html               |
+|  popup.js     |  (Shadow DOM)    |        viewer.js                 |
+|  Settings/    |  FAB button +    |       Analysis Viewer            |
+|  Cost/        |  side panel      |       (URL parameter load)       |
+|  History/Debug|  "Event" scraping|                                  |
++-------+-------+--------+---------+-------------+--------------------+
+        | chrome.runtime | chrome.runtime        | URL parameter
+        | .sendMessage() | .sendMessage()        |
+        v                v                        v
++---------------------------------------------------------------------+
+|                    Service Worker Orchestration (background.js)      |
+|                                                                     |
+|  +-------------------------------------------------------------+   |
+|  |                    Three Analysis Modes                       |   |
+|  |  +----------+  +------------------+  +------------------+   |   |
+|  |  | Single   |  | Multi-Agent      |  | Multi-Period     |   |   |
+|  |  | Analysis |  | Debate Mode      |  | Resonance Mode   |   |   |
+|  |  |          |  | Bull+Bear+       |  | Monthly+Weekly+  |   |   |
+|  |  |          |  | Predictor->Judge |  | Daily resonance  |   |   |
+|  |  +----------+  +------------------+  +------------------+   |   |
+|  +-------------------------------------------------------------+   |
+|                                                                     |
+|  Native Messaging Bridge (chrome.runtime.sendNativeMessage):         |
+|    +- query_sector_alpha(code,period,lookback) -> sector alpha      |
+|    +- read(mc_dropout/{code}) -> LSTM MC Dropout pre-computed JSON  |
++--------------+------------------------------------------------------+
+               | chrome.runtime.sendNativeMessage("com.eastmoney_ai.sync", ...)
+               v
++----------------------------------------------------------------------+
+|            Native Messaging Host (native-host/server.js)              |
+|            Independent Node process, Chrome launches on demand,      |
+|            stdio protocol                                             |
+|                                                                      |
+|  +--------------------------------------------------------------+   |
+|  | Message routing (handleMessage):                               |   |
+|  |  query_sector_alpha -> import lib/sector/alpha.js -> calcSectorAlpha(db) |
+|  |  read(mc_dropout/{code}) -> fs.readFileSync(JSON) -> return LSTM signal |
+|  |  sync/sync_batch -> fs.writeFileSync -> .eastmoney-ai/storage/   |
+|  +--------------------------------------------------------------+   |
+|                                                   |                  |
+|                         dynamic import('../lib/db/connection.js')    |
+|                                                   v                  |
+|                    +------------------------------+                  |
+|                    |   lib/db/connection.js        |                  |
+|                    |   better-sqlite3 (Node native)|                  |
+|                    +--------------+---------------+                  |
+|                                   |                                  |
++-----------------------------------+----------------------------------+
+                                    v
+                    +------------------------------+
+                    |      SQLite Database         |
+                    |  .eastmoney-ai/db/            |
+                    |  klines-v2.sqlite             |
+                    |  Monthly/Weekly/Daily/60min   |
+                    |  Sector mapping / Adjust. factors|
+                    +------------------------------+
+        |                              |
+        v                              v
++----------------------+   +------------------------------+
+|   lib/ Core Engine   |   |      Cache & Persistence     |
+|  (static import      |   |                              |
+|   closure, no Node   |   | chrome.storage.local         |
+|   native modules)    |   |  (analysis cache/history/    |
+|                      |   |   settings)                  |
+| +------------------+ |   |                              |
+| | build-prompt.js  | |   +------------------------------+
+| | (Prompt assembly)| |
+| +--------+---------+ |
+|          |           |
+| +--------+---------+ |
+| | lib/agents/      | |
+| | (Multi-Agent)    | |
+| +--------+---------+ |
+|          |           |
+| +--------+---------+ |
+| | lib/indicators/  | |   +------------------------------+
+| | (Technical lib)  | |   |   lib/data-sources/           |
+| | MA/MACD/RSI/     | |   |   Multi-source K-line fetch   |
+| | KDJ/BOLL/OBV/ATR | |   |   + degradation              |
+| +--------+---------+ |   |                              |
+|          |           |   | Eastmoney->Baidu->Sina->Tencent|
+| +--------+---------+ |   | (timeout+rate-limit degrade)  |
+| | lib/signals/     | |   +--------------+---------------+
+| | (Signal factory) | |                  |
+| | 15 long/short    | |   +--------------+---------------+
+| +--------+---------+ |   | lib/data-validation/         |
+|          |           |   | K-line quality check          |
+| +--------+---------+ |   | (field/sequence/consistency)  |
+| | lib/quant-factors| |   +------------------------------+
+| | 5-dim quant      | |
+| | factors (pure    | |   +------------------------------+
+| | compute, no ext) | |   |  lib/eval/ + lib/evaluation/  |
+| +------------------+ |   |  Eval framework + nightly     |
+|                      |   |  pipeline                     |
+| +------------------+ |   |  (CLI only, not in runtime    |
+| | lib/self-backtest| |   |   closure)                    |
+| | (Self-backtest   | |   +------------------------------+
+| |  calibration)    | |
+| +------------------+ |
+|                      |
+| +------------------+ |
+| | lib/score-fusion | |  <- regime weights hardcoded (score-fusion.js:29-34)
+| | (LLM+Quant fuse) | |     reads no config files or research outputs
+| +------------------+ |
++----------------------+
+        |
+        v
++---------------------------------------------------------------------+
+|                      LLM Provider Abstraction (lib/llm/)             |
+|                                                                     |
+|  +-----------------+    +-----------------+                         |
+|  | Anthropic       |    | DeepSeek        |                         |
+|  | claude-sonnet-4 |    | deepseek-chat   |                         |
+|  | (SSE stream+    |    | (OpenAI compat, |                         |
+|  |  Tool Use+      |    |  no Tool Use)   |                         |
+|  |  extended think)|    |                 |                         |
+|  +-----------------+    +-----------------+                         |
++---------------------------------------------------------------------+
+        |
+        v
++---------------------------------------------------------------------+
+|                     External Data Sources & APIs                     |
+|                                                                     |
+|  Eastmoney API       Baidu Stock       Sina Finance     Tencent Fin. |
+|  push2his.           finance.pae.     hq.sinajs.cn     web.ifzq.    |
+|  eastmoney.com       baidu.com                          gtimg.cn    |
++---------------------------------------------------------------------+
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-              离线评估 & 研究流水线
-
-    ┌─────────────────┐     ┌─────────────────┐
-    │ 夜间评估流水线    │     │ 研究实验          │
-    │ lib/evaluation/ │     │ scripts/         │
-    │                 │     │                  │
-    │ nightly.js      │     │ 特征工程          │
-    │  → collector    │     │ LSTM训练          │
-    │  → cost-guard   │     │ XGBoost集成       │
-    │  → draft-review │     │ IC分析            │
-    │  → refine       │     │ 因子研究          │
-    └────────┬────────┘     └────────┬─────────┘
-             │                       │
-             ▼                       ▼
-    ┌─────────────────────────────────────────┐
-    │              SQLite 数据库               │
-    │  月线/周线/日线K线 │ 行业映射 │ 复权因子  │
-    └──────────────────┬──────────────────────┘
-                       │
-         ┌─────────────┼─────────────┐
-         ▼             ▼             ▼
-    ┌───────────┐ ┌──────────┐ ┌───────────┐
-    │  LSTM 训练 │ │ 回测引擎  │ │ 组合优化   │
-    │  lib/lstm/ │ │ backtest │ │ portfolio │
-    │  [已接入]  │ │ [独立R&D]│ │ [独立R&D] │
-    │  经 Native │ │ 运行时0  │ │ 运行时0   │
-    │  Messaging │ │ 引用     │ │ 引用      │
-    │  注入prompt│ │          │ │           │
-    └───────────┘ └──────────┘ └───────────┘
-         │
-         ▼
-    ┌───────────┐
-    │ mc_export │
-    │ _json.py  │
-    │ → JSON    │
-    │ → native- │
-    │   host    │
-    └───────────┘
++---------------------------------------------------------------------+
+|                   Offline Research Layer (Python / Node CLI)         |
+|                                                                     |
+|  +===============================================================+  |
+|  |  Connected to runtime (via Native Messaging, reads pre-computed) |
+|  +===============================================================+  |
+|  |                                                               |  |
+|  |  lib/lstm/  Deep Learning                                     |  |
+|  |  +---------------------------------------------------------+  |  |
+|  |  | mc_dropout.py (MC Dropout uncertainty quantification)    |  |  |
+|  |  |   v 50 forward passes -> y3_mean/y3_std/overall_confidence|  |  |
+|  |  | cli/mc_export_json.py                                    |  |  |
+|  |  |   v export JSON -> .eastmoney-ai/storage/mc_dropout/{code}.json |
+|  |  | native-host/server.js (read handler)                     |  |  |
+|  |  |   v sendNativeMessage('read', 'mc_dropout/{code}')       |  |  |
+|  |  | background.js:325-358                                    |  |  |
+|  |  |   v uncertainty gating: high=skip, low+medium=inject     |  |  |
+|  |  | buildLstmSignalBlock() -> prompt                         |  |  |
+|  |  +---------------------------------------------------------+  |  |
+|  |  Native host unavailable or data not generated: silent degrade, |
+|  |  does not affect normal analysis                                |
+|  +===============================================================+  |
+|                                                                     |
+|  +===============================================================+  |
+|  |  Independent R&D (0 runtime references, no runtime-consumed    |
+|  |   config/outputs produced)                                     |
+|  +===============================================================+  |
+|  |                                                               |  |
+|  |  kronos/  Transformer Prediction (BSQ+autoregressive)          |  |
+|  |  lib/backtest/  Backtest Engine (Walk-Forward/sector neutral)  |  |
+|  |  lib/portfolio/  Portfolio Optimization (Black-Litterman/      |
+|  |                  Risk Parity)                                  |  |
+|  |  lib/scanner/  Batch Scanning (HS300+watchlist, CLI only)     |  |
+|  |  lib/uncertainty/  Uncertainty Quantification (CLI eval only) |  |
+|  |                                                               |  |
+|  |  These modules' research results are recorded in docs/*.md     |  |
+|  |  and PROGRESS.md; runtime makes no reads.                     |  |
+|  +===============================================================+  |
+|                                                                     |
+|  +----------------------------------------------------------+      |
+|  | cli/ CLI Toolchain (Node)                                 |      |
+|  | DB init | Batch eval | Nightly batch | Eval scripts       |      |
+|  +----------------------------------------------------------+      |
+|                                                                     |
+|  +----------------------------------------------------------+      |
+|  | scripts/ Python Research Experiments (~100+)              |      |
+|  | Feature engineering | LSTM experiments | XGBoost ensemble |      |
+|  | IC analysis | Factor research                            |      |
+|  +----------------------------------------------------------+      |
++---------------------------------------------------------------------+
 ```
 
 ---
 
-## 三、模块关系总表
+## 2. Function Module Diagram (Data Flow)
 
-| 层级 | 模块 | 职责 | 运行时状态 |
+```
+                        User Clicks Analyze
+                             |
+                             v
+              +--------------------------+
+              |     Parse URL and Code    |
+              |    parse-url.js           |
+              +------------+-------------+
+                           |
+                           v
+              +--------------------------+
+              |     Fetch K-line Data     |
+              |  lib/data-sources/        |
+              |  Multi-source degrade     |
+              |  +-Eastmoney (primary)    |
+              |  +-Baidu (backup 1)       |
+              |  +-Sina (backup 2)        |
+              |  +-Tencent (backup 3)     |
+              +------------+-------------+
+                           |
+                           v
+              +--------------------------+
+              |     Data Quality Check    |
+              |  lib/data-validation/      |
+              |  Field/sequence/consistency|
+              +------------+-------------+
+                           |
+       +-------------------+-------------------+
+       v                   v                   v
++------------+    +---------------+    +---------------+
+| Sector alpha|    | LSTM signal   |    |  K-line data  |
+| (async)    |    | (async, opt)  |    |  (main path)  |
+|            |    |               |    |               |
+| sendNative |    | sendNative    |    |               |
+| Message(   |    | Message(      |    |               |
+|  query_    |    |  read,        |    |               |
+|  sector_   |    |  mc_dropout/  |    |               |
+|  alpha)    |    |  {code})      |    |               |
+|    v       |    |    v          |    |               |
+| native-    |    | MC Dropout    |    |               |
+| host ->    |    | JSON -> uncert|    |               |
+| lib/sector |    | gating        |    |               |
+| /alpha.js  |    | (high=skip)   |    |               |
+|    v       |    |    v          |    |               |
+| sectorAlpha|    | lstmSignal    |    |               |
+| Data       |    | Data          |    |               |
++----+-------+    +-------+-------+    +-------+-------+
+     |                    |                    |
+     +--------------------+--------------------+
+                          |
+           +--------------+--------------+
+           v              v              v
+    +------------+  +------------+  +------------+
+    | Monthly    |  | Weekly     |  | Daily      |
+    | direction  |  | direction  |  | direction  |
+    | MA60 slope |  | MA20 slope |  | MA20 slope |
+    | +MACD      |  | +MACD      |  | +MACD      |
+    +-----+------+  +-----+------+  +-----+------+
+          |               |               |
+          +---------------+---------------+ 
+                          |
+                          v
+              +--------------------------+
+              |   Multi-Period Resonance  |
+              |   lib/multi-period/       |
+              |   strong/partial/divergent|
+              +------------+-------------+
+                           |
+           +---------------+---------------+
+           v               v               v
+    +------------+  +------------+  +------------+
+    | Technical  |  | Signal     |  | Quant      |
+    | Indicators |  | Detection  |  | Factors    |
+    | MA/MACD/   |  | 15 signals |  | 5-dim      |
+    | RSI/KDJ/   |  | long+short |  | trend/pos/ |
+    | BOLL/OBV   |  | factory    |  | vol/vol/   |
+    |            |  |            |  | consistency|
+    +-----+------+  +-----+------+  +-----+------+
+          |               |               |
+          +---------------+---------------+ 
+                          |
+                          v
+              +--------------------------------------+
+              |         Prompt Assembly               |
+              |       lib/build-prompt.js             |
+              |                                       |
+              |  Input: K-line table + indicators     |
+              |       + signals                       |
+              |       + sectorAlphaData (optional)    |
+              |       + lstmSignalData   (optional)   |
+              |       + resonance (pure fn format)    |
+              |                                       |
+              |  4 styles: tech/chanlun/value/comp    |
+              |  3 modes: single/debate/resonance     |
+              +------------+-------------------------+
+                           |
+            +--------------+--------------+
+            v                             v
+    +--------------+             +--------------+
+    |  Single      |             |  Debate Mode |
+    |  Direct LLM  |             |  3 concurrent|
+    |              |             |  Agents      |
+    |              |             |  v           |
+    |              |             |  Judge synth |
+    +------+-------+             +------+-------+
+           |                            |
+           +------------+---------------+
+                        |
+                        v
+              +--------------------------+
+              |    LLM Provider Call      |
+              |    lib/llm/              |
+              |    Anthropic | DeepSeek  |
+              +------------+-------------+
+                           |
+                           v
+              +--------------------------+
+              |    Structured Output     |
+              |    Parsing               |
+              |   parse-structured-output|
+              |   Extract JSON, validate |
+              +------------+-------------+
+                           |
+                           v
+              +--------------------------+
+              |    Score Fusion (opt)    |
+              |   lib/score-fusion.js    |
+              |   LLM score x Quant score|
+              |                          |
+              |   Adaptive Regime weights|
+              |   (hardcoded constants   |
+              |   score-fusion.js:29-34) |
+              |   - strong_trend: L30%+Q70%|
+              |   - sideways:     L92%+Q8%|
+              |   - high_vol:     L85%+Q15%|
+              |   - mixed:        L50%+Q50%|
+              |   No config/research read |
+              +------------+-------------+
+                           |
+                           v
+              +--------------------------+
+              |    Cache Write + Return   |
+              |   chrome.storage.local   |
+              |   analysis:market.code:  |
+              |   period:bucket:style:   |
+              |   mode:decision           |
+              +--------------------------+
+
+=====================================================
+
+              Offline Eval & Research Pipeline
+
+    +-----------------+     +-----------------+
+    | Nightly Eval    |     | Research        |
+    | Pipeline        |     | Experiments     |
+    | lib/evaluation/ |     | scripts/         |
+    |                 |     |                  |
+    | nightly.js      |     | Feature eng.     |
+    |  -> collector   |     | LSTM training    |
+    |  -> cost-guard  |     | XGBoost ensemble |
+    |  -> draft-review|     | IC analysis      |
+    |  -> refine      |     | Factor research  |
+    +--------+--------+     +--------+---------+
+             |                       |
+             v                       v
+    +-----------------------------------------+
+    |              SQLite Database             |
+    |  Monthly/Weekly/Daily | Sector map | Adj.|
+    +------------------+----------------------+
+                       |
+         +-------------+-------------+
+         v             v             v
+    +-----------+ +----------+ +-----------+
+    |  LSTM     | | Backtest | | Portfolio |
+    |  Training | | Engine   | | Optimizer |
+    |  lib/lstm/| | backtest | | portfolio |
+    |  [Connected]| [Indep. | | [Indep.  |
+    |  via Native |  R&D]    | |  R&D]    |
+    |  Messaging  | 0 runtime| | 0 runtime |
+    |  inject     | refs     | | refs      |
+    |  to prompt  |          | |           |
+    +-----------+ +----------+ +-----------+
+         |
+         v
+    +-----------+
+    | mc_export |
+    | _json.py  |
+    | -> JSON   |
+    | -> native-|
+    |   host    |
+    +-----------+
+```
+
+---
+
+## 3. Module Relationship Summary Table
+
+| Layer | Module | Responsibility | Runtime Status |
 |------|------|------|-----------|
-| **交互** | `content.js` / `popup.js` / `viewer.js` | 用户UI、设置管理、分析展示 | 运行时入口 |
-| **编排** | `background.js` | 消息路由、模式选择、缓存管理、Native Messaging 桥 | 运行时中枢 |
-| **分析引擎** | `lib/build-prompt.js` | Prompt拼装（4风格 × 3模式） | 运行时 |
-| | `lib/agents/` | 多Agent辩论（Bull/Bear/Predictor/Judge） | 运行时 |
-| | `lib/indicators/` | 技术指标计算（MA/MACD/RSI/KDJ/BOLL/OBV） | 运行时 |
-| | `lib/signals/` | 15个交易信号检测 | 运行时 |
-| | `lib/multi-period/` | 多周期共振分析 | 运行时 |
-| | `lib/quant-factors.js` | 5维量化因子（纯计算） | 仅 CLI |
-| | `lib/score-fusion.js` | LLM+量化混合评分，regime 权重硬编码 (`:29-34`) | 仅 CLI |
-| | `lib/self-backtest.js` | 自我回测校准 | 运行时 |
-| **LLM** | `lib/llm/` | Provider抽象（Anthropic/DeepSeek）+ 定价 | 运行时 |
-| **数据** | `lib/data-sources/` | 4源K线获取 + 降级 | 运行时 |
-| | `lib/data-validation/` | K线质量校验 | 运行时 |
-| | `lib/db/` | SQLite持久化 → **经 Native Messaging 代理访问** | 仅 CLI + native-host |
-| **桥接** | `native-host/server.js` | stdio 协议，路由 query_sector_alpha / read(mc_dropout) / sync | 独立 Node 进程 |
-| | `lib/sector/alpha.js` | 行业alpha计算 → 由 native-host 动态 import | 仅 native-host |
-| **评估** | `lib/eval/` + `lib/evaluation/` | 评估框架 + 夜间流水线 | 仅 CLI |
-| **研究（已接入）** | `lib/lstm/` → JSON → native-host → background.js | MC Dropout 不确定性量化，不确定性门控过滤 | 离线训练，运行时读产物 |
-| **研究（独立 R&D）** | `kronos/` | Transformer 价格预测，含自有 CLI | 运行时 0 引用 |
-| | `lib/backtest/` | Walk-Forward 回测 | 运行时 0 引用 |
-| | `lib/portfolio/` | Black-Litterman / 风险平价 | 运行时 0 引用 |
-| | `lib/scanner/` | 批量股票扫描 | 仅 CLI |
-| | `lib/uncertainty/` | 不确定性量化 | 仅 CLI |
-| **CLI** | `cli/` | 命令行工具（DB/批量/批处理） | 仅 CLI |
-| **脚本** | `scripts/` (~100+) | Python 研究实验 | 离线 |
+| **Interaction** | `content.js` / `popup.js` / `viewer.js` | User UI, settings management, analysis display | Runtime entry |
+| **Orchestration** | `background.js` | Message routing, mode selection, cache management, Native Messaging bridge | Runtime hub |
+| **Analysis Engine** | `lib/build-prompt.js` | Prompt assembly (4 styles x 3 modes) | Runtime |
+| | `lib/agents/` | Multi-Agent debate (Bull/Bear/Predictor/Judge) | Runtime |
+| | `lib/indicators/` | Technical indicator computation (MA/MACD/RSI/KDJ/BOLL/OBV) | Runtime |
+| | `lib/signals/` | 15 trading signal detection | Runtime |
+| | `lib/multi-period/` | Multi-period resonance analysis | Runtime |
+| | `lib/quant-factors.js` | 5-dim quant factors (pure compute) | CLI only |
+| | `lib/score-fusion.js` | LLM+Quant hybrid scoring, regime weights hardcoded (`:29-34`) | CLI only |
+| | `lib/self-backtest.js` | Self-backtest calibration | Runtime |
+| **LLM** | `lib/llm/` | Provider abstraction (Anthropic/DeepSeek) + pricing | Runtime |
+| **Data** | `lib/data-sources/` | 4-source K-line fetch + degradation | Runtime |
+| | `lib/data-validation/` | K-line quality validation | Runtime |
+| | `lib/db/` | SQLite persistence -> **accessed via Native Messaging proxy** | CLI + native-host only |
+| **Bridge** | `native-host/server.js` | stdio protocol, routes query_sector_alpha / read(mc_dropout) / sync | Independent Node process |
+| | `lib/sector/alpha.js` | Sector alpha computation -> dynamically imported by native-host | native-host only |
+| **Evaluation** | `lib/eval/` + `lib/evaluation/` | Eval framework + nightly pipeline | CLI only |
+| **Research (Connected)** | `lib/lstm/` -> JSON -> native-host -> background.js | MC Dropout uncertainty quantification, uncertainty gating filter | Offline training, runtime reads outputs |
+| **Research (Independent R&D)** | `kronos/` | Transformer price prediction, has own CLI | 0 runtime refs |
+| | `lib/backtest/` | Walk-Forward backtest | 0 runtime refs |
+| | `lib/portfolio/` | Black-Litterman / Risk Parity | 0 runtime refs |
+| | `lib/scanner/` | Batch stock scanning | CLI only |
+| | `lib/uncertainty/` | Uncertainty quantification | CLI only |
+| **CLI** | `cli/` | Command-line tools (DB/batch/batch processing) | CLI only |
+| **Scripts** | `scripts/` (~100+) | Python research experiments | Offline |
 
 ---
 
-## 四、关键架构决策（p0 审计确认）
+## 4. Key Architecture Decisions (p0 audit confirmed)
 
-### 4.1 Native Messaging 桥
+### 4.1 Native Messaging Bridge
 
 ```
-background.js ──sendNativeMessage──→ native-host/server.js ──动态import──→ lib/db/connection.js → SQLite
-                                     ↑
-                                     Chrome 按需启动，stdio 长度前缀协议
-                                     消息类型：query_sector_alpha / read / sync / sync_batch / remove
+background.js --sendNativeMessage--> native-host/server.js --dynamic import--> lib/db/connection.js -> SQLite
+                                     ^
+                                     Chrome launches on demand, stdio length-prefix protocol
+                                     Message types: query_sector_alpha / read / sync / sync_batch / remove
 ```
 
-- **承载内容**：
-  - `query_sector_alpha(code, period, lookback)` → `lib/sector/alpha.js` → `calcSectorAlpha(db)` → 行业超额收益
-  - `read('mc_dropout/{code}')` → 读 `.eastmoney-ai/storage/mc_dropout/{code}.json` → LSTM MC Dropout 信号
-  - `sync/sync_batch` → 写 `chrome.storage.local` 数据到磁盘文件
-- `background.js` **从不直接 import `lib/db/`**，不引入 `better-sqlite3` 到 Service Worker
+- **Carried content**:
+  - `query_sector_alpha(code, period, lookback)` -> `lib/sector/alpha.js` -> `calcSectorAlpha(db)` -> sector excess return
+  - `read('mc_dropout/{code}')` -> read `.eastmoney-ai/storage/mc_dropout/{code}.json` -> LSTM MC Dropout signal
+  - `sync/sync_batch` -> write `chrome.storage.local` data to disk files
+- `background.js` **never directly imports `lib/db/`**, does not introduce `better-sqlite3` into Service Worker
 
-### 4.2 研究层连通性
+### 4.2 Research Layer Connectivity
 
-| 模块 | 运行时引用？ | 数据通道 |
+| Module | Runtime Reference? | Data Channel |
 |------|------------|---------|
-| `lib/lstm/` | **是** | `mc_dropout.py` → `mc_export_json.py` → `.eastmoney-ai/storage/mc_dropout/{code}.json` → native-host `read` handler → `background.js:325-358` → 不确定性门控(high=跳过) → `buildLstmSignalBlock()` → prompt |
-| `kronos/` | **否** | 仅 `cli_predict.py` 手动调用 |
-| `lib/backtest/` | **否** | 独立 Python 脚本 |
-| `lib/portfolio/` | **否** | 独立 Python 脚本 |
+| `lib/lstm/` | **Yes** | `mc_dropout.py` -> `mc_export_json.py` -> `.eastmoney-ai/storage/mc_dropout/{code}.json` -> native-host `read` handler -> `background.js:325-358` -> uncertainty gating(high=skip) -> `buildLstmSignalBlock()` -> prompt |
+| `kronos/` | **No** | Only `cli_predict.py` manual invocation |
+| `lib/backtest/` | **No** | Independent Python script |
+| `lib/portfolio/` | **No** | Independent Python script |
 
-### 4.3 Score-fusion 权重来源
+### 4.3 Score-fusion Weight Source
 
-`lib/score-fusion.js:29-34` — **硬编码常量**，不读任何配置文件或研究产物：
+`lib/score-fusion.js:29-34` — **Hardcoded constants**, reads no config files or research outputs:
 
 ```js
 const ADAPTIVE_WEIGHTS = {
@@ -443,55 +462,55 @@ const ADAPTIVE_WEIGHTS = {
 };
 ```
 
-Regime 检测 (`detectStockRegime`) 基于运行时计算的 `quantResult.factors.f2` (价格位置) 和 `f3` (波动率百分位)，纯函数。
+Regime detection (`detectStockRegime`) based on runtime-computed `quantResult.factors.f2` (price position) and `f3` (volatility percentile), pure function.
 
-### 4.4 静态 import 边界
+### 4.4 Static Import Boundary
 
-Service Worker 静态 import 闭包 = `background.js` → lib/ 下 7 个子目录的传递闭包。
-`lib/db/`、`lib/lstm/`、`lib/backtest/`、`lib/portfolio/`、`lib/sector/` 均不在闭包内。
-`lib/db/` 仅由 native-host 和 CLI 脚本通过**动态 import()** 访问。
+Service Worker static import closure = `background.js` -> transitive closure of 7 subdirectories under lib/.
+`lib/db/`, `lib/lstm/`, `lib/backtest/`, `lib/portfolio/`, `lib/sector/` are all NOT in the closure.
+`lib/db/` is only accessed by native-host and CLI scripts via **dynamic import()**.
 
-守卫测试：`test/import-guard.test.js`。
+Guard test: `test/import-guard.test.js`.
 
 ---
 
-## 五、目录结构
+## 5. Directory Structure
 
 ```
 eastmoney-monthly-ai/
-├── manifest.json              # Chrome MV3 扩展清单
-├── background.js              # Service Worker 编排 + Native Messaging 消费者
-├── content.js / content.css   # Shadow DOM 注入
-├── popup.html / popup.js      # 设置面板
-├── viewer.html / viewer.js    # 独立分析查看器
-├── native-host/               # Native Messaging Host (Node 进程)
-│   ├── server.js              #   stdio 协议, 动态 import lib/db
-│   ├── install.js / uninstall.js
-│   ├── launcher.bat
-│   └── manifest/
-├── lib/                       # 核心库
-│   ├── llm/                   #   Provider 抽象
-│   ├── agents/                #   多Agent系统
-│   ├── indicators/            #   技术指标
-│   ├── signals/               #   信号工厂
-│   ├── multi-period/          #   多周期共振
-│   ├── data-sources/          #   多源K线
-│   ├── data-validation/       #   数据校验
-│   ├── tools/                 #   LLM工具
-│   ├── db/                    #   SQLite (仅 CLI + native-host 可达)
-│   ├── sector/                #   行业alpha (仅 native-host 可达)
-│   ├── eval/                  #   评估框架 (仅 CLI)
-│   ├── evaluation/            #   夜间流水线 (仅 CLI)
-│   ├── lstm/                  #   深度学习 (离线训练, 产物经 native-host 注入运行时)
-│   ├── backtest/              #   回测引擎 (独立 R&D)
-│   ├── portfolio/             #   组合优化 (独立 R&D)
-│   ├── scanner/               #   批量扫描 (仅 CLI)
-│   ├── dashboard/             #   评分仪表盘 (viewer)
-│   └── uncertainty/           #   不确定性量化 (仅 CLI)
-├── cli/                       # CLI 工具
-├── scripts/                   # Python 研究脚本
-├── kronos/                    # Transformer 预测 (独立 R&D)
-├── data/                      # 静态数据
-├── test/                      # 测试 (含 import-guard.test.js)
-└── docs/                      # 文档 (含 p0-audit.md)
++-- manifest.json              # Chrome MV3 extension manifest
++-- background.js              # Service Worker orchestration + Native Messaging consumer
++-- content.js / content.css   # Shadow DOM injection
++-- popup.html / popup.js      # Settings panel
++-- viewer.html / viewer.js    # Independent analysis viewer
++-- native-host/               # Native Messaging Host (Node process)
+|   +-- server.js              #   stdio protocol, dynamic import lib/db
+|   +-- install.js / uninstall.js
+|   +-- launcher.bat
+|   +-- manifest/
++-- lib/                       # Core library
+|   +-- llm/                   #   Provider abstraction
+|   +-- agents/                #   Multi-Agent system
+|   +-- indicators/            #   Technical indicators
+|   +-- signals/               #   Signal factory
+|   +-- multi-period/          #   Multi-period resonance
+|   +-- data-sources/          #   Multi-source K-line
+|   +-- data-validation/       #   Data validation
+|   +-- tools/                 #   LLM tools
+|   +-- db/                    #   SQLite (CLI + native-host reachable only)
+|   +-- sector/                #   Sector alpha (native-host reachable only)
+|   +-- eval/                  #   Eval framework (CLI only)
+|   +-- evaluation/            #   Nightly pipeline (CLI only)
+|   +-- lstm/                  #   Deep learning (offline training, outputs via native-host inject into runtime)
+|   +-- backtest/              #   Backtest engine (independent R&D)
+|   +-- portfolio/             #   Portfolio optimization (independent R&D)
+|   +-- scanner/               #   Batch scanning (CLI only)
+|   +-- dashboard/             #   Scoring dashboard (viewer)
+|   +-- uncertainty/           #   Uncertainty quantification (CLI only)
++-- cli/                       # CLI tools
++-- scripts/                   # Python research scripts
++-- kronos/                    # Transformer prediction (independent R&D)
++-- data/                      # Static data
++-- test/                      # Tests (includes import-guard.test.js)
++-- docs/                      # Documentation (includes p0-audit.md)
 ```

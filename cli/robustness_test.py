@@ -746,7 +746,7 @@ def step4_oos_tracking(df, stock_to_ind):
     # --- 4c. 每月运行脚本 ---
     run_script = f'''"""
 样本外跟踪 — 每月运行脚本
-用法: {PYTHON} {tracking_dir / 'run_monthly.py'}
+Usage: {PYTHON} {tracking_dir / 'run_monthly.py'}
 功能:
   1. 计算最新月度因子排名 → tracking/<YYYY-MM>.csv
   2. 回填上月预测的实际收益 → 更新 master_log.csv

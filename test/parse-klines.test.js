@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseKlines } from '../lib/parse-klines.js';
 
-test('parseKlines: 单行解析', () => {
+test('parseKlines: single row parsing', () => {
   const out = parseKlines([
     '2024-01-31,1700.00,1750.50,1780.00,1690.00,1234567,12345678.90,5.0,2.5,40.0,1.5',
   ]);

@@ -1,4 +1,4 @@
-// draft-review 测试
+// draft-review test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeStats, pickFailureCases } from '../../lib/evaluation/draft-review.js';

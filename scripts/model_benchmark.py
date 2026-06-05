@@ -1,4 +1,4 @@
-"""多模型对标: 本地模型 vs Qlib SOTA 公开 benchmark + Ken French 数据集。
+"""Multi-model benchmark: local models vs Qlib SOTA public benchmark + Ken French dataset。
 当 Qlib 成功安装后，可运行完整对比；否则仅 sklearn+LightGBM 对比。
 """
 import numpy as np, pandas as pd, sqlite3, time, json, sys
@@ -105,7 +105,7 @@ def monthly_ic(test, pred):
     return np.mean(ics) if ics else np.nan, ics
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 主流程
+# Main flow
 # ═══════════════════════════════════════════════════════════════════════════
 
 def main():
@@ -146,7 +146,7 @@ def main():
 
     results = {}
     print("\n[2] 本模型结果 vs Qlib SOTA:")
-    print(f"{'模型':<18s} {'IC':>8s} {'ICIR':>8s} {'vs Qlib IC':>12s} {'差距':>8s} {'备注':>20s}")
+    print(f"{'模型':<18s} {'IC':>8s} {'ICIR':>8s} {'vs Qlib IC':>12s} {'差距':>8s} {'Note':>20s}")
     print("-"*78)
 
     for name, model in models.items():
@@ -170,12 +170,12 @@ def main():
                 note = '>>优于SOTA' if gap > 0.01 else '>优于' if gap > 0 else '<劣于'
             print(f"{name:<18s} {ic:+.4f} {icir:+.4f} {qlib_ic:+.4f} {gap:+.4f} {note}")
         except Exception as e:
-            print(f"{name:<18s} 失败: {e}")
+            print(f"{name:<18s} failed: {e}")
             results[name] = {'error':str(e)}
 
     # Qlib 专有模型（仅对比用）
     print(f"\n{'─'*78}")
-    print("Qlib 专有模型 (本地无对应，仅供参考):")
+    print("Qlib 专有模型 (本地无对应，仅供Reference):")
     for name in ['DoubleEnsemble','ALSTM','GRU','TRA','TabNet']:
         qlib = QLIB_BENCHMARKS.get(name, {})
         print(f"  {name:<16s} IC={qlib.get('IC',0):+.4f} IR={qlib.get('IR',0):.4f} AnnRet={qlib.get('Ann_Return',0):.2%}")

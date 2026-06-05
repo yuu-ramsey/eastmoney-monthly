@@ -1,4 +1,4 @@
-"""调试 legulegu - 找JS数据源"""
+"""Debug legulegu - find JS data source"""
 import ssl, urllib3
 urllib3.disable_warnings()
 import requests, re, json

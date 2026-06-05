@@ -1,4 +1,4 @@
-"""检查SQLite DB中的行业映射"""
+"""Check industry mapping in SQLite DB"""
 import sqlite3, os, glob
 
 # Find DB files

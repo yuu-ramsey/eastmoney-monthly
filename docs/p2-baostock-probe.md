@@ -1,29 +1,29 @@
-# P2 Baostock 退市覆盖实测
+# P2 Baostock Delisted Coverage Live Test
 
-> 分支: `p2-verify-and-data-probe` | 日期: 2026-05-29
+> Branch: `p2-verify-and-data-probe` | Date: 2026-05-29
 
-## 结论: Baostock 免费保留退市股历史月线。survivorship 偏差可免费修复。
+## Conclusion: Baostock freely preserves delisted stock historical monthly data. Survivorship bias can be fixed for free.
 
 ---
 
-## 实测
+## Live Test
 
-`pip install baostock`（无需注册/token），`bs.login()`。
+`pip install baostock` (no registration/token needed), `bs.login()`.
 
-| 代码 | 月线 | 时间范围 | 末价 |
+| Code | Monthly Bars | Time Range | Last Price |
 |------|------|---------|------|
-| sz.000033 (新都退) | 30 | 2015-01 ~ 2017-06 | 1.20 |
-| sz.000511 (*ST烯碳) | 42 | 2015-01 ~ 2018-06 | 0.79 |
-| sz.002070 (*ST众和) | 54 | 2015-01 ~ 2019-06 | 0.50 |
-| sz.000018 (神城A退) | 60 | 2015-01 ~ 2019-12 | 0.24 |
-| sh.600401 (*ST海润) | 54 | 2015-01 ~ 2019-06 | 0.12 |
-| sh.600432 (*ST吉恩) | 42 | 2015-01 ~ 2018-06 | 1.02 |
-| sz.000001 (平安银行) | ✓ | 对照 | — |
+| sz.000033 (Xindutong) | 30 | 2015-01 ~ 2017-06 | 1.20 |
+| sz.000511 (*ST Xitan) | 42 | 2015-01 ~ 2018-06 | 0.79 |
+| sz.002070 (*ST Zhonghe) | 54 | 2015-01 ~ 2019-06 | 0.50 |
+| sz.000018 (ShenchengA Tui) | 60 | 2015-01 ~ 2019-12 | 0.24 |
+| sh.600401 (*ST Hairun) | 54 | 2015-01 ~ 2019-06 | 0.12 |
+| sh.600432 (*ST Jien) | 42 | 2015-01 ~ 2018-06 | 1.02 |
+| sz.000001 (Ping An Bank) | Pass | Reference | — |
 
-6/6 退市股全部有完整历史。退市月后无数据，末价为摘牌前实际收盘价（非 0）。
+6/6 delisted stocks all have complete history. No data after delisting month; last price is actual closing price before delisting (not 0).
 
-## 影响
+## Impact
 
-- 退市股末价有实际值（非 close=0），直接可用于 alpha 计算
-- 可拉 2018-2025 全量退市股并入 SQLite，低位池重算
-- 免费 + 无需注册 → 可作为标准 pipeline 步骤
+- Delisted stock last price has actual value (not close=0), directly usable for alpha calculation
+- Can pull 2018-2025 full delisted stock set and merge into SQLite; low-position pool recompute
+- Free + no registration needed -> can serve as standard pipeline step

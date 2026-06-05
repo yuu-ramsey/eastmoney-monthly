@@ -1,4 +1,4 @@
-// data-sources 测试 — URL拼接、字段映射、降级逻辑
+// data-sources test - URL assembly, field mapping, degradation logic
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 

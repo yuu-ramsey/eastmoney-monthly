@@ -1,5 +1,5 @@
-// 一键安装 Native Messaging Host
-// 用法: node native-host/install.js <扩展ID>
+// One-click install Native Messaging Host
+// Usage: node native-host/install.js <扩展ID>
 // 如未提供扩展ID，脚本会提示如何获取
 
 import * as fs from 'node:fs';
@@ -20,7 +20,7 @@ const REG_KEY = `HKEY_CURRENT_USER\\Software\\Google\\Chrome\\NativeMessagingHos
 const extensionId = process.argv[2];
 
 if (!extensionId) {
-  console.log('用法: node native-host/install.js <扩展ID>');
+  console.log('Usage: node native-host/install.js <扩展ID>');
   console.log('');
   console.log('获取扩展ID:');
   console.log('  1. 打开 chrome://extensions');

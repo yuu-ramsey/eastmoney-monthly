@@ -1,4 +1,4 @@
-// 核心工具测试
+// Core utility test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sum, avg, max, min, std, emaInit, smaSmoothing } from '../../lib/indicators/core.js';

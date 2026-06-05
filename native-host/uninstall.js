@@ -1,4 +1,4 @@
-// 卸载 Native Messaging Host
+// Uninstall Native Messaging Host
 import { execSync } from 'node:child_process';
 
 const REG_EXE = 'C:\\Windows\\System32\\reg.exe';

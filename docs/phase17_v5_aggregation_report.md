@@ -1,20 +1,20 @@
-# Phase 17 v5 轨道 1: 月度聚合修复报告
+# Phase 17 v5 Track 1: Monthly Aggregation Fix Report
 
-## 问题
+## Problem
 
-`export_daily_signals.py` 成功导出 866K 日线预测（Test IC3=0.114），但月度聚合后 IC=NaN。
+`export_daily_signals.py` successfully exported 866K daily predictions (Test IC3=0.114), but monthly aggregation resulted in IC=NaN.
 
-## 根因
+## Root Cause
 
-1. 聚合策略 `latest`（月末最后一日）信噪比丢失严重
-2. Val 期（2022-2023）数据量足够，但 Test 期（2024-2026）收益方差低导致 Spearman 数值不稳定
-3. 日线 LSTM 预测的是 63-日 forward return，换算到月度（21 交易日）时信号退化
+1. Aggregation strategy `latest` (last trading day of month) suffered severe signal-to-noise loss
+2. Val period (2022-2023) had sufficient data, but Test period (2024-2026) had low return variance causing Spearman numerical instability
+3. Daily LSTM predicts 63-day forward return; signal degrades when converting to monthly (21 trading days)
 
-## 修复
+## Fix
 
-5 种聚合策略对比（Val 期 2022-2023）：
+5 aggregation strategies compared (Val period 2022-2023):
 
-| 策略 | IC | n | L-S |
+| Strategy | IC | n | L-S |
 |------|-----|---|-----|
 | latest | -0.072 | 6,963 | -0.015 |
 | **mean** | **-0.050** | 6,963 | -0.006 |
@@ -22,13 +22,13 @@
 | recent_5 | -0.060 | 6,963 | -0.010 |
 | recent_10 | -0.055 | 6,963 | -0.009 |
 
-**最佳: mean，IC=-0.050。信号方向为反向**（日线动量 = 月线均值回归）。
+**Best: mean, IC=-0.050. Signal direction is contrarian** (daily momentum = monthly mean reversion).
 
-## 输出
+## Output
 
-- `monthly_lstm_signals_v2.parquet`（43,534 条，反向，mean 聚合）
-- 信号统计: mean=0.58, std=0.62
+- `monthly_lstm_signals_v2.parquet` (43,534 records, contrarian, mean aggregation)
+- Signal stats: mean=0.58, std=0.62
 
-## 结论
+## Conclusion
 
-月度聚合 IC=-0.050，弱信号但真实有效。反向一致性符合 Phase 11/12 发现。
+Monthly aggregation IC=-0.050, weak signal but real. Contrarian consistency aligns with Phase 11/12 findings.

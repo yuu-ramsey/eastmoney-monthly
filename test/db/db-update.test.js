@@ -1,4 +1,4 @@
-// db-update 测试 — 增量更新逻辑
+// db-update test - incremental update logic
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';

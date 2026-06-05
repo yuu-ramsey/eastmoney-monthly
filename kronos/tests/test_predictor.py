@@ -1,7 +1,7 @@
 """
-KronosPredictor 端到端推理测试 — 合成数据验证
+KronosPredictor end-to-end inference test — synthetic data validation
 
-验证标准：用合成 K 线数据跑完整推理流程，输出 DataFrame 列和形状正确。
+Validation: run full inference pipeline on synthetic K-line data, verify output DataFrame columns and shape.
 """
 
 import numpy as np

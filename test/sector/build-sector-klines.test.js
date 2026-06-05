@@ -1,4 +1,4 @@
-// sector/build-sector-klines.js 测试 — 市值加权合成
+// sector/build-sector-klines.js test - market-cap weighted synthesis
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,7 +13,7 @@ function setupDb() {
 }
 
 function seedMapping(db) {
-  db.prepare('INSERT INTO industries (industry_code, industry_name) VALUES (?, ?)').run('801780.SI', '银行');
+  db.prepare('INSERT INTO industries (industry_code, industry_name) VALUES (?, ?)').run('801780.SI', 'Banking');
   db.prepare('INSERT INTO stock_industry_mapping (stock_code, industry_code, stock_name, market_cap) VALUES (?,?,?,?)').run('601398', '801780.SI', '工商银行', 25000);
   db.prepare('INSERT INTO stock_industry_mapping (stock_code, industry_code, stock_name, market_cap) VALUES (?,?,?,?)').run('601939', '801780.SI', '建设银行', 20000);
   db.prepare('INSERT INTO stock_industry_mapping (stock_code, industry_code, stock_name, market_cap) VALUES (?,?,?,?)').run('601288', '801780.SI', '农业银行', 18000);
@@ -76,7 +76,7 @@ test('buildAllSectorKlines: 成分股不足3只时跳过', () => {
 
 test('buildAllSectorKlines: 无 market_cap 成分股被跳过', () => {
   const db = setupDb();
-  db.prepare('INSERT INTO industries (industry_code, industry_name) VALUES (?, ?)').run('801780.SI', '银行');
+  db.prepare('INSERT INTO industries (industry_code, industry_name) VALUES (?, ?)').run('801780.SI', 'Banking');
   db.prepare('INSERT INTO stock_industry_mapping (stock_code, industry_code, market_cap) VALUES (?,?,?)').run('601398', '801780.SI', null); // 无市值
   db.prepare('INSERT INTO stock_industry_mapping (stock_code, industry_code, market_cap) VALUES (?,?,?)').run('601939', '801780.SI', 20000);
   db.prepare('INSERT INTO stock_industry_mapping (stock_code, industry_code, market_cap) VALUES (?,?,?)').run('601288', '801780.SI', 18000);

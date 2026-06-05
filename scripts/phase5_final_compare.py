@@ -1,5 +1,5 @@
 """
-Phase 5: 四版本最终对比
+Phase 5: Four-version final comparison
 61d(baseline) / 52d(删G1+G5+G4部分) / 41d(FFT振幅10维) / 32d(合并精简)
 统一5-Fold CV, IC + ICIR + IC>0
 修复: IC>0 = 月份正IC占比 (非个股方向正确率)
@@ -25,7 +25,7 @@ def ts():
 
 
 def cs_ic_full(pred, true, dates):
-    """返回 IC均值, ICIR, IC_std, IC>0(月份正IC占比), 月度ICs"""
+    """Returns IC均值, ICIR, IC_std, IC>0(月份正IC占比), 月度ICs"""
     ics = []
     for m in np.unique(dates):
         mask = dates == m
@@ -207,7 +207,7 @@ def build_features():
 
 
 def train_and_eval_cv(X_train, y_train, X_test, y_test, dates_test, label, n_folds=5):
-    """训练 LGB+XGB+Ridge 集成, 返回全期 + 5-Fold CV 指标"""
+    """训练 LGB+XGB+Ridge 集成, Returns全期 + 5-Fold CV 指标"""
     sc = StandardScaler()
     Xt = sc.fit_transform(X_train); Xte = sc.transform(X_test)
 
@@ -272,7 +272,7 @@ if __name__ == '__main__':
     print(f"[{ts()}] 行业中性化...", flush=True); t0 = time.time()
     flat61_ind = cross_sectional_neutralize(flat61.copy(), dates_arr, inds_arr, 'categorical')
     flat41_ind = cross_sectional_neutralize(flat41.copy(), dates_arr, inds_arr, 'categorical')
-    print(f"[{ts()}] 完成 ({time.time() - t0:.0f}s)", flush=True)
+    print(f"[{ts()}] done ({time.time() - t0:.0f}s)", flush=True)
 
     tr_m = (dates_arr >= '2010-01') & (dates_arr <= '2014-12')
     te_m = (dates_arr >= '2015-01')
@@ -372,4 +372,4 @@ if __name__ == '__main__':
     with open(OUT / 'final_4way_summary.json', 'w') as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
 
-    print(f"\n[{ts()}] 四方对比完成. 结果: {OUT}")
+    print(f"\n[{ts()}] 四方对比done. 结果: {OUT}")

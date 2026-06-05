@@ -1,5 +1,5 @@
 """B1-XGB: XGBoost stacking ensemble vs Ridge baseline.
-Walk-forward 逐月训练，严格防未来信息泄露。
+Walk-forward monthly training, strictly prevents future information leakage.
 对比 Ridge IC=0.063 baseline vs XGBoost with same + extended features.
 """
 import numpy as np, pandas as pd, sqlite3, warnings

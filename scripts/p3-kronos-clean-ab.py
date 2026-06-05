@@ -100,7 +100,7 @@ for tp in tps:
 print(f"Kronos matched: {len(pairs)} pairs")
 
 # ── A: Kronos direction vs Alpha ──
-print("\n=== A: Kronos 方向 vs 实际 Alpha ===")
+print("\n=== A: Kronos Direction vs Actual Alpha ===")
 test_pairs = [p for p in pairs if not p['isTrain']]
 train_pairs = [p for p in pairs if p['isTrain']]
 
@@ -166,7 +166,7 @@ print(f"  Reversal gate: {'PASS' if rev_pass else 'FAIL'}")
 
 # ── D: Clean conclusion ──
 print("\n=== D: 干净结论 ===")
-print(f"  1. Kronos Test CI [{t_lo:+.1f}, {t_hi:+.1f}] → {'✓ 通过' if t_lo > 0 else '✗ 失败'}")
+print(f"  1. Kronos Test CI [{t_lo:+.1f}, {t_hi:+.1f}] → {'✓ 通过' if t_lo > 0 else '✗ failed'}")
 print(f"  2. r(Kronos, rev1m) = {r_kronos_rev:.4f} → {'互补' if abs(r_kronos_rev) < 0.3 else '冗余' if abs(r_kronos_rev) < 0.7 else '高度相关'}")
 print(f"  3. 反转 Test CI [{rev_tlo:.1f},{rev_thi:.1f}] → 翻负确认，撤出正确")
 print(f"  4. Kronos 是唯一通过 24tp 门控的外部信号")

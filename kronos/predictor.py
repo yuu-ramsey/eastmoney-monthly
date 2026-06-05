@@ -1,7 +1,7 @@
 """
-Kronos 推理封装 — 自回归生成预测 K 线
+Kronos inference wrapper — autoregressive generation of predicted K-lines
 
-推理流程：
+Inference pipeline:
 1. Tokenizer.encode(历史 OHLCV) → s1/s2 token 序列
 2. 逐 token 自回归：decode_s1 预测 s1 → 采样 → decode_s2 预测 s2 → 采样
 3. Tokenizer.decode(s1, s2) → 预测期 OHLCV 重建

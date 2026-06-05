@@ -1,4 +1,4 @@
-// 运行时 import 边界守卫测试
+// Runtime import boundary guard test
 // 锁住"Service Worker 静态 import 闭包不含 Node 原生模块"不变量
 //
 // 规则：

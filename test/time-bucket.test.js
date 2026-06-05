@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-// timeBucket 和 isoWeekFromDate 的纯函数副本（与 background.js 同款）
+// timeBucket and isoWeekFromDate pure function copy (same as background.js)
 function timeBucket(dateStr, period) {
   switch (period) {
     case 'daily':

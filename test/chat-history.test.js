@@ -1,4 +1,4 @@
-// content.js conversationHistory 逻辑单元测试
+// content.js conversationHistory logic unit test
 // 核心不变式：conversationHistory[0].content 始终是完整 prompt 原文，不是 UI 折叠摘要
 // 失败路径：sendFollowUp 三个分支都移除"思考中…"占位并渲染错误提示
 import { test } from 'node:test';

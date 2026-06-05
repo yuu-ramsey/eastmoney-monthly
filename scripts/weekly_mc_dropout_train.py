@@ -1,11 +1,11 @@
-"""周线 MC Dropout 降噪训练：不确定性量化 + 折扣目标 + walk-forward 评估
+"""Weekly MC Dropout denoising training: uncertainty quantification + discounted target + walk-forward evaluation
 
 降噪策略：
   1. 目标降噪：折扣多月回报（γ=0.9, 13w+26w+39w+52w）
   2. 推断降噪：MC Dropout 50次采样 → cv = std/|mean|
   3. 信号降噪：过滤 high uncertainty (cv≥0.7) → 去除~31%噪音信号
 
-用法：
+Usage:
   python scripts/weekly_mc_dropout_train.py           # 完整训练+评估
   python scripts/weekly_mc_dropout_train.py --quick   # 快速模式（少epoch）
 """

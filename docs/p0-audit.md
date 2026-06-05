@@ -1,16 +1,16 @@
-# P0 架构审计报告
+# P0 Architecture Audit Report
 
-> 审计日期: 2026-05-29 | 范围: 只读, 不修改任何代码 | 审计员: Claude Code
+> Audit date: 2026-05-29 | Scope: read-only, no code modifications | Auditor: Claude Code
 
 ---
 
-## 1. 运行时可达模块集合 vs 仅 CLI/research 集合
+## 1. Runtime Reachable Module Set vs CLI/Research-Only Set
 
-**结论: lib/ 树确实混放了运行时代码和研究代码, 但 Service Worker 的 import 图没有误引入 Node 原生模块 —— 运行时可达集合远小于完整 lib/。**
+**Conclusion: The lib/ tree indeed mixes runtime code and research code, but the Service Worker's import graph has not mistakenly introduced Node native modules — the runtime reachable set is far smaller than the full lib/.**
 
-### 运行时可传递到达的 lib/* 子目录
+### Runtime Transitively Reachable lib/* Subdirectories
 
-从 `manifest.json` 声明的入口出发, 追踪 `background.js` (service_worker) 的静态 import 链:
+Starting from `manifest.json` declared entry points, tracing `background.js` (service_worker) static import chain:
 
 **manifest.json:15-17**
 ```json
@@ -20,7 +20,7 @@
 }
 ```
 
-**background.js:7-20 静态 import**
+**background.js:7-20 static imports**
 ```js
 import { parseStockUrl } from './lib/parse-url.js';
 import { parseKlines } from './lib/parse-klines.js';
@@ -38,7 +38,7 @@ import { getMoneyFlowTool } from './lib/tools/get-money-flow.js';
 import { runHistoricalAnalysis, ... } from './lib/self-backtest.js';
 ```
 
-**lib/build-prompt.js:5-9 静态 import (传递)**
+**lib/build-prompt.js:5-9 static imports (transitive)**
 ```js
 import { buildTemplatePrompt, ... } from './prompt-templates.js';
 import { calcNormalizedReturns } from './multi-period/normalized-return.js';
@@ -47,116 +47,116 @@ import { checkKlines } from './data-validation/validate-klines.js';
 import { generateSignalSummary, ... } from './signals/summary.js';
 ```
 
-**lib/build-prompt.js:370 动态 import (仅传递方向 → 共振摘要格式化函数)**
+**lib/build-prompt.js:370 dynamic import (only transitive direction -> resonance summary formatting function)**
 ```js
 const { formatResonanceSummary, buildResonanceConstraint } = await import('./multi-period/resonance.js');
 ```
 
-**运行时可达集合:**
+**Runtime reachable set:**
 ```
-lib/llm/                (3 文件: index.js, anthropic.js, deepseek.js, pricing.js)
-lib/agents/             (11 文件: runner, bull, bear, predictor, judge, base, phase15-*,
+lib/llm/                (3 files: index.js, anthropic.js, deepseek.js, pricing.js)
+lib/agents/             (11 files: runner, bull, bear, predictor, judge, base, phase15-*,
                          technical-agent, sector-agent, judge-agent)
-lib/multi-period/       (normalized-return.js, resonance.js — 仅纯函数)
-lib/indicators/         (calculate.js → core.js, trend.js, momentum.js, volatility.js, volume.js)
-lib/signals/            (summary.js → atoms.js, config.js, factory.js)
+lib/multi-period/       (normalized-return.js, resonance.js — pure functions only)
+lib/indicators/         (calculate.js -> core.js, trend.js, momentum.js, volatility.js, volume.js)
+lib/signals/            (summary.js -> atoms.js, config.js, factory.js)
 lib/data-validation/    (validate-klines.js)
 lib/tools/              (get-financials.js, get-money-flow.js)
-lib/ 顶层               (parse-url, parse-klines, compute-ma, compute-macd, build-prompt,
+lib/ top-level          (parse-url, parse-klines, compute-ma, compute-macd, build-prompt,
                          prompt-templates, parse-structured-output, cross-level-check,
                          history, self-backtest, score-fusion, quant-factors,
                          cross-section, industry-map)
 ```
 
-**仅 CLI/research 集合 (未出现在运行时 import 图中):**
+**CLI/Research-only set (not present in runtime import graph):**
 ```
-lib/db/                 (connection.js 引 better-sqlite3 — Node 原生模块)
-lib/eval/               (评估框架, 仅 CLI 调用)
-lib/evaluation/         (夜间评估流水线, 仅 CLI 调用)
-lib/lstm/               (Python 深度学习, 仅 CLI 调用)
-lib/backtest/           (Python 回测引擎)
-lib/portfolio/          (Python 组合优化)
-lib/sector/             (行业 alpha — 通过 Native Messaging 代理)
-lib/scanner/            (批量扫描, 仅 CLI 调用)
-lib/dashboard/          (评分仪表盘, 仅 viewer 使用)
-lib/uncertainty/        (仅在 CLI eval 中使用)
+lib/db/                 (connection.js references better-sqlite3 — Node native module)
+lib/eval/               (Evaluation framework, CLI only)
+lib/evaluation/         (Nightly evaluation pipeline, CLI only)
+lib/lstm/               (Python deep learning, CLI only)
+lib/backtest/           (Python backtest engine)
+lib/portfolio/          (Python portfolio optimization)
+lib/sector/             (Sector alpha — accessed via Native Messaging proxy)
+lib/scanner/            (Batch scanning, CLI only)
+lib/dashboard/          (Scoring dashboard, viewer only)
+lib/uncertainty/        (Only used in CLI eval)
 ```
 
-佐证: `content.js` 和 `popup.js` 均为零 import 的独立脚本, 不做传递分析。
+Corroboration: `content.js` and `popup.js` are both zero-import standalone scripts; no transitive analysis needed.
 
 ---
 
-## 2. 运行时违规依赖点
+## 2. Runtime Violation Dependency Points
 
-**结论: 0 个违规。所有 Node-only/原生模块引用均在仅 CLI/research 路径中, 不在 Service Worker 的 import 闭包内。**
+**Conclusion: 0 violations. All Node-only/native module references are in CLI/research-only paths, not in the Service Worker import closure.**
 
-### 已验证的 Node 原生模块使用点 (全部不在运行时路径)
+### Verified Node Native Module Usage Points (all NOT in runtime path)
 
-| 文件:行 | 模块 | 风险 | 判定 |
+| File:Line | Module | Risk | Verdict |
 |---------|------|------|------|
-| `lib/db/connection.js:4` | `better-sqlite3` | Node 原生 C++ 模块 | 安全 — 仅 CLI + native-host 可达 |
-| `lib/db/connection.js:5` | `node:fs` | Node 核心模块 | 安全 — 同上 |
-| `lib/db/connection.js:6` | `node:path` | Node 核心模块 | 安全 — 同上 |
-| `lib/db/connection.js:7` | `node:url` | Node 核心模块 | 安全 — 同上 |
-| `native-host/server.js:5-7` | `node:fs`, `node:path`, `node:url` | Node 原生 | 安全 — native-host 是独立 Node 进程 |
+| `lib/db/connection.js:4` | `better-sqlite3` | Node native C++ module | Safe — only reachable from CLI + native-host |
+| `lib/db/connection.js:5` | `node:fs` | Node core module | Safe — same as above |
+| `lib/db/connection.js:6` | `node:path` | Node core module | Safe — same as above |
+| `lib/db/connection.js:7` | `node:url` | Node core module | Safe — same as above |
+| `native-host/server.js:5-7` | `node:fs`, `node:path`, `node:url` | Node native | Safe — native-host is independent Node process |
 
-### 关键防线: `lib/multi-period/resonance.js` 的动态 import 隔离
+### Key Defense: Dynamic import isolation in `lib/multi-period/resonance.js`
 
 **lib/multi-period/resonance.js:12**
 ```js
-// 动态导入避免 service worker 加载 Node 原生模块 (better-sqlite3)
+// Dynamic import to avoid service worker loading Node native module (better-sqlite3)
 const { getKlines } = await import('../db/klines-repo.js');
 ```
 
-`getResonanceAsOf()` 函数内部才动态 import `lib/db/klines-repo.js` → `lib/db/connection.js` → `better-sqlite3`。
+`getResonanceAsOf()` function internally dynamic-imports `lib/db/klines-repo.js` -> `lib/db/connection.js` -> `better-sqlite3`.
 
-`build-prompt.js` 虽然动态 import `resonance.js`, 但只解构了 `formatResonanceSummary` 和 `buildResonanceConstraint` 两个纯函数, 从不调用 `getResonanceAsOf()`。
+Although `build-prompt.js` dynamically imports `resonance.js`, it only destructures `formatResonanceSummary` and `buildResonanceConstraint`, two pure functions, and never calls `getResonanceAsOf()`.
 
 **lib/build-prompt.js:370**
 ```js
 const { formatResonanceSummary, buildResonanceConstraint } = await import('./multi-period/resonance.js');
 ```
 
-验证: 全局 grep `getResonanceAsOf` 的调用点:
+Verification: global grep for `getResonanceAsOf` call sites:
 
 ```
-lib/multi-period/resonance.js:10   — 函数定义
+lib/multi-period/resonance.js:10   — function definition
 cli/eval-v6-sector.js:451          — getResonanceAsOf({ getKlines }, ...)
 cli/eval-v6-sector.js:456          — getResonanceAsOf(tp.stockCode, tp.cutoffDate)
 ```
 
-**仅 CLI 脚本 `cli/eval-v6-sector.js` 调用 `getResonanceAsOf`**。Service Worker 路径不会触发 SQLite import。
+**Only CLI script `cli/eval-v6-sector.js` calls `getResonanceAsOf`**. Service Worker path will not trigger SQLite import.
 
-### crypto 判定
+### crypto Determination
 
-grep 未发现 runtime 路径中有 `require('crypto')` 或 `from 'crypto'`。各模块使用的 Web Crypto API (`crypto.subtle`, `crypto.randomUUID`) 均为 Chrome Service Worker 内置标准 API。
+grep found no `require('crypto')` or `from 'crypto'` in runtime paths. All modules use Web Crypto API (`crypto.subtle`, `crypto.randomUUID`), which are Chrome Service Worker built-in standard APIs.
 
 ---
 
-## 3. SQLite 访问路径
+## 3. SQLite Access Path
 
-**结论: 扩展运行时通过 Native Messaging 代理访问 SQLite, 不直接 import `better-sqlite3`。`lib/db/` 完全不在 Service Worker import 图中。**
+**Conclusion: Extension runtime accesses SQLite via Native Messaging proxy; never directly imports `better-sqlite3`. `lib/db/` is completely absent from the Service Worker import graph.**
 
-### 访问链路
+### Access Chain
 
 ```
 background.js (Service Worker)
-  │
-  │ chrome.runtime.sendNativeMessage(NATIVE_HOST, { type: 'query_sector_alpha', ... })
-  │ chrome.runtime.sendNativeMessage(NATIVE_HOST, { type: 'read', key: 'mc_dropout/600519' })
-  ▼
-native-host/server.js (独立 Node 进程, Chrome 按需启动)
-  │
-  │ await import('../lib/db/connection.js')
-  │ const db = getDb();
-  │ db.prepare(...)
-  ▼
+  |
+  | chrome.runtime.sendNativeMessage(NATIVE_HOST, { type: 'query_sector_alpha', ... })
+  | chrome.runtime.sendNativeMessage(NATIVE_HOST, { type: 'read', key: 'mc_dropout/600519' })
+  v
+native-host/server.js (Independent Node process, Chrome launches on demand)
+  |
+  | await import('../lib/db/connection.js')
+  | const db = getDb();
+  | db.prepare(...)
+  v
 .eastmoney-ai/db/klines-v2.sqlite
 ```
 
-### 证据
+### Evidence
 
-**background.js:309-321 — 行业 alpha 查询**
+**background.js:309-321 — Sector alpha query**
 ```js
 const alphaResp = await chrome.runtime.sendNativeMessage(NATIVE_HOST, {
   type: 'query_sector_alpha',
@@ -167,65 +167,65 @@ if (alphaResp && alphaResp.type === 'sector_alpha' && alphaResp.data) {
 }
 ```
 
-**background.js:325-358 — MC Dropout LSTM 信号读取**
+**background.js:325-358 — MC Dropout LSTM signal read**
 ```js
 const mcResp = await chrome.runtime.sendNativeMessage(NATIVE_HOST, {
   type: 'read',
   key: `mc_dropout/${code}`,
 });
 if (mcResp && mcResp.type === 'read_result' && mcResp.data) {
-  // 注入 lstmSignalData 到 prompt
+  // inject lstmSignalData into prompt
 }
 ```
 
-**native-host/server.js:197-199 — DB 接入点**
+**native-host/server.js:197-199 — DB access point**
 ```js
 const { getDb } = await import('../lib/db/connection.js');
 const { calcSectorAlpha } = await import('../lib/sector/alpha.js');
 const db = getDb();
 ```
 
-**native-host/manifest/eastmoney-ai-sync.json — 注册**
+**native-host/manifest/eastmoney-ai-sync.json — Registration**
 ```json
 {
   "name": "com.eastmoney_ai.sync",
-  "description": "东方财富 AI 分析数据同步",
+  "description": "Eastmoney AI Analysis Data Sync",
   "path": "LAUNCHER_PATH_PLACEHOLDER",
   "type": "stdio",
   "allowed_origins": ["chrome-extension://EXTENSION_ID_PLACEHOLDER/"]
 }
 ```
 
-### 直接使用 SQLite 的 CLI 入口 (对比)
+### CLI Entries Using SQLite Directly (for comparison)
 
 ```
-cli/index.js            — ema sync/db 命令
-cli/db-init.js          — 建库
-cli/db-update.js        — 增量更新
-cli/db-status.js        — 状态查询
-cli/eval-*.js           — 所有 eval 脚本直接 import lib/db/connection.js
-scripts/*.js            — 数据构建脚本
+cli/index.js            — ema sync/db commands
+cli/db-init.js          — DB init
+cli/db-update.js        — Incremental update
+cli/db-status.js        — Status query
+cli/eval-*.js           — All eval scripts directly import lib/db/connection.js
+scripts/*.js            — Data build scripts
 ```
 
 ---
 
-## 4. 编排与生命周期
+## 4. Orchestration & Lifecycle
 
-**结论: 辩论中间态全存内存变量, 无断点续跑, 有 keepalive 定时器防 Service Worker 休眠。**
+**Conclusion: Debate intermediate state is stored entirely in memory variables; no checkpoint resume; keepalive timer prevents Service Worker from sleeping.**
 
-### 辩论编排 (lib/agents/runner.js)
+### Debate Orchestration (lib/agents/runner.js)
 
-**完整代码 (64 行) — 关键逻辑:**
+**Full code (64 lines) — key logic:**
 
 ```js
 export async function runDebate(ctx, opts) {
   const startTime = Date.now();
 
-  // 第一阶段：三方并发, 结果存内存变量
+  // Phase 1: three concurrent calls, results stored in memory variables
   const [bull, bear, predictor] = await Promise.allSettled([
-    bullAgent.run(ctx, opts),   // → partials.bull
-    bearAgent.run(ctx, opts),   // → partials.bear
-    predictorAgent.run(ctx, opts), // → partials.predictor
+    bullAgent.run(ctx, opts),   // -> partials.bull
+    bearAgent.run(ctx, opts),   // -> partials.bear
+    predictorAgent.run(ctx, opts), // -> partials.predictor
   ]);
 
   const partials = {
@@ -234,7 +234,7 @@ export async function runDebate(ctx, opts) {
     predictor: predictor.status === 'fulfilled' ? predictor.value : null,
   };
 
-  // 第二阶段：Judge 综合（至少 2 个 Agent 成功才调）
+  // Phase 2: Judge synthesis (only when at least 2 Agents succeed)
   let judge = null;
   const successCount = Object.values(partials).filter((p) => p !== null).length;
   if (successCount >= 2) {
@@ -245,53 +245,53 @@ export async function runDebate(ctx, opts) {
 }
 ```
 
-- **中间态存储**: 纯 JS 内存变量 `partials`。不写 `chrome.storage.local`。
-- **断点续跑**: 无。Service Worker 被杀死后, 所有中间态丢失, 需从头重跑。
-- **容错**: `Promise.allSettled` 保证单个 Agent 失败不阻塞整体。
+- **Intermediate state storage**: Pure JS memory variable `partials`. Does not write to `chrome.storage.local`.
+- **Checkpoint resume**: None. When Service Worker is killed, all intermediate state is lost; must restart from scratch.
+- **Fault tolerance**: `Promise.allSettled` ensures single Agent failure does not block overall flow.
 
-### 生命周期管理 (background.js)
+### Lifecycle Management (background.js)
 
-**background.js:395 — keepalive 定时器**
+**background.js:395 — keepalive timer**
 ```js
 chrome.alarms.create(alarmName, { periodInMinutes: 0.5 });
-// 每 30 秒触发, 防止 Service Worker 在长分析期间休眠
+// Triggers every 30 seconds to prevent Service Worker from sleeping during long analysis
 ```
 
-**background.js:984 — storage 变更监听**
+**background.js:984 — storage change listener**
 ```js
 chrome.storage.onChanged.addListener((changes, areaName) => { ... });
 ```
 
-**manifest.json:6 — 权限声明**
+**manifest.json:6 — Permission declaration**
 ```json
 "permissions": ["storage", "alarms"]
 ```
 
-- 分析结果写 `chrome.storage.local` (带 cache key)。
-- 分析进度通过 `chrome.storage.local` 传递 `{'pending:code': {...}}` 状态, content script 轮询此 key 显示进度 UI。
-- 无 `onSuspend` / `onSuspendCanceled` 钩子 —— 未实现优雅挂起保存。
+- Analysis results written to `chrome.storage.local` (with cache key).
+- Analysis progress passed via `chrome.storage.local` with `{'pending:code': {...}}` state; content script polls this key to display progress UI.
+- No `onSuspend` / `onSuspendCanceled` hooks — graceful suspend save not implemented.
 
 ---
 
-## 5. 研究层 → 运行时消费
+## 5. Research Layer -> Runtime Consumption
 
-**结论: LSTM 信号是唯一被运行时消费的研究产物 (通过 Native Messaging 读预计算 JSON)。Kronos/backtest/portfolio 为孤岛, 0 运行时引用。Score-fusion 的 regime 权重为硬编码, 不读任何外部文件。**
+**Conclusion: LSTM signal is the only research product consumed at runtime (via Native Messaging reading pre-computed JSON). Kronos/backtest/portfolio are islands with 0 runtime references. Score-fusion regime weights are hardcoded, reading no external files.**
 
-### 5.1 LSTM — 真实消费路径
+### 5.1 LSTM — Real Consumption Path
 
-数据流:
+Data flow:
 ```
-lib/lstm/mc_dropout.py (模型推理)
-  → cli/mc_export_json.py (导出 JSON → .eastmoney-ai/storage/mc_dropout/{code}.json)
-  → native-host/server.js (read handler, 读 JSON 文件)
-  → chrome.runtime.sendNativeMessage → background.js:325-358
-  → lib/build-prompt.js → buildLstmSignalBlock() (注入 prompt)
+lib/lstm/mc_dropout.py (model inference)
+  -> cli/mc_export_json.py (export JSON -> .eastmoney-ai/storage/mc_dropout/{code}.json)
+  -> native-host/server.js (read handler, reads JSON file)
+  -> chrome.runtime.sendNativeMessage -> background.js:325-358
+  -> lib/build-prompt.js -> buildLstmSignalBlock() (inject into prompt)
 ```
 
-**background.js:334 — 不确定性过滤**
+**background.js:334 — Uncertainty filtering**
 ```js
 if (ulevel === 'high') {
-  console.log(`[analyze] MC Dropout high uncertainty for ${code}, 跳过 LSTM 信号`);
+  console.log(`[analyze] MC Dropout high uncertainty for ${code}, skip LSTM signal`);
   lstmSignalData = null;
 } else {
   lstmSignalData = {
@@ -304,23 +304,23 @@ if (ulevel === 'high') {
 ```
 
 **lib/prompt-templates.js:97 — buildLstmSignalBlock()**
-用 `lstmSignalData` 构建包含 MC Dropout 不确定性指标的 Markdown 表格。
+Uses `lstmSignalData` to build a Markdown table containing MC Dropout uncertainty metrics.
 
-当 native host 不可用或数据未预计算时,**静默降级** (catch 块为空), 不影响正常分析。
+When native host is unavailable or data is not pre-computed, **silent degradation** (empty catch block), does not affect normal analysis.
 
-### 5.2 Kronos — 孤岛
+### 5.2 Kronos — Island
 
-**佐证**: 全局 grep `kronos` 在 `background.js`、`lib/build-prompt.js`、`lib/score-fusion.js`、`lib/quant-factors.js` 中均无匹配。
-- `kronos/` 模块有自己的 CLI (`cli_predict.py`) 和编排器, 但不产出运行时消费的文件。
-- `background.js` 不读取任何 kronos 输出。
+**Corroboration**: Global grep for `kronos` in `background.js`, `lib/build-prompt.js`, `lib/score-fusion.js`, `lib/quant-factors.js` all return no matches.
+- `kronos/` module has its own CLI (`cli_predict.py`) and orchestrator, but does not produce files consumed at runtime.
+- `background.js` does not read any kronos output.
 
-### 5.3 Backtest / Portfolio — 孤岛
+### 5.3 Backtest / Portfolio — Islands
 
-**佐证**: grep `black.?litterman|risk.?parity` 在 background.js 中无匹配。
-- `lib/backtest/engine.py` 和 `lib/portfolio/optimizer.py` 均为独立 Python 脚本, 不产生运行时配置文件。
-- 回测结果存在 `docs/` 和 `PROGRESS.md` 中, 运行时不做任何读取。
+**Corroboration**: grep `black.?litterman|risk.?parity` in background.js returns no matches.
+- `lib/backtest/engine.py` and `lib/portfolio/optimizer.py` are independent Python scripts that do not produce runtime configuration files.
+- Backtest results are stored in `docs/` and `PROGRESS.md`; runtime makes no reads.
 
-### 5.4 Score-fusion regime 权重 — 硬编码
+### 5.4 Score-fusion Regime Weights — Hardcoded
 
 **lib/score-fusion.js:29-34**
 ```js
@@ -332,32 +332,32 @@ const ADAPTIVE_WEIGHTS = {
 };
 ```
 
-- 不读 JSON 配置, 不读研究产物, 不读 chrome.storage。
-- Regime 检测 (`detectStockRegime`) 完全基于运行时计算的 `quantResult.factors` 中的 f2 (价格位置) 和 f3 (波动率百分位), 纯函数无副作用。
+- Does not read JSON config, does not read research outputs, does not read chrome.storage.
+- Regime detection (`detectStockRegime`) is entirely based on runtime-computed `quantResult.factors` f2 (price position) and f3 (volatility percentile), pure function with no side effects.
 
 ---
 
-## 6. 待确认 (需要验证)
+## 6. Pending Confirmation (needs verification)
 
-| 编号 | 事项 | 原因 | 验证方法 |
+| # | Item | Reason | Verification Method |
 |------|------|------|---------|
-| U1 | `lib/sector/alpha.js` 是否能被 native-host 的 `handleQuerySectorAlpha` 正确调用 | 该函数接受 `better-sqlite3` 实例作为参数, native-host 传入 `getDb()`, 但该函数未在 Service Worker 环境中测试过 | 在已部署环境中跑一次实际分析, 检查 console 是否有 `[analyze] sectorAlpha` 日志 |
-| U2 | MC Dropout JSON 数据是否存在 | `background.js:325-358` 尝试从 `mc_dropout/{code}` 读 JSON, 但 `cli/mc_export_json.py` 是否已运行过未知 | 检查 `.eastmoney-ai/storage/mc_dropout/` 目录是否存在 |
-| U3 | Native host manifest 是否已安装 | `native-host/manifest/eastmoney-ai-sync.json` 含占位符 `LAUNCHER_PATH_PLACEHOLDER` 和 `EXTENSION_ID_PLACEHOLDER`, 需 `native-host/install.js` 填入实际路径后注册到 Chrome | 检查 `chrome://extensions` → 扩展详情 → Service Worker console 是否报 `Native host not found` |
-| U4 | `lib/agents/phase15-runner.js` 是否被任何运行时路径调用 | 搜索仅发现 `cli/eval-phase15.js` 引用, 但 `background.js` 只 import `runDebate` 来自 `lib/agents/runner.js`, 不 import Phase 15 runner | 确认 background.js 中只有旧 debate runner |
-| U5 | `viewer.html/viewer.js` 是否在 manifest 注册 | `manifest.json` 中未声明 viewer 为 web_accessible_resources 或 action 入口, 但文件存在 | 确认 viewer 是否通过其他方式打开 (可能直接文件 URL) |
-| U6 | 构建工具缺失 → 多 JS 文件如何被浏览器加载 | `package.json` 无 build script, 无 webpack/esbuild/rollup 配置, 但 `background.js` 使用 ES module `import` 将大量 lib/ 文件合并 | Chrome MV3 service_worker 的 `"type": "module"` 声明可原生支持 ES import, 无需打包。这意味着所有 import 的 lib/*.js 都必须出现在扩展包中 |
+| U1 | Whether `lib/sector/alpha.js` can be correctly called by native-host's `handleQuerySectorAlpha` | The function accepts a `better-sqlite3` instance as parameter; native-host passes `getDb()`, but the function has not been tested in Service Worker environment | Run an actual analysis in deployed environment, check console for `[analyze] sectorAlpha` log |
+| U2 | Whether MC Dropout JSON data exists | `background.js:325-358` attempts to read JSON from `mc_dropout/{code}`, but whether `cli/mc_export_json.py` has been run is unknown | Check if `.eastmoney-ai/storage/mc_dropout/` directory exists |
+| U3 | Whether Native host manifest is installed | `native-host/manifest/eastmoney-ai-sync.json` contains placeholders `LAUNCHER_PATH_PLACEHOLDER` and `EXTENSION_ID_PLACEHOLDER`; needs `native-host/install.js` to fill actual paths and register with Chrome | Check `chrome://extensions` -> extension details -> Service Worker console for `Native host not found` errors |
+| U4 | Whether `lib/agents/phase15-runner.js` is called by any runtime path | Search only found `cli/eval-phase15.js` reference; but `background.js` only imports `runDebate` from `lib/agents/runner.js`, not Phase 15 runner | Confirm background.js has only old debate runner |
+| U5 | Whether `viewer.html/viewer.js` is registered in manifest | `manifest.json` does not declare viewer as web_accessible_resources or action entry, but files exist | Confirm whether viewer is opened via other means (possibly direct file URL) |
+| U6 | Build tool missing -> how multiple JS files are loaded by browser | `package.json` has no build script, no webpack/esbuild/rollup config, but `background.js` uses ES module `import` merging many lib/ files | Chrome MV3 service_worker `"type": "module"` declaration natively supports ES import without bundling. This means all imported lib/*.js must be present in the extension package |
 
 ---
 
-## 总结
+## Summary
 
-| 审计项 | 结论 |
+| Audit Item | Conclusion |
 |--------|------|
-| lib/ 树混放 | **是**, 但运行时 import 闭包不包含 Node 原生模块 |
-| 运行时误用 Node 模块 | **否** — 0 个违规, `lib/db/` 完全隔离在仅 CLI/native-host 路径 |
-| SQLite 访问路径 | **Native Messaging 代理**, 运行时非直接访问 |
-| 辩论中间态 | **纯内存**, 无断点续跑, 有 keepalive 保活 |
-| LSTM → 运行时 | **是** — 通过 Native Messaging 读预计算 JSON |
-| Kronos/Backtest/Portfolio → 运行时 | **孤岛** — 0 引用 |
-| Score-fusion 权重 | **硬编码常量**, 非读配置/研究产物 |
+| lib/ tree mixing | **Yes**, but runtime import closure does not contain Node native modules |
+| Runtime misuse of Node modules | **No** — 0 violations, `lib/db/` fully isolated in CLI/native-host paths only |
+| SQLite access path | **Native Messaging proxy**, runtime no direct access |
+| Debate intermediate state | **Pure memory**, no checkpoint resume, keepalive prevents sleep |
+| LSTM -> runtime | **Yes** — via Native Messaging reading pre-computed JSON |
+| Kronos/Backtest/Portfolio -> runtime | **Islands** — 0 references |
+| Score-fusion weights | **Hardcoded constants**, not reading config/research outputs |

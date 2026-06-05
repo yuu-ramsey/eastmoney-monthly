@@ -27,9 +27,9 @@ const DEFAULT_MAX_TOKENS = 4000;
 const PERIOD_KLTS = { monthly: '103', weekly: '102', daily: '101' };
 
 const ERR = {
-  NO_KEY: '请先在扩展弹窗里填入 API key',
-  PARSE_URL: '无法从当前页 URL 解析股票代码',
-  EASTMONEY: '获取东财 K 线数据失败',
+  NO_KEY: 'Please fill in your API key in the extension popup first',
+  PARSE_URL: 'Unable to parse stock code from current page URL',
+  EASTMONEY: 'Failed to fetch Eastmoney K-line data',
 };
 
 // ---- migrate legacy fields (v3a) ----
@@ -137,8 +137,8 @@ async function handleAnalyze(pageUrl, opts = {}) {
   const mode = debateMode ? 'debate' : 'single';
   const decision = decisionMode ? 'on' : 'off';
 
-  const PERIOD_LABELS = { monthly: '月线', weekly: '周线', daily: '日线', multi: '多周期' };
-  const periodLabel = PERIOD_LABELS[period] || '月线';
+  const PERIOD_LABELS = { monthly: 'Monthly', weekly: 'Weekly', daily: 'Daily', multi: 'Multi-Period' };
+  const periodLabel = PERIOD_LABELS[period] || 'Monthly';
 
   // ---- multi-period resonance branch ----
   if (isMulti) {
@@ -165,7 +165,7 @@ async function handleAnalyze(pageUrl, opts = {}) {
     const hs300WithMA = hs300Klines.map((k, i) => ({
       ...k, ma5: hs300MA5[i], ma20: hs300MA20[i], ma60: hs300MA60[i], dif: hs300MACD.dif[i], dea: hs300MACD.dea[i], hist: hs300MACD.hist[i],
     }));
-    hs300IndexData = { name: hs300Data.name || '沪深300', klines: hs300WithMA };
+    hs300IndexData = { name: hs300Data.name || 'HS300', klines: hs300WithMA };
   }
 
   const latestDate = klines[klines.length - 1].date;
@@ -284,13 +284,13 @@ async function handleAnalyze(pageUrl, opts = {}) {
       analysis = debateResult.judge.text;
     } else {
       const sections = [];
-      if (debateResult.partials.bull) sections.push('# 看多视角\n\n' + debateResult.partials.bull.text);
-      if (debateResult.partials.bear) sections.push('# 看空视角\n\n' + debateResult.partials.bear.text);
-      if (debateResult.partials.predictor) sections.push('# 关键价位识别\n\n' + debateResult.partials.predictor.text);
+      if (debateResult.partials.bull) sections.push('# Bullish Perspective\n\n' + debateResult.partials.bull.text);
+      if (debateResult.partials.bear) sections.push('# Bearish Perspective\n\n' + debateResult.partials.bear.text);
+      if (debateResult.partials.predictor) sections.push('# Key Price Level Identification\n\n' + debateResult.partials.predictor.text);
       for (const [role, err] of Object.entries(debateResult.errors || {})) {
-        if (err) sections.push(`# ${role} 调用失败\n\n> ${err}`);
+        if (err) sections.push(`# ${role} call failed\n\n> ${err}`);
       }
-      analysis = sections.join('\n\n---\n\n') || '辩论模式生成失败';
+      analysis = sections.join('\n\n---\n\n') || 'Debate mode generation failed';
     }
     cost = debateResult.totalCost;
 
@@ -363,11 +363,11 @@ async function handleAnalyze(pageUrl, opts = {}) {
               y6_std: d.y6_std,
               overall_confidence: d.overall_confidence,
               uncertainty_level: ulevel,
-              uncertainty_emoji: { low: '🟢', medium: '🟡', high: '🔴' }[ulevel] || '🟡',
+              uncertainty_emoji: { low: 'LOW', medium: 'MEDIUM', high: 'HIGH' }[ulevel] || 'MEDIUM',
               uncertainty_desc: {
-                low: '模型预测一致性强，信号可信度较高',
-                medium: '模型预测存在分歧，信号需结合技术面验证',
-                high: '模型预测分歧大，信号不可靠，以技术分析为主',
+                low: 'Model predictions show strong consensus, signal reliability is high.',
+                medium: 'Model predictions show divergence, signal requires technical verification.',
+                high: 'Model predictions show significant divergence, signal is unreliable — rely on technical analysis.',
               }[ulevel] || '',
               mc_samples: 50,
             };
@@ -619,7 +619,7 @@ async function fetchEastmoneyKlines(market, code, limit, period) {
   try {
     resp = await fetch(`${EASTMONEY_KLINE_ENDPOINT}?${params.toString()}`);
   } catch (_) {
-    throw new Error('网络错误，请检查连接');
+    throw new Error('Network error, please check your connection');
   }
   if (!resp.ok) throw new Error(ERR.EASTMONEY);
 
@@ -650,7 +650,7 @@ async function fetchHS300Klines(limit, period) {
     const json = await resp.json();
     const data = json?.data;
     if (!data || !Array.isArray(data.klines)) return null;
-    return { name: data.name || '沪深300', klines: data.klines };
+    return { name: data.name || 'HS300', klines: data.klines };
   } catch (_) {
     // index data fetch failure does not block main flow
     return null;
@@ -740,7 +740,7 @@ async function handleMultiPeriod({ market, code, settings, style, decisionMode, 
   const hs300Klines = hs300Data ? parseKlines(hs300Data.klines) : [];
   if (hs300Klines.length > 0) {
     const hs300WithMA = attachIndicators(hs300Klines);
-    hs300IndexData = { name: hs300Data.name || '沪深300', klines: hs300WithMA };
+    hs300IndexData = { name: hs300Data.name || 'HS300', klines: hs300WithMA };
   }
 
   // bucket by daily latest date (finest granularity)
@@ -910,7 +910,7 @@ async function handleSaveConversation(id, conversationHistory) {
   const items = await chrome.storage.local.get([HISTORY_KEY]);
   const list = Array.isArray(items[HISTORY_KEY]) ? items[HISTORY_KEY] : [];
   const idx = list.findIndex((e) => e.id === id);
-  if (idx < 0) throw new Error('历史记录不存在');
+  if (idx < 0) throw new Error('History record does not exist');
   list[idx].conversationHistory = conversationHistory;
   // update timestamp
   list[idx].timestamp = Date.now();
@@ -951,13 +951,13 @@ async function handleExportHistory(id) {
   if (id) {
     // export single
     const entry = list.find((e) => e.id === id);
-    if (!entry) throw new Error('记录不存在');
+    if (!entry) throw new Error('Record does not exist');
     const md = historyToMarkdown(entry);
     return { markdown: md, filename: `${entry.name || entry.code}_${formatHistoryDate(entry.timestamp)}.md` };
   }
   // export all
   const md = list.map(historyToMarkdown).join('\n\n---\n\n');
-  return { markdown: md, filename: `分析历史_${formatHistoryDate(Date.now())}.md`, count: list.length };
+  return { markdown: md, filename: `analysis_history_${formatHistoryDate(Date.now())}.md`, count: list.length };
 }
 
 // ---- Native Messaging auto-sync to Node side ----

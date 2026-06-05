@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeMACD } from '../lib/compute-macd.js';
 
-// 辅助:手工计算 EMA,用于交叉验证
+// Helper: manual EMA calculation for cross-validation
 function emaRef(values, period) {
   const out = new Array(values.length).fill(null);
   if (values.length < period) return out;

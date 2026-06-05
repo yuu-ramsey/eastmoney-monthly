@@ -1,4 +1,4 @@
-// debug:lastAnalysis 记录测试
+// debug:lastAnalysis record test
 // 只能在 Node 测试框架中模拟 chrome.storage.local
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

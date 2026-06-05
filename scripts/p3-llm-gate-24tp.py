@@ -75,7 +75,7 @@ def build_prompt(tp):
     if not kl:
         return None
     return (
-        f"你是A股技术分析师。以下是{tp['stockCode']}近12+个月月线(前复权):\n"
+        f"You are an A-share technical analyst. Below is {tp['stockCode']} recent 12+ months of monthly klines (pre-adjusted):\n"
         f"{kl}\n\n"
         f"该股处于低位——过去12月底部20%且<MA60。判断未来6个月方向。\n\n"
         f'输出JSON:\n```json\n{{"signal":"strong_bull|bull|neutral|bear|strong_bear"}}\n```\n'

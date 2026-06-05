@@ -1,4 +1,4 @@
-// schema 测试 — 表结构 + 索引验证
+// schema test - table structure + index verification
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';

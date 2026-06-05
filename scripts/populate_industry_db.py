@@ -1,4 +1,4 @@
-"""将CSRC行业映射写入DB的stock_industry_mapping表"""
+"""Write CSRC industry mapping to DB stock_industry_mapping table"""
 import sqlite3, json, os, time
 
 PROJECT = '.'
@@ -8,7 +8,7 @@ print(f'DB exists: {os.path.exists(DB)}, Size: {os.path.getsize(DB)}')
 
 db = sqlite3.connect(DB)
 
-# 检查表
+# Check table
 tables = db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
 print(f'Tables: {[t[0] for t in tables]}')
 

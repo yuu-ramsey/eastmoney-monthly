@@ -1,4 +1,4 @@
-// get_financials handler 测试
+// get_financials handler test
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { getFinancialsTool } from '../../lib/tools/get-financials.js';

@@ -1,54 +1,54 @@
-# P2 Eval 最终结果 — C3
+# P2 Eval Final Results — C3
 
-> 分支: `p2-rebuild-unbiased-pool` | 日期: 2026-05-30
+> Branch: `p2-rebuild-unbiased-pool` | Date: 2026-05-30
 >
-> ⚠ 含 0.7% 退市股 ⚠ 幸存者偏差已大幅修正 ⚠ MDE 8.1%
+> ⚠ Contains 0.7% delisted stocks ⚠ Survivorship bias substantially corrected ⚠ MDE 8.1%
 
 ---
 
-## 主指标
+## Primary Metric
 
 | | Spread | 95% CI |
 |---|--------|--------|
 | **LLM** | **+8.94%** | **[+3.7, +14.1]** |
-| 反转 | +6.63% | [+1.3, +11.2] |
-| **差值** | **+2.31%** | **[-4.7, +10.0]** |
+| Reversal | +6.63% | [+1.3, +11.2] |
+| **Difference** | **+2.31%** | **[-4.7, +10.0]** |
 
-**INCONCLUSIVE（CI 含 0）。但 LLM 自身显著——v1→v2 最大变化。**
+**INCONCLUSIVE (CI contains 0). But LLM itself is significant — the biggest change v1->v2.**
 
 ---
 
-## LLM 信号分布
+## LLM Signal Distribution
 
 strong_bull 6% | bull 23% | neutral 66% | bear 4% | strong_bear 0%
 
-Bull bias 从 v1 的 67%/1% 改善到 29%/4%。
+Bull bias improved from v1's 67%/1% to 29%/4%.
 
 ---
 
-## 四条基线
+## Four Baselines
 
-| 基线 | Spread | CI |
+| Baseline | Spread | CI |
 |------|--------|-----|
 | LLM | +8.94% | [+3.7, +14.1] |
-| 反转 | +6.63% | [+1.3, +11.2] |
-| 动量 | +0.44% | [-4.2, +5.1] |
+| Reversal | +6.63% | [+1.3, +11.2] |
+| Momentum | +0.44% | [-4.2, +5.1] |
 
 ---
 
 ## Train/Test
 
-Train: +10.10% | Test: +6.35% | Cost: **¥0.45**
+Train: +10.10% | Test: +6.35% | Cost: **0.45 CNY**
 
 ---
 
-## v1→v2 总结
+## v1->v2 Summary
 
-| 指标 | v1 | v2 |
+| Metric | v1 | v2 |
 |------|-----|-----|
 | MDE | 24% | 8.1% |
-| 反转 | -32.5% artifact | +6.6% CI 正 |
-| LLM | -7.6% CI 含 0 | **+8.9% CI 正** |
-| 差值 CI | [-39,+56] | [-4.7,+10.0] |
+| Reversal | -32.5% artifact | +6.6% CI positive |
+| LLM | -7.6% CI contains 0 | **+8.9% CI positive** |
+| Difference CI | [-39,+56] | [-4.7,+10.0] |
 
-LLM 在无偏池上有独立预测力。与反转互补而非替代。
+LLM has independent predictive power on the unbiased pool. Complementary to reversal, not substitutive.

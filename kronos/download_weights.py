@@ -1,7 +1,7 @@
 """
-Kronos 权重下载 CLI — 从 HuggingFace Hub 下载预训练模型
+Kronos weight download CLI — downloads pretrained models from HuggingFace Hub
 
-用法:
+Usage:
     python -m kronos.download_weights                        # 下载 tokenizer + model
     python -m kronos.download_weights --tokenizer-only       # 仅下载 tokenizer
     python -m kronos.download_weights --model-only           # 仅下载 model

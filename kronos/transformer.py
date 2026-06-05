@@ -1,7 +1,7 @@
 """
-Kronos 自回归 Transformer — 分层 token 预测模型
+Kronos autoregressive Transformer — hierarchical token prediction model
 
-Decoder-only 架构：
+Decoder-only architecture:
 1. 输入 s1+s2 token → HierarchicalEmbedding + TemporalEmbedding
 2. N 层 TransformerBlock 处理
 3. decode_s1: 先预测 s1（粗粒度趋势），采样得到 s1

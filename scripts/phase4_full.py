@@ -1,5 +1,5 @@
 """
-Phase 4: 鲁棒性检验 — 完整版
+Phase 4: Robustness check — full version
 =============================
 基于行业中性化因子（LGB+XGB+Ridge Ensemble），执行：
   Task 4.1: 收益延迟 IC 衰减 (T+1 ~ T+6)
@@ -40,7 +40,7 @@ def cs_ic(pred, true, dates):
     return np.mean(ics), np.mean(ics)/np.std(ics) if np.std(ics)>0 else 0, ics
 
 def cs_ic_monthly(pred, true, dates):
-    """返回月度 IC DataFrame"""
+    """Returns月度 IC DataFrame"""
     rows = []
     for m in np.unique(dates):
         mask = dates == m
@@ -198,7 +198,7 @@ print(f"[{ts()}] {len(flat):,} 样本, {flat.shape[1]}d ({time.time()-t0:.0f}s)"
 # ============================================================
 print(f"[{ts()}] 行业中性化...", flush=True); t0 = time.time()
 flat_ind = cross_sectional_neutralize(flat.copy(), dates_arr, inds_arr, 'categorical')
-print(f"[{ts()}] 完成 ({time.time()-t0:.0f}s)", flush=True)
+print(f"[{ts()}] done ({time.time()-t0:.0f}s)", flush=True)
 
 # Split: Train 2010-2014, Test 2015+
 tr_m = (dates_arr >= '2010-01') & (dates_arr <= '2014-12')
@@ -621,7 +621,7 @@ print(f"{'='*65}")
 tracking_dir = OUT / 'tracking'
 tracking_dir.mkdir(parents=True, exist_ok=True)
 
-# 最新一期因子排名
+# latest一期因子排名
 latest_date = dates_sorted[-1]
 latest = pred_df_valid[pred_df_valid['date'] == latest_date].copy()
 latest = latest.sort_values('pred_ens', ascending=False)
@@ -629,7 +629,7 @@ latest['rank'] = range(1, len(latest)+1)
 latest['percentile'] = latest['rank'] / len(latest) * 100
 rank_cols = ['rank', 'code', 'pred_ens', 'percentile', 'close', 'industry']
 latest[rank_cols].to_csv(tracking_dir / f'{latest_date}.csv', index=False)
-print(f"  最新因子排名: {tracking_dir / f'{latest_date}.csv'} ({len(latest)} stocks)")
+print(f"  latest因子排名: {tracking_dir / f'{latest_date}.csv'} ({len(latest)} stocks)")
 
 # Master log (最近36个月)
 recent_dates = dates_sorted[-36:]
@@ -677,7 +677,7 @@ json.dump(summary, open(tracking_dir / 'summary.json', 'w'), indent=2)
 # Final Summary
 # ============================================================
 print(f"\n{'='*65}")
-print("Phase 4 鲁棒性检验 — 完成")
+print("Phase 4 鲁棒性检验 — done")
 print(f"{'='*65}")
 print(f"  Task 4.1 IC Decay:       {decay_df['horizon'].tolist()}")
 print(f"  Task 4.2 Noise Sens:     {noise_df['IC_decay_pct'].tolist()}")

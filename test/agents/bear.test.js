@@ -1,10 +1,10 @@
-// Bear Agent 测试——与 bull.test.js 对称
+// Bear Agent test - symmetric to bull.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { bearAgent } from '../../lib/agents/bear.js';
 
 const sampleCtx = {
-  name: '贵州茅台',
+  name: 'Kweichow Moutai',
   code: '600519',
   period: 'monthly',
   periodLabel: '月线',

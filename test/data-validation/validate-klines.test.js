@@ -1,4 +1,4 @@
-// K 线数据健康检查测试
+// K-line data health check test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { checkKlines } from '../../lib/data-validation/validate-klines.js';

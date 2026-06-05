@@ -1,4 +1,4 @@
-// 趋势指标测试 + 茅台对账
+// Trend indicator test + Moutai reconciliation
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sma, ema, macd } from '../../lib/indicators/trend.js';

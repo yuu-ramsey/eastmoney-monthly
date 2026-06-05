@@ -1,4 +1,4 @@
-// 多周期共振 prompt 测试
+// Multi-period resonance prompt test
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildMultiPeriodPrompt } from '../lib/build-prompt.js';

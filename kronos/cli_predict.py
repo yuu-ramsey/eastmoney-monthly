@@ -1,7 +1,7 @@
 """
-Kronos 本地离线预测 CLI
+Kronos local offline prediction CLI
 
-用法:
+Usage:
     python cli_predict.py 600519                    # 文本输出
     python cli_predict.py 600519 --json             # JSON 输出（供 Node.js 消费）
     python cli_predict.py 600519 --n-samples 20     # 自定义采样次数

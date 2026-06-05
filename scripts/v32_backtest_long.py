@@ -1,5 +1,5 @@
 """
-v32 纯多头回测: 32维因子 Q5多头组合 + 涨跌停限 + 流动性筛选 + 月度调仓
+v32 pure long backtest: 32d factor Q5 long portfolio + price limit + liquidity filter + monthly rebalance
 """
 import warnings; warnings.filterwarnings('ignore')
 import numpy as np, pandas as pd, sqlite3, time, json
@@ -16,7 +16,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 N_FFT = 10
 DATE_FMT = '%Y-%m-%d %H:%M:%S'
 
-# 筛选参数
+# Filter Parameters
 MIN_DAILY_AMOUNT = 5_000_000   # 日均成交额 > 500万
 LIMIT_UP_DOWN = 0.10           # 涨跌停 ±10%
 TOP_QUINTILE = 0.20            # Q5 = top 20%
@@ -101,7 +101,7 @@ def load_daily_filters():
 
 
 def build_32d_features():
-    """构建32维特征, 返回特征矩阵 + 元数据"""
+    """构建32维特征, Returns特征矩阵 + 元数据"""
     print(f"[{ts()}] 加载月线数据...", flush=True)
     conn = sqlite3.connect(str(DB))
     codes = [r[0] for r in conn.execute(
@@ -197,7 +197,7 @@ if __name__ == '__main__':
     # ---- 2. 行业中性化 ----
     print(f"[{ts()}] 行业中性化...", flush=True); t0 = time.time()
     X_ind = cross_sectional_neutralize(X.copy(), meta['month'].values, meta['industry'].values)
-    print(f"[{ts()}] 完成 ({time.time()-t0:.0f}s)", flush=True)
+    print(f"[{ts()}] done ({time.time()-t0:.0f}s)", flush=True)
 
     # ---- 3. Train/Test split ----
     tr_m = (meta['month'] >= '2010-01') & (meta['month'] <= '2014-12')
@@ -333,7 +333,7 @@ if __name__ == '__main__':
     print(f"{'='*60}")
     print(f"  回测期: {portfolio_returns[0]['month']} ~ {portfolio_returns[-1]['next_month']}")
     print(f"  总月份: {n_months}")
-    print(f"  累积净收益: {cum_ret:+.2%}")
+    print(f"  accumulated净收益: {cum_ret:+.2%}")
     print(f"  年化收益:   {ann_ret:+.2%}")
     print(f"  年化波动:   {ann_vol:.2%}")
     print(f"  Sharpe:     {sharpe:.3f}")
@@ -384,4 +384,4 @@ if __name__ == '__main__':
     with open(OUT / 'v32_backtest_summary.json', 'w') as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
 
-    print(f"\n[{ts()}] 回测完成. 结果: {OUT}")
+    print(f"\n[{ts()}] 回测done. 结果: {OUT}")

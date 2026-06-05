@@ -1,5 +1,5 @@
 """
-v32 + 同业近似特征: 在32维基础上加入行业内排名/相似度特征, 看IC是否提升
+v32 + peer approximation features: add within-industry ranking/similarity features on top of 32d, check IC improvement
 新增4维:
   - ind_rank_pct: 行业内月收益百分位 (0~1)
   - ind_zscore: 行业内月收益z-score
@@ -216,7 +216,7 @@ def build_features():
         peer_features[idx, 3] = dist_pct
 
     X36 = np.concatenate([X36_base[:, :32], peer_features], axis=1).astype(np.float32)
-    print(f"[{ts()}] 完成: 32d={X32.shape[1]}d, 36d={X36.shape[1]}d ({time.time()-t0:.0f}s)", flush=True)
+    print(f"[{ts()}] done: 32d={X32.shape[1]}d, 36d={X36.shape[1]}d ({time.time()-t0:.0f}s)", flush=True)
     return X32, X36, y, meta
 
 
@@ -283,7 +283,7 @@ if __name__ == '__main__':
     print(f"[{ts()}] 行业中性化...", flush=True); t0 = time.time()
     X32_ind = cross_sectional_neutralize(X32.copy(), meta['month'].values, meta['industry'].values)
     X36_ind = cross_sectional_neutralize(X36.copy(), meta['month'].values, meta['industry'].values)
-    print(f"[{ts()}] 完成 ({time.time()-t0:.0f}s)", flush=True)
+    print(f"[{ts()}] done ({time.time()-t0:.0f}s)", flush=True)
 
     tr_m = (meta['month'] >= '2010-01') & (meta['month'] <= '2014-12')
     te_m = (meta['month'] >= '2015-01')
@@ -375,4 +375,4 @@ if __name__ == '__main__':
             'delta_IC': float(delta_ic), 'delta_IC_pct': float(delta_pct),
         }, f, indent=2, ensure_ascii=False)
 
-    print(f"\n[{ts()}] 同业特征对比完成. ΔIC={delta_ic:+.4f}. 结果: {OUT}")
+    print(f"\n[{ts()}] 同业特征对比done. ΔIC={delta_ic:+.4f}. 结果: {OUT}")

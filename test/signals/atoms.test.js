@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cross, exist, count, hhv, llv, every } from '../../lib/signals/atoms.js';
 
-test('cross: A上穿B', () => {
+test('cross: A crosses above B', () => {
   const a = [1, 2, 1, 1, 3], b = [2, 2, 2, 2, 2];
   const r = cross(a, b);
   assert.equal(r.crossed, true);

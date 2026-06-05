@@ -18,13 +18,13 @@
   // ---------- DOM structure ----------
   const wrapper = document.createElement('div');
   wrapper.innerHTML = `
-    <button class="fab" data-role="fab" title="AI 分析" type="button">AI</button>
+    <button class="fab" data-role="fab" title="AI Analysis" type="button">AI</button>
     <div class="panel" data-role="panel">
       <div class="panel-header">
-        <div class="title" data-role="title">AI 分析</div>
+        <div class="title" data-role="title">AI Analysis</div>
         <div class="actions">
-          <button class="reanalyze" data-role="reanalyze" type="button" title="重新分析（消耗 token）" style="display:none;">🔄 重新分析</button>
-          <button class="close" data-role="close" type="button" title="关闭">✕</button>
+          <button class="reanalyze" data-role="reanalyze" type="button" title="Re-analyze (consumes tokens)" style="display:none;">Re-analyze</button>
+          <button class="close" data-role="close" type="button" title="Close">x</button>
         </div>
       </div>
       <div class="panel-overview" data-role="overview" style="display:none;">
@@ -42,16 +42,16 @@
         <div class="dashboard-main">
           <div class="dashboard-score">
             <div class="score-number" data-role="scoreNumber">--</div>
-            <div class="score-label">综合评分</div>
+            <div class="score-label">Score</div>
           </div>
           <div class="dashboard-signal" data-role="signalBadge"></div>
           <div class="dashboard-confidence" data-role="confidenceBadge"></div>
         </div>
         <div class="dashboard-summary" data-role="summaryText"></div>
         <div class="dashboard-levels">
-          <div class="level-item"><span class="level-label">支撑</span><span class="level-values" data-role="supportLevels"></span></div>
-          <div class="level-item"><span class="level-label">压力</span><span class="level-values" data-role="resistanceLevels"></span></div>
-          <div class="level-item"><span class="level-label">止损</span><span class="level-values" data-role="stopLoss"></span></div>
+          <div class="level-item"><span class="level-label">Support</span><span class="level-values" data-role="supportLevels"></span></div>
+          <div class="level-item"><span class="level-label">Resist</span><span class="level-values" data-role="resistanceLevels"></span></div>
+          <div class="level-item"><span class="level-label">Stop</span><span class="level-values" data-role="stopLoss"></span></div>
         </div>
         <div class="dashboard-meta">
           <span data-role="positionPercentile"></span>
@@ -59,13 +59,13 @@
         </div>
       </div>
       <div class="panel-body" data-role="body">
-        <div class="hint">加载中…</div>
+        <div class="hint">Loading...</div>
       </div>
       <div class="thinking-stream" data-role="thinkingStream" style="display:none;">
         <div class="thinking-header" data-role="thinkingHeader">
-          <span class="thinking-icon">🧠</span>
-          <span class="thinking-status" data-role="thinkingStatus">AI 正在分析...</span>
-          <button class="thinking-toggle" data-role="thinkingToggle">折叠</button>
+          <span class="thinking-icon">Brain</span>
+          <span class="thinking-status" data-role="thinkingStatus">AI is analyzing...</span>
+          <button class="thinking-toggle" data-role="thinkingToggle">Collapse</button>
         </div>
         <div class="thinking-body" data-role="thinkingBody"></div>
       </div>
@@ -73,10 +73,10 @@
         <div class="chat-messages" data-role="chatMessages"></div>
         <div class="chat-warning" data-role="chatWarning" style="display:none;"></div>
         <div class="chat-input-row">
-          <input type="text" data-role="chatInput" placeholder="基于当前分析追问…" autocomplete="off">
-          <button data-role="chatSend" type="button">发送</button>
-          <button data-role="chatClear" type="button">清空</button>
-          <button data-role="chatSave" type="button" title="保存对话到历史">💾</button>
+          <input type="text" data-role="chatInput" placeholder="Ask a follow-up based on current analysis..." autocomplete="off">
+          <button data-role="chatSend" type="button">Send</button>
+          <button data-role="chatClear" type="button">Clear</button>
+          <button data-role="chatSave" type="button" title="Save conversation to history">Save</button>
         </div>
       </div>
     </div>
@@ -126,7 +126,7 @@
     }
   });
   reanalyzeEl.addEventListener('click', () => {
-    if (!confirm('重新分析会消耗 token，确定？')) return;
+    if (!confirm('Re-analyzing will consume tokens. Are you sure?')) return;
     analyze(true);
   });
 
@@ -141,10 +141,10 @@
     const body = thinkingBodyEl;
     if (body.style.display === 'none') {
       body.style.display = 'block';
-      thinkingToggleEl.textContent = '折叠';
+      thinkingToggleEl.textContent = 'Collapse';
     } else {
       body.style.display = 'none';
-      thinkingToggleEl.textContent = '展开';
+      thinkingToggleEl.textContent = 'Expand';
     }
   });
 
@@ -152,8 +152,8 @@
     thinkingStreamEl.style.display = 'block';
     thinkingBodyEl.innerHTML = '';
     thinkingBodyEl.style.display = 'block';
-    thinkingStatusEl.textContent = 'AI 正在分析...';
-    thinkingToggleEl.textContent = '折叠';
+    thinkingStatusEl.textContent = 'AI is analyzing...';
+    thinkingToggleEl.textContent = 'Collapse';
   }
 
   function appendThinkingLine(text, cls) {
@@ -165,9 +165,9 @@
   }
 
   function hideThinkingStream() {
-    thinkingStatusEl.textContent = '✓ 分析完成';
+    thinkingStatusEl.textContent = 'Analysis complete';
     thinkingBodyEl.style.display = 'none';
-    thinkingToggleEl.textContent = '展开';
+    thinkingToggleEl.textContent = 'Expand';
   }
 
   // listen for STREAM_PROGRESS from background
@@ -183,7 +183,7 @@
         appendThinkingLine(text || '', 'stream-text');
         break;
       case 'tool_start':
-        appendThinkingLine(`📊 Calling ${name}(${input})...`, 'stream-tool');
+        appendThinkingLine(`Calling ${name}(${input})...`, 'stream-tool');
         break;
       case 'tool_result':
         // update the corresponding tool call line
@@ -200,7 +200,7 @@
     for (let i = lines.length - 1; i >= 0; i--) {
       if (lines[i].textContent.includes(toolName)) {
         const summary = String(result || '').slice(0, 80);
-        lines[i].textContent = `✓ ${toolName} 返回：${summary}${result.length > 80 ? '...' : ''}`;
+        lines[i].textContent = `${toolName} returned: ${summary}${result.length > 80 ? '...' : ''}`;
         lines[i].className = 'stream-tool-done';
         break;
       }
@@ -233,11 +233,10 @@
   function extractPositionPercentile(analysisText) {
     // match patterns like "XX percentile" or "XX% position"
     const patterns = [
-      /第\s*(\d+(?:\.\d+)?)\s*百分位/,
-      /百分位[：:]\s*(\d+(?:\.\d+)?)\s*%/,
-      /处于[^\d]*(\d+(?:\.\d+)?)\s*%/,
-      /位置[^\d]*(\d+(?:\.\d+)?)\s*百分位/,
-      /(\d+(?:\.\d+)?)\s*百分位/,
+      /(\d+(?:\.\d+)?)\s*percentile/i,
+      /percentile[：:]\s*(\d+(?:\.\d+)?)/i,
+      /at\s+(\d+(?:\.\d+)?)\s*%/,
+      /position[^\d]*(\d+(?:\.\d+)?)\s*percentile/i,
     ];
     for (const p of patterns) {
       const m = analysisText.match(p);
@@ -350,17 +349,17 @@
     fabEl.disabled = true;
     reanalyzeEl.disabled = true;
     panelEl.classList.add('open');
-    titleEl.textContent = 'AI 分析';
+    titleEl.textContent = 'AI Analysis';
     overviewEl.style.display = 'none';
     metaEl.style.display = 'none';
     reanalyzeEl.style.display = 'none';
     showThinkingStream();
-    setBody('<div class="loading">加载中…</div>');
+    setBody('<div class="loading">Loading...</div>');
 
     try {
       const code = parseCodeFromUrl();
       if (!code) {
-        setBody('<div class="error">无法从当前页面解析股票代码</div>');
+        setBody('<div class="error">Unable to parse stock code from current page</div>');
         return;
       }
       lastAnalyzedCode = code;
@@ -387,11 +386,11 @@
         pageEvents,
       });
       if (!resp) {
-        setBody('<div class="error">service worker 无响应，可能扩展未加载</div>');
+        setBody('<div class="error">Service worker is not responding. The extension may not be loaded.</div>');
         return;
       }
       if (!resp.ok) {
-        setBody(`<div class="error">${escapeHtml(resp.error || '未知错误')}</div>`);
+        setBody(`<div class="error">${escapeHtml(resp.error || 'Unknown error')}</div>`);
         return;
       }
 
@@ -413,7 +412,7 @@
 
       renderResult({ ...resp, cached: false });
     } catch (err) {
-      setBody(`<div class="error">通信错误: ${escapeHtml(err.message || String(err))}</div>`);
+      setBody(`<div class="error">Communication error: ${escapeHtml(err.message || String(err))}</div>`);
     } finally {
       hideThinkingStream();
       busy = false;
@@ -439,7 +438,7 @@
       dashboardCardEl.style.display = 'block';
       scoreNumberEl.textContent = '?';
       scoreNumberEl.style.color = '#888';
-      signalBadgeEl.textContent = '⚠️ 本次未生成结构化数据，仅显示文本分析';
+      signalBadgeEl.textContent = 'No structured data generated for this analysis — text only';
       signalBadgeEl.style.background = '#fff3cd';
       confidenceBadgeEl.textContent = '';
       summaryTextEl.textContent = '';
@@ -460,12 +459,12 @@
     scoreNumberEl.style.color = colors[s.signal] || '#888';
 
     // signal
-    const labels = { strong_bull: '🟢🟢 强看多', bull: '🟢 看多', neutral: '⚪ 中性', bear: '🔴 看空', strong_bear: '🔴🔴 强看空' };
+    const labels = { strong_bull: 'Strong Bull', bull: 'Bull', neutral: 'Neutral', bear: 'Bear', strong_bear: 'Strong Bear' };
     signalBadgeEl.textContent = labels[s.signal] || s.signal || '?';
     signalBadgeEl.style.background = '';
 
     // confidence
-    const confLabels = { high: '置信度：高', medium: '置信度：中', low: '置信度：低' };
+    const confLabels = { high: 'Confidence: High', medium: 'Confidence: Medium', low: 'Confidence: Low' };
     const confBg = { high: '#d4edda', medium: '#fff3cd', low: '#f0f0f0' };
     confidenceBadgeEl.textContent = confLabels[s.confidence] || '';
     confidenceBadgeEl.style.background = confBg[s.confidence] || '';
@@ -489,14 +488,14 @@
     // position_percentile
     if (s.position_percentile != null) {
       var pp = s.position_percentile;
-      positionPercentileEl.textContent = '位置 ' + pp.toFixed(1) + '%';
+      positionPercentileEl.textContent = 'Pos ' + pp.toFixed(1) + '%';
       positionPercentileEl.style.background = pp < 30 ? '#d4edda' : pp > 70 ? '#f8d7da' : '#f0f0f0';
       positionPercentileEl.style.padding = '2px 6px';
       positionPercentileEl.style.borderRadius = '3px';
     }
 
     // trend
-    var trendMap = { uptrend: '上行趋势 ↗', downtrend: '下行趋势 ↘', sideways: '横盘 ↔', reversing: '趋势反转中 ⇄' };
+    var trendMap = { uptrend: 'Uptrend', downtrend: 'Downtrend', sideways: 'Sideways', reversing: 'Reversing' };
     trendLabelEl.textContent = trendMap[s.trend] || s.trend || '';
   }
 
@@ -508,14 +507,14 @@
     // meta info bar
     const dtStr = resp.analyzedAt ? formatTime(resp.analyzedAt) : '';
     const badge = resp.cached
-      ? '<span class="badge badge-cache">缓存</span>'
-      : '<span class="badge badge-fresh">新分析</span>';
+      ? '<span class="badge badge-cache">Cached</span>'
+      : '<span class="badge badge-fresh">Fresh</span>';
     const periodLabel = PERIOD_LABELS[resp.period] || '';
     const styleLabel = STYLE_LABELS[resp.style] || '';
     const providerLabel = PROVIDER_LABELS[resp.provider] || (resp.provider || '');
-    const dbBadge = resp.mode === 'debate' ? ' · 辩论模式' : '';
-    const dcBadge = resp.decision === 'on' ? ' · 决策模式' : '';
-    metaEl.innerHTML = `${badge} ${periodLabel} ${escapeHtml(resp.monthKey || resp.bucket || '')} · ${dtStr} · ${providerLabel}(${escapeHtml(resp.model || '')})${styleLabel ? ' · ' + styleLabel : ''}${dbBadge}${dcBadge}`;
+    const dbBadge = resp.mode === 'debate' ? ' . Debate' : '';
+    const dcBadge = resp.decision === 'on' ? ' . Decision' : '';
+    metaEl.innerHTML = `${badge} ${periodLabel} ${escapeHtml(resp.monthKey || resp.bucket || '')} . ${dtStr} . ${providerLabel}(${escapeHtml(resp.model || '')})${styleLabel ? ' . ' + styleLabel : ''}${dbBadge}${dcBadge}`;
     metaEl.style.display = 'block';
 
     // overview bar: stock name + code + current price + position percentile
@@ -539,7 +538,7 @@
 
     // initialize conversation history
     const firstUserMsg = resp.prompt
-      || `分析 ${resp.name || ''}(${resp.code || ''}) ${PERIOD_LABELS[resp.period] || resp.period || ''}`;
+      || `Analyze ${resp.name || ''}(${resp.code || ''}) ${PERIOD_LABELS[resp.period] || resp.period || ''}`;
     conversationHistory = [
       { role: 'user', content: firstUserMsg },
       { role: 'assistant', content: resp.analysis || '' },
@@ -562,7 +561,7 @@
     return sections.map((sec) => {
       const category = classifySection(sec.title);
       const isExpanded = (category === 'position' || category === 'ma' || category === 'price' || category === 'conclusion');
-      const icon = isExpanded ? '▼' : '▶';
+      const icon = isExpanded ? 'v' : '>';
       const expandedClass = isExpanded ? 'expanded' : '';
       const bodyClass = isExpanded ? '' : 'collapsed';
 
@@ -604,7 +603,7 @@
         // save previous section
         const bodyText = currentLines.join('\n').trim();
         if (currentTitle || bodyText) {
-          sections.push({ title: currentTitle || '概述', body: bodyText });
+          sections.push({ title: currentTitle || 'Overview', body: bodyText });
         }
         currentTitle = (h1 || h2 || h3)[1].trim();
         currentLines = [];
@@ -623,7 +622,7 @@
     // last section
     const bodyText = currentLines.join('\n').trim();
     if (currentTitle || bodyText) {
-      sections.push({ title: currentTitle || '概述', body: bodyText });
+      sections.push({ title: currentTitle || 'Overview', body: bodyText });
     }
 
     return sections;
@@ -631,19 +630,19 @@
 
   function classifySection(title) {
     const t = title.toLowerCase();
-    if (/位置|分位|区间|高位|低位|中继|估值阶段/.test(t)) return 'position';
-    if (/均线|ma\d|排列|移动平均/.test(t)) return 'ma';
-    if (/支撑|压力|阻力|价位|中枢|买卖点|加仓|减仓|止损/.test(t)) return 'price';
-    if (/趋势|方向|走势|判断|共振/.test(t)) return 'trend';
-    if (/反方|风险|反向|出错/.test(t)) return 'counter';
-    if (/操作|建议|策略|仓位|入场|决策/.test(t)) return 'action';
-    if (/结论|总结|综合/.test(t)) return 'conclusion';
+    if (/position|percentile|range|valuation/i.test(t)) return 'position';
+    if (/ma|ema|moving average/i.test(t)) return 'ma';
+    if (/support|resistance|level|central hub|price|target|stop|entry|exit/i.test(t)) return 'price';
+    if (/trend|direction|momentum/i.test(t)) return 'trend';
+    if (/risk|counter|downside|bear case/i.test(t)) return 'counter';
+    if (/action|advice|position sizing|entry|strategy/i.test(t)) return 'action';
+    if (/conclusion|summary|verdict/i.test(t)) return 'conclusion';
     return '';
   }
 
   const CATEGORY_LABELS = {
-    position: '位置', ma: '均线', price: '价位',
-    trend: '趋势', counter: '反方', action: '操作', conclusion: '结论',
+    position: 'Position', ma: 'MA', price: 'Levels',
+    trend: 'Trend', counter: 'Risks', action: 'Action', conclusion: 'Conclusion',
   };
 
   // card fold toggle click
@@ -656,11 +655,11 @@
     if (body.classList.contains('collapsed')) {
       body.classList.remove('collapsed');
       header.classList.add('expanded');
-      icon.textContent = '▼';
+      icon.textContent = 'v';
     } else {
       body.classList.add('collapsed');
       header.classList.remove('expanded');
-      icon.textContent = '▶';
+      icon.textContent = '>';
     }
   });
 
@@ -679,8 +678,8 @@
     }[c]));
   }
 
-  const STYLE_LABELS = { technical: '技术分析', chanlun: '缠论', value: '价值视角', comprehensive: '综合' };
-  const PERIOD_LABELS = { monthly: '月线', weekly: '周线', daily: '日线', multi: '多周期' };
+  const STYLE_LABELS = { technical: 'Technical', chanlun: 'Chanlun', value: 'Value', comprehensive: 'Comprehensive' };
+  const PERIOD_LABELS = { monthly: 'Monthly', weekly: 'Weekly', daily: 'Daily', multi: 'Multi' };
   const PROVIDER_LABELS = { anthropic: 'Claude', deepseek: 'DeepSeek' };
 
   function renderMarkdown(md) {
@@ -739,7 +738,7 @@
       // skip first prompt (too long, don't render)
       if (i === 0 && msg.role === 'user') {
         return `<div class="chat-msg chat-msg-user chat-msg-first">
-          <div class="chat-bubble">📊 首次分析 prompt（已提交，长度 ${msg.content.length} 字符）</div>
+          <div class="chat-bubble">Initial analysis prompt (submitted, length ${msg.content.length} chars)</div>
         </div>`;
       }
       const cls = msg.role === 'user' ? 'chat-msg-user' : 'chat-msg-assistant';
@@ -752,7 +751,7 @@
     // warning for 20+ messages
     if (conversationHistory.length >= 20) {
       chatWarningEl.style.display = 'block';
-      chatWarningEl.textContent = `⚠️ 对话已达 ${conversationHistory.length} 条，token 消耗较大。建议清空对话后重新开始。`;
+      chatWarningEl.textContent = `Conversation has reached ${conversationHistory.length} messages. Token usage is high. Consider clearing and restarting.`;
     } else {
       chatWarningEl.style.display = 'none';
     }
@@ -771,26 +770,26 @@
 
     // add loading placeholder
     const loadingIdx = conversationHistory.length;
-    conversationHistory.push({ role: 'assistant', content: '⏳ 思考中…' });
+    conversationHistory.push({ role: 'assistant', content: 'Thinking...' });
     renderChatMessages();
 
     try {
       const resp = await chrome.runtime.sendMessage({
         type: 'FOLLOW_UP',
         question,
-        history: conversationHistory.filter((m) => m.content !== '⏳ 思考中…').slice(0, -1),
+        history: conversationHistory.filter((m) => m.content !== 'Thinking...').slice(0, -1),
       });
       // remove loading placeholder
       conversationHistory.splice(loadingIdx, 1);
 
       if (!resp || !resp.ok) {
-        conversationHistory.push({ role: 'assistant', content: `❌ 错误：${resp?.error || '无响应'}` });
+        conversationHistory.push({ role: 'assistant', content: `Error: ${resp?.error || 'No response'}` });
       } else {
         conversationHistory.push({ role: 'assistant', content: resp.text });
       }
     } catch (err) {
       conversationHistory.splice(loadingIdx, 1);
-      conversationHistory.push({ role: 'assistant', content: `❌ 通信错误：${err.message || String(err)}` });
+      conversationHistory.push({ role: 'assistant', content: `Communication error: ${err.message || String(err)}` });
     }
 
     renderChatMessages();
@@ -810,12 +809,12 @@
   // save conversation to history
   async function saveConversationToHistory() {
     if (!currentAnalysisId) {
-      chatSaveEl.textContent = '⚠️';
-      setTimeout(() => { chatSaveEl.textContent = '💾'; }, 1500);
+      chatSaveEl.textContent = 'x';
+      setTimeout(() => { chatSaveEl.textContent = 'Save'; }, 1500);
       return;
     }
     chatSaveEl.disabled = true;
-    chatSaveEl.textContent = '⏳';
+    chatSaveEl.textContent = '...';
     try {
       const resp = await chrome.runtime.sendMessage({
         type: 'SAVE_CONVERSATION',
@@ -823,15 +822,15 @@
         conversationHistory,
       });
       if (resp && resp.ok) {
-        chatSaveEl.textContent = '✅';
+        chatSaveEl.textContent = 'OK';
       } else {
-        chatSaveEl.textContent = '❌';
+        chatSaveEl.textContent = 'ERR';
       }
     } catch (_) {
-      chatSaveEl.textContent = '❌';
+      chatSaveEl.textContent = 'ERR';
     }
     setTimeout(() => {
-      chatSaveEl.textContent = '💾';
+      chatSaveEl.textContent = 'Save';
       chatSaveEl.disabled = false;
     }, 1500);
   }

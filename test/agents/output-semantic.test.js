@@ -14,7 +14,7 @@ const sampleKlines = [
 ];
 
 const debateCtx = {
-  name: '贵州茅台',
+  name: 'Kweichow Moutai',
   code: '600519',
   period: 'monthly',
   periodLabel: '月线',

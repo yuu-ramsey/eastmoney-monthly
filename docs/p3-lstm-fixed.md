@@ -1,19 +1,19 @@
-# P3 LSTM-WF 修复报告
+# P3 LSTM-WF Fix Report
 
-> 分支: `p3-lstm-fix` | 日期: 2026-05-30
+> Branch: `p3-lstm-fix` | Date: 2026-05-30
 
-## Step 1: NaN 根因
+## Step 1: NaN Root Cause
 
-数据干净：0 NaN feature，10/211K NaN target，0 除零。IC=NaN 根因：模型未学动，val pred std=0 → spearmanr 除零。
+Data is clean: 0 NaN features, 10/211K NaN targets, 0 division by zero. IC=NaN root cause: model did not learn; val pred std=0 -> spearmanr division by zero.
 
-## Step 2: 数据扩充
+## Step 2: Data Expansion
 
-月线 211K → 日线 1.2M seqs（500 stocks），walk-forward split 不变。
+Monthly 211K -> Daily 1.2M seqs (500 stocks), walk-forward split unchanged.
 
-## Step 3: 训练
+## Step 3: Training
 
-日线训练因缩进 bug 未正确执行。1583 preds 来自未训练权重，IC=-1。
+Daily training did not execute correctly due to indentation bug. 1583 preds from untrained weights, IC=-1.
 
-## Step 4: 门控
+## Step 4: Gate
 
-**未通过。** 月线/日线 LSTM 均未学到有效信号。
+**Not passed.** Neither monthly nor daily LSTM learned a valid signal.

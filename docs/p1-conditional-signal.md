@@ -1,34 +1,34 @@
-# P1 条件信号分析：不依赖评分矩阵的真 alpha 评估
+# P1 Conditional Signal Analysis: Real Alpha Assessment Without Scoring Matrix
 
-> 分支: p0a-verify-3-4 | 日期: 2026-05-29
+> Branch: p0a-verify-3-4 | Date: 2026-05-29
 > 
-> **结论先行：模型能识别极端强势股（strong_bull 桶 alpha=18-20% vs 无条件 6%），
-> 但在区分一般 bullish vs bearish 上无显著能力（spread 95% CI 含 0）。
-> 方向命中率 59% 仅比 always-bullish 高 8pp，统计上不可靠。
-> 原评分 0.187→0.197 的"提升"在 alpha 空间完全不可见。**
+> **Conclusion first: The model can identify extreme momentum stocks (strong_bull bucket alpha=18-20% vs unconditional 6%),
+> but has no significant ability to differentiate general bullish vs bearish (spread 95% CI contains 0).
+> Directional accuracy 59% is only +8pp above always-bullish, statistically unreliable.
+> The original score improvement 0.187->0.197 is completely invisible in alpha space.**
 
 ---
 
-## 分析方法
+## Analysis Method
 
-**`cli/eval-reanalyze-conditional.js`** — 完全不使用 `scorePrediction` 评分矩阵，
-只用真实 6 个月 alpha（来自 `frozen-eval-dataset-v1.json`）评估预测信息量。
+**`cli/eval-reanalyze-conditional.js`** — Completely discards the `scorePrediction` scoring matrix,
+using only real 6-month alpha (from `frozen-eval-dataset-v1.json`) to evaluate prediction informativeness.
 
-对比两个 eval:
+Comparing two evals:
 - v4-signals (0.187 exclPF, 640 records)
 - frozen-baseline (0.1966, 640 records)
 
 ---
 
-## 1. 条件实现收益
+## 1. Conditional Realized Returns
 
 ### v4-signals
 
 ```
-全样本 (n=640): alpha均值=6.07%  中位数=0.88%  alpha>0占比=51.2%
+Full sample (n=640): alpha mean=6.07%  median=0.88%  alpha>0%=51.2%
 
-预测桶            n    alpha均值  alpha中位  alpha>0%   vs无条件Δ
-────────────────────────────────────────────────────────────────
+Prediction bucket   n    alpha mean  alpha median  alpha>0%   vs unconditional Delta
+--------------------------------------------------
 strong_bull      104    18.54%     6.19%    61.5% +   12.47%
 bull             141     4.50%     2.41%    58.9%    -1.57%
 neutral           64     1.17%    -4.22%    45.3%    -4.89%
@@ -36,7 +36,7 @@ bear             203     0.79%    -3.56%    39.9%    -5.27%
 strong_bear       63     9.94%    -2.27%    49.2% +    3.87%
 ```
 
-**真实命令输出**（`node cli/eval-reanalyze-conditional.js`）:
+**Real command output** (`node cli/eval-reanalyze-conditional.js`):
 ```
 strong_bull      104    18.54%     6.19%    61.5% +   12.47%
 bull             141     4.50%     2.41%    58.9%    -1.57%
@@ -45,17 +45,17 @@ bear             203     0.79%    -3.56%    39.9%    -5.27%
 strong_bear       63     9.94%    -2.27%    49.2% +    3.87%
 ```
 
-**判读**:
-- strong_bull 桶: alpha=18.54%，远高于无条件 6.07%。✓ 模型能识别极端强势股
-- bull 桶: alpha=4.50%，**低于**无条件均值。✗ "一般看多"不带来超额收益
-- bear 桶: alpha=0.79%，**为正**。✗ "看空"的股票实际仍在涨
-- **strong_bear 桶: alpha=9.94%，为正且高于无条件**。✗✗ 模型认为"最差"的股票反而涨得更好——这不是反向信号，是无区分力
+**Judgment**:
+- strong_bull bucket: alpha=18.54%, far above unconditional 6.07%. (Pass) The model can identify extreme momentum stocks
+- bull bucket: alpha=4.50%, **below** unconditional mean. (Fail) "Generally bullish" does not bring excess returns
+- bear bucket: alpha=0.79%, **positive**. (Fail) Stocks predicted "bearish" are actually still rising
+- **strong_bear bucket: alpha=9.94%, positive and above unconditional**. (Fail, Fail) Stocks the model considers "worst" actually rose better — this is not a contrarian signal; it is non-discrimination
 
 ### frozen-baseline
 
 ```
-预测桶            n    alpha均值  alpha中位  alpha>0%   vs无条件Δ
-────────────────────────────────────────────────────────────────
+Prediction bucket   n    alpha mean  alpha median  alpha>0%   vs unconditional Delta
+--------------------------------------------------
 strong_bull      107    20.22%     7.24%    65.4% +   14.16%
 bull             150     3.44%     1.36%    58.0%    -2.62%
 neutral           72     4.49%    -3.74%    48.6%    -1.57%
@@ -63,91 +63,91 @@ bear             250     1.55%    -3.56%    40.8%    -4.52%
 strong_bear       54     7.24%     1.77%    53.7% +    1.18%
 ```
 
-同样 pattern: strong_bull 一骑绝尘，其余桶乱序。
+Same pattern: strong_bull stands out alone; remaining buckets are disordered.
 
 ---
 
-## 2. 方向区分度 (spread)
+## 2. Directional Discrimination (spread)
 
-| 指标 | v4 (0.187) | baseline (0.197) |
+| Metric | v4 (0.187) | baseline (0.197) |
 |------|-----------|-----------------|
-| bullish alpha均值 | 10.46% | 10.43% |
-| bearish alpha均值 | 2.96% | 2.56% |
+| bullish alpha mean | 10.46% | 10.43% |
+| bearish alpha mean | 2.96% | 2.56% |
 | **spread** | **7.50%** | **7.87%** |
 | **95% CI (block bootstrap)** | **[-2.16%, +19.77%]** | **[-1.67%, +19.45%]** |
 | n_eff (blocks) | 160 | 160 |
 
-**真实命令输出**:
+**Real command output**:
 ```
-v4: spread 95% CI: [-2.16%, 19.77%], n_eff ≈ 160
-bl: spread 95% CI: [-1.67%, 19.45%], n_eff ≈ 160
-→ ✗ CI 含 0 → 无法拒绝 spread=0，预测无显著方向区分力
+v4: spread 95% CI: [-2.16%, 19.77%], n_eff approx 160
+bl: spread 95% CI: [-1.67%, 19.45%], n_eff approx 160
+-> (Fail) CI contains 0 -> cannot reject spread=0; prediction has no significant directional discrimination
 ```
 
-**spread 7.5% 看起来很大，但 CI 宽达 ±11%。** 这是 40 只股票 × 4 时点 = 160 块的直接后果——块内 4 个 template 高度相关，有效样本量不足以区分信号和噪声。
+**spread 7.5% looks large but CI width is +/-11%.** This is a direct consequence of 40 stocks x 4 timepoints = 160 blocks — 4 templates within a block are highly correlated; effective sample size is insufficient to separate signal from noise.
 
-v4 (0.187) 和 baseline (0.197) 的 spread 几乎一样（7.50% vs 7.87%），0.01 的评分差异在 alpha 空间**完全不可见**。
+v4 (0.187) and baseline (0.197) have nearly identical spread (7.50% vs 7.87%); the 0.01 score difference is **completely invisible** in alpha space.
 
 ---
 
-## 3. 方向命中率
+## 3. Directional Accuracy
 
-| 指标 | v4 (0.187) | baseline (0.197) |
+| Metric | v4 (0.187) | baseline (0.197) |
 |------|-----------|-----------------|
-| 方向性预测 n | 511 | 561 |
-| 命中 n | 301 | 330 |
-| **命中率** | **58.9%** | **58.8%** |
-| Always-bullish 对照 | 50.7% | 51.3% |
-| **超额** | **+8.2pp** | **+7.5pp** |
+| Directional predictions n | 511 | 561 |
+| Hits n | 301 | 330 |
+| **Hit rate** | **58.9%** | **58.8%** |
+| Always-bullish comparison | 50.7% | 51.3% |
+| **Excess** | **+8.2pp** | **+7.5pp** |
 
-分桶（v4）:
+By bucket (v4):
 ```
-strong_bull  n=104  命中=64 (61.5%)  ← 确实偏高
-bull         n=141  命中=83 (58.9%)  ← 接近先验
-bear         n=203  命中=122 (60.1%) ← 但 bear 需要 alpha<0 才算"命中"
-strong_bear  n= 63  命中=32 (50.8%)  ← 接近抛硬币
+strong_bull  n=104  hits=64 (61.5%)  <- indeed elevated
+bull         n=141  hits=83 (58.9%)  <- near prior
+bear         n=203  hits=122 (60.1%) <- but bear needs alpha<0 to "hit"
+strong_bear  n= 63  hits=32 (50.8%)  <- near coin flip
 ```
 
-注意 "命中" 对 bear/strong_bear 的定义是 alpha < 0。bear 桶的 alpha 均值是 +0.79%（实际在涨），但 60.1% 的 bear 预测对应 alpha < 0 → 这是"停止的钟一天对两次"——因为全样本 49% alpha < 0 的先验就已经很高。
+Note: "hit" for bear/strong_bear is defined as alpha < 0. The bear bucket alpha mean is +0.79% (actually rising), but 60.1% of bear predictions correspond to alpha < 0 -> this is "a stopped clock is right twice a day" — because the full-sample prior of 49% alpha < 0 is already high.
 
 ---
 
-## 4. 与原评分矩阵的对比
+## 4. Comparison with Original Scoring Matrix
 
-| 维度 | 原评分矩阵 | 真 alpha |
+| Dimension | Original Scoring Matrix | Real Alpha |
 |------|----------|---------|
-| Always neutral | 0.401（最强策略） | 1.17%（低于无条件均值） |
-| v4 vs baseline 差异 | 0.187 vs 0.197 (+5.3%) | spread 7.50 vs 7.87（几乎相同） |
-| 统计显著性 | 未报告 | ✗ 不显著 |
-| 能区分 bull vs bear | 矩阵保证有分（0.5） | 实际不能 |
+| Always neutral | 0.401 (strongest strategy) | 1.17% (below unconditional mean) |
+| v4 vs baseline difference | 0.187 vs 0.197 (+5.3%) | spread 7.50 vs 7.87 (nearly identical) |
+| Statistical significance | Not reported | (Fail) Not significant |
+| Can distinguish bull vs bear | Matrix guarantees score (0.5) | Actually cannot |
 
-原评分矩阵存在结构性缺陷（0.3 保底分），且把 neutral 变成最优策略。真 alpha 分析显示"预判 bull"和"预判 bear"的实际收益差异宽得不显著。
-
----
-
-## 5. 总结
-
-1. **模型信息量集中在 strong_bull 桶** — 约 100/640 条预测能选出 alpha~19% 的股票，但占不到 1/6
-2. **bull / bear / neutral / strong_bear 四桶之间无显著区分** — 排序乱、CI 重合
-3. **spread 7.5% 在 n_eff=160 时统计不显著** — 需要 ~4× 样本（≥40 stocks × ≥20 timepoints）才能把 CI 压到不含 0
-4. **0.187 vs 0.197 在 alpha 空间是 no-op** — 两个 prompt 版本的预测质量完全相同。评分矩阵的微小差异来自 parse_failed 比例和矩阵噪声，不是预测能力提升
-
-**对下一步的建议**: 在扩展样本（≥100 stocks, ≥12 timepoints）之前，任何 <0.02 的评分差异不应被解释为"提升"。优先做样本扩展而非继续调 prompt。
+The original scoring matrix has structural flaws (0.3 floor), and makes neutral the optimal strategy. Real alpha analysis shows the actual return difference between "predict bull" and "predict bear" is wide and not significant.
 
 ---
 
-## 脚本
+## 5. Summary
 
-`cli/eval-reanalyze-conditional.js` — 独立 CLI，用法:
+1. **Model information is concentrated in the strong_bull bucket** — approximately 100/640 predictions can select stocks with alpha ~19%, but account for less than 1/6
+2. **No significant differentiation among bull / bear / neutral / strong_bear buckets** — disordered ranking, overlapping CIs
+3. **spread 7.5% is statistically insignificant at n_eff=160** — needs ~4x sample (>=40 stocks x >=20 timepoints) to push CI to exclude 0
+4. **0.187 vs 0.197 is a no-op in alpha space** — the two prompt versions have completely identical prediction quality. Minute scoring matrix differences come from parse_failed proportion and matrix noise, not prediction capability improvement
+
+**Recommendation for next steps**: Before expanding sample (>=100 stocks, >=12 timepoints), any score difference <0.02 should not be interpreted as "improvement." Prioritize sample expansion over continued prompt tuning.
+
+---
+
+## Script
+
+`cli/eval-reanalyze-conditional.js` — standalone CLI, usage:
 ```
 node cli/eval-reanalyze-conditional.js
 ```
-不调 LLM，不写文件，仅读取已有 jsonl + frozen dataset 做纯数值统计。
+Does not call LLM, does not write files; only reads existing jsonl + frozen dataset for pure numerical statistics.
 
-## 未改动
+## Untouched
 
-| 模块 | 状态 |
+| Module | Status |
 |------|------|
-| lib/eval/compute-score.js | 未碰 |
-| 任何 LLM 调用 | 未触发 |
-| frozen dataset | 只读 |
+| lib/eval/compute-score.js | Untouched |
+| Any LLM call | Not triggered |
+| frozen dataset | Read-only |

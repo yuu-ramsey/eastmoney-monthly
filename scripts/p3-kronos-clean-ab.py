@@ -1,13 +1,13 @@
-"""Kronos 干净 A/B 重测 — 零 LLM 成本，纯计算。
-验证: 24tp 池上 Kronos 方向 vs 实际 alpha。
-A/B: Kronos 信号方向是否与短期反转/动量独立（互补性检查）。
+"""Kronos clean A/B retest — zero LLM cost, pure computation.
+Verifies: Kronos direction vs actual alpha on the 24tp pool.
+A/B: Whether Kronos signal direction is independent of short-term reversal/momentum (complementarity check).
 """
 import json, numpy as np
 from pathlib import Path
 
 PROJECT = Path(__file__).resolve().parent.parent
 
-# ── 加载数据 ──
+# ── Load data ──
 pool = json.load(open(PROJECT / 'data' / 'frozen-eval-lowpos-v2-24tp.json'))
 signals = json.load(open(PROJECT / 'data' / 'p3-kronos-lstm-signals.json'))
 kronos = signals.get('kronos_24tp', {})
@@ -16,7 +16,7 @@ cache = json.load(open(PROJECT / 'data' / 'baostock-klines-cache.json'))
 tps = pool['testPoints']
 print(f"24tp pool: {len(tps)} pairs")
 
-# ── 构建分析对 ──
+# ── Build analysis pairs ──
 def winsorize(arr, pct=1):
     s = sorted(arr)
     lo = s[max(0, len(s) // (100//pct) - 1)]
@@ -52,7 +52,7 @@ def block_ci(pairs, z_key, ascending=True):
     sv = sorted(vals)
     return sv[len(sv) // 40], sv[len(sv) * 39 // 40], sum(vals) / len(vals), len(blist)
 
-# ── 匹配 Kronos 预测 ──
+# ── Match Kronos predictions ──
 pairs = []
 for tp in tps:
     alpha = tp.get('alpha')
@@ -65,7 +65,7 @@ for tp in tps:
     if kv is None or np.isnan(kv):
         continue
 
-    # 计算短期反转（与已撤出的反转因子相同逻辑）
+    # Compute short-term reversal (same logic as the withdrawn reversal factor)
     full_key = None
     for k in cache:
         if k.endswith('.' + code):
@@ -99,7 +99,7 @@ for tp in tps:
 
 print(f"Kronos matched: {len(pairs)} pairs")
 
-# ── A: Kronos 方向 vs Alpha ──
+# ── A: Kronos direction vs Alpha ──
 print("\n=== A: Kronos 方向 vs 实际 Alpha ===")
 test_pairs = [p for p in pairs if not p['isTrain']]
 train_pairs = [p for p in pairs if p['isTrain']]
@@ -121,16 +121,16 @@ t_lo, t_hi, t_mean, t_nb = block_ci(test_pairs, 'kronos_raw', ascending=False)
 print(f"\n  Kronos Block CI: Full [{k_lo:+.1f}, {k_hi:+.1f}] mean={k_mean:+.1f}% nBlocks={k_nb}")
 print(f"  Kronos Block CI: Test [{t_lo:+.1f}, {t_hi:+.1f}] mean={t_mean:+.1f}% nBlocks={t_nb}")
 
-# ── B: Kronos 互补性检查 ──
+# ── B: Kronos complementarity check ──
 print("\n=== B: 互补性检查 ===")
 
-# 1. Kronos vs 短期反转相关性
+# 1. Kronos vs short-term reversal correlation
 kronos_vals = np.array([p['kronos_raw'] for p in pairs])
 rev_vals = np.array([p['rev1m'] for p in pairs])
 r_kronos_rev = np.corrcoef(kronos_vals, rev_vals)[0, 1] if len(kronos_vals) > 1 else 0
 print(f"  r(Kronos, rev1m) = {r_kronos_rev:.4f}")
 
-# 2. 分歧案例分析: Kronos 方向 vs 反转方向
+# 2. Disagreement case analysis: Kronos direction vs reversal direction
 disagree = [p for p in test_pairs
             if p['kronos_dir'] != 0 and p['rev1m'] != 0
             and np.sign(p['kronos_dir']) != np.sign(p['rev1m'])]
@@ -145,7 +145,7 @@ if disagree:
     d_alpha = wins_mean([p['alpha'] for p in disagree])
     print(f"  分歧时平均 alpha: {d_alpha:+.1f}%")
 
-# 3. 反转因子在 24tp 上的表现（确认翻负）
+# 3. Reversal factor performance on 24tp (confirm sign flip)
 print("\n=== C: 反转因子确认（24tp 翻负验证）===")
 for key in ['rev1m', 'rev3m', 'd60']:
     vals = [p[key] for p in pairs if not np.isnan(p[key])]
@@ -164,7 +164,7 @@ print(f"  Reversal Test: CI[{rev_tlo:.1f},{rev_thi:.1f}] mean={rev_tm:.1f}% nBlo
 rev_pass = rev_tlo > 0
 print(f"  Reversal gate: {'PASS' if rev_pass else 'FAIL'}")
 
-# ── D: 干净结论 ──
+# ── D: Clean conclusion ──
 print("\n=== D: 干净结论 ===")
 print(f"  1. Kronos Test CI [{t_lo:+.1f}, {t_hi:+.1f}] → {'✓ 通过' if t_lo > 0 else '✗ 失败'}")
 print(f"  2. r(Kronos, rev1m) = {r_kronos_rev:.4f} → {'互补' if abs(r_kronos_rev) < 0.3 else '冗余' if abs(r_kronos_rev) < 0.7 else '高度相关'}")

@@ -1,10 +1,10 @@
-// content script: 注入 Shadow DOM 侧边面板,管理内容侧缓存,监听 URL 变化自动触发分析
+// content script: inject Shadow DOM side panel, manage content-side cache, monitor URL changes to auto-trigger analysis
 
 (function () {
   if (window.__monthlyAIInjected) return;
   window.__monthlyAIInjected = true;
 
-  // ---------- 创建 host + shadow root ----------
+  // ---------- create host + shadow root ----------
   const host = document.createElement('div');
   host.id = 'monthly-ai-host';
   document.documentElement.appendChild(host);
@@ -15,7 +15,7 @@
   link.href = chrome.runtime.getURL('content.css');
   root.appendChild(link);
 
-  // ---------- DOM 结构 ----------
+  // ---------- DOM structure ----------
   const wrapper = document.createElement('div');
   wrapper.innerHTML = `
     <button class="fab" data-role="fab" title="AI 分析" type="button">AI</button>
@@ -38,8 +38,36 @@
         </div>
       </div>
       <div class="panel-meta" data-role="meta" style="display:none;"></div>
+      <div class="dashboard-card" data-role="dashboardCard" style="display:none;">
+        <div class="dashboard-main">
+          <div class="dashboard-score">
+            <div class="score-number" data-role="scoreNumber">--</div>
+            <div class="score-label">综合评分</div>
+          </div>
+          <div class="dashboard-signal" data-role="signalBadge"></div>
+          <div class="dashboard-confidence" data-role="confidenceBadge"></div>
+        </div>
+        <div class="dashboard-summary" data-role="summaryText"></div>
+        <div class="dashboard-levels">
+          <div class="level-item"><span class="level-label">支撑</span><span class="level-values" data-role="supportLevels"></span></div>
+          <div class="level-item"><span class="level-label">压力</span><span class="level-values" data-role="resistanceLevels"></span></div>
+          <div class="level-item"><span class="level-label">止损</span><span class="level-values" data-role="stopLoss"></span></div>
+        </div>
+        <div class="dashboard-meta">
+          <span data-role="positionPercentile"></span>
+          <span data-role="trendLabel"></span>
+        </div>
+      </div>
       <div class="panel-body" data-role="body">
         <div class="hint">加载中…</div>
+      </div>
+      <div class="thinking-stream" data-role="thinkingStream" style="display:none;">
+        <div class="thinking-header" data-role="thinkingHeader">
+          <span class="thinking-icon">🧠</span>
+          <span class="thinking-status" data-role="thinkingStatus">AI 正在分析...</span>
+          <button class="thinking-toggle" data-role="thinkingToggle">折叠</button>
+        </div>
+        <div class="thinking-body" data-role="thinkingBody"></div>
       </div>
       <div class="chat-area" data-role="chatArea" style="display:none;">
         <div class="chat-messages" data-role="chatMessages"></div>
@@ -75,6 +103,20 @@
   const chatSendEl = root.querySelector('[data-role="chatSend"]');
   const chatClearEl = root.querySelector('[data-role="chatClear"]');
   const chatSaveEl = root.querySelector('[data-role="chatSave"]');
+  const thinkingStreamEl = root.querySelector('[data-role="thinkingStream"]');
+  const dashboardCardEl = root.querySelector('[data-role="dashboardCard"]');
+  const scoreNumberEl = root.querySelector('[data-role="scoreNumber"]');
+  const signalBadgeEl = root.querySelector('[data-role="signalBadge"]');
+  const confidenceBadgeEl = root.querySelector('[data-role="confidenceBadge"]');
+  const summaryTextEl = root.querySelector('[data-role="summaryText"]');
+  const supportLevelsEl = root.querySelector('[data-role="supportLevels"]');
+  const resistanceLevelsEl = root.querySelector('[data-role="resistanceLevels"]');
+  const stopLossEl = root.querySelector('[data-role="stopLoss"]');
+  const positionPercentileEl = root.querySelector('[data-role="positionPercentile"]');
+  const trendLabelEl = root.querySelector('[data-role="trendLabel"]');
+  const thinkingBodyEl = root.querySelector('[data-role="thinkingBody"]');
+  const thinkingStatusEl = root.querySelector('[data-role="thinkingStatus"]');
+  const thinkingToggleEl = root.querySelector('[data-role="thinkingToggle"]');
 
   closeEl.addEventListener('click', () => panelEl.classList.remove('open'));
   fabEl.addEventListener('click', () => {
@@ -89,11 +131,83 @@
   });
 
   let busy = false;
-  let lastAnalyzedCode = ''; // 用于 URL 变化检测
+  let lastAnalyzedCode = ''; // for URL change detection
   let conversationHistory = [];
-  let currentAnalysisId = null; // 当前分析的历史记录 ID
+  let currentAnalysisId = null; // history record ID of current analysis
 
-  // ---------- 从页面提取当前价格 ----------
+  // ---------- thinking stream UI ----------
+
+  thinkingToggleEl.addEventListener('click', () => {
+    const body = thinkingBodyEl;
+    if (body.style.display === 'none') {
+      body.style.display = 'block';
+      thinkingToggleEl.textContent = '折叠';
+    } else {
+      body.style.display = 'none';
+      thinkingToggleEl.textContent = '展开';
+    }
+  });
+
+  function showThinkingStream() {
+    thinkingStreamEl.style.display = 'block';
+    thinkingBodyEl.innerHTML = '';
+    thinkingBodyEl.style.display = 'block';
+    thinkingStatusEl.textContent = 'AI 正在分析...';
+    thinkingToggleEl.textContent = '折叠';
+  }
+
+  function appendThinkingLine(text, cls) {
+    const el = document.createElement('div');
+    el.className = cls || 'stream-text';
+    el.textContent = text;
+    thinkingBodyEl.appendChild(el);
+    thinkingBodyEl.scrollTop = thinkingBodyEl.scrollHeight;
+  }
+
+  function hideThinkingStream() {
+    thinkingStatusEl.textContent = '✓ 分析完成';
+    thinkingBodyEl.style.display = 'none';
+    thinkingToggleEl.textContent = '展开';
+  }
+
+  // listen for STREAM_PROGRESS from background
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg?.type !== 'STREAM_PROGRESS' || !msg.event) return;
+    const { type, text, name, input, result } = msg.event;
+
+    switch (type) {
+      case 'thinking':
+        appendThinkingLine(text || '', 'stream-thinking');
+        break;
+      case 'text':
+        appendThinkingLine(text || '', 'stream-text');
+        break;
+      case 'tool_start':
+        appendThinkingLine(`📊 Calling ${name}(${input})...`, 'stream-tool');
+        break;
+      case 'tool_result':
+        // update the corresponding tool call line
+        updateLastToolLine(name, result);
+        break;
+      case 'done':
+        hideThinkingStream();
+        break;
+    }
+  });
+
+  function updateLastToolLine(toolName, result) {
+    const lines = thinkingBodyEl.querySelectorAll('.stream-tool');
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (lines[i].textContent.includes(toolName)) {
+        const summary = String(result || '').slice(0, 80);
+        lines[i].textContent = `✓ ${toolName} 返回：${summary}${result.length > 80 ? '...' : ''}`;
+        lines[i].className = 'stream-tool-done';
+        break;
+      }
+    }
+  }
+
+  // ---------- extract current price from page ----------
   function extractCurrentPrice() {
     const selectors = [
       '.cur_price', '.price', '#price9', '.stock_price .cur',
@@ -108,16 +222,16 @@
         if (!isNaN(num) && num > 0) return num;
       } catch (_) { /* skip */ }
     }
-    // 尝试从页面标题解析
+    // try parsing from page title
     const title = document.title;
     const match = title.match(/(\d+\.\d{2})/);
     if (match) return parseFloat(match[1]);
     return null;
   }
 
-  // ---------- 从分析文本提取位置百分位 ----------
+  // ---------- extract position percentile from analysis text ----------
   function extractPositionPercentile(analysisText) {
-    // 匹配 "第 XX 百分位" 或 "XX.XX% 的位置" 等模式
+    // match patterns like "XX percentile" or "XX% position"
     const patterns = [
       /第\s*(\d+(?:\.\d+)?)\s*百分位/,
       /百分位[：:]\s*(\d+(?:\.\d+)?)\s*%/,
@@ -132,7 +246,7 @@
     return null;
   }
 
-  // ---------- 内容侧缓存 ----------
+  // ---------- content-side cache ----------
   function getCacheKey(code, template) {
     const monthKey = new Date().toISOString().slice(0, 7); // YYYY-MM
     const tpl = template || 'unknown';
@@ -145,7 +259,7 @@
     const items = await chrome.storage.local.get([key]);
     const entry = items[key];
     if (!entry) return null;
-    // 30 天过期
+    // 30 day expiry
     if (Date.now() - entry.timestamp > 30 * 24 * 60 * 60 * 1000) {
       await chrome.storage.local.remove([key]);
       return null;
@@ -180,7 +294,7 @@
     }
   }
 
-  // ---------- 从页面抓取事件 ----------
+  // ---------- scrape events from page ----------
   function collectPageEvents() {
     const rows = document.querySelectorAll('.siderstockcalendarcontent table tbody tr');
     const events = [];
@@ -221,15 +335,15 @@
     return events.slice(0, 10);
   }
 
-  // ---------- 解析股票代码 ----------
+  // ---------- parse stock code ----------
   function parseCodeFromUrl(url) {
-    // 东财 URL 实际格式: quote.eastmoney.com/sh600519.html（无斜杠分隔）
+    // Eastmoney URL actual format: quote.eastmoney.com/sh600519.html (no slash separator)
     const m = (url || location.href).match(/\b(sh|sz|bj)\.?(\d{4,6})\b/i);
     if (m) return m[2];
     return null;
   }
 
-  // ---------- 主分析流程 ----------
+  // ---------- main analysis flow ----------
   async function analyze(force) {
     if (busy) return;
     busy = true;
@@ -240,7 +354,8 @@
     overviewEl.style.display = 'none';
     metaEl.style.display = 'none';
     reanalyzeEl.style.display = 'none';
-    setBody('<div class="loading">正在加载…</div>');
+    showThinkingStream();
+    setBody('<div class="loading">加载中…</div>');
 
     try {
       const code = parseCodeFromUrl();
@@ -250,11 +365,11 @@
       }
       lastAnalyzedCode = code;
 
-      // 1. 获取当前 template 设置（用于缓存 key）
+      // 1. get current template setting (for cache key)
       const settingsItems = await chrome.storage.local.get(['template']);
       const currentTemplate = settingsItems.template || 'technical';
 
-      // 2. 先查内容侧缓存（非强制模式）
+      // 2. check content-side cache first (non-force mode)
       if (!force) {
         const cached = await getContentCache(code, currentTemplate);
         if (cached?.analysis) {
@@ -263,7 +378,7 @@
         }
       }
 
-      // 3. 调 SW
+      // 3. call SW
       const pageEvents = collectPageEvents();
       const resp = await chrome.runtime.sendMessage({
         type: 'ANALYZE',
@@ -280,7 +395,7 @@
         return;
       }
 
-      // 4. 写入内容侧缓存
+      // 4. write to content-side cache
       await setContentCache(code, currentTemplate, {
         code,
         name: resp.name,
@@ -300,18 +415,97 @@
     } catch (err) {
       setBody(`<div class="error">通信错误: ${escapeHtml(err.message || String(err))}</div>`);
     } finally {
+      hideThinkingStream();
       busy = false;
       fabEl.disabled = false;
       reanalyzeEl.disabled = false;
     }
   }
 
-  // ---------- 渲染结果 ----------
+  // ---------- dashboard JSON parsing ----------
+
+  function parseDashboardJSON(text) {
+    if (!text) return null;
+    const blocks = [];
+    const re = /```json\s*([\s\S]*?)```/g;
+    let m;
+    while ((m = re.exec(text)) !== null) blocks.push(m[1].trim());
+    if (blocks.length === 0) return null;
+    try { return JSON.parse(blocks[blocks.length - 1]); } catch (_) { return null; }
+  }
+
+  function renderDashboard(scoreData) {
+    if (!scoreData) {
+      dashboardCardEl.style.display = 'block';
+      scoreNumberEl.textContent = '?';
+      scoreNumberEl.style.color = '#888';
+      signalBadgeEl.textContent = '⚠️ 本次未生成结构化数据，仅显示文本分析';
+      signalBadgeEl.style.background = '#fff3cd';
+      confidenceBadgeEl.textContent = '';
+      summaryTextEl.textContent = '';
+      supportLevelsEl.textContent = '';
+      resistanceLevelsEl.textContent = '';
+      stopLossEl.textContent = '';
+      positionPercentileEl.textContent = '';
+      trendLabelEl.textContent = '';
+      return;
+    }
+
+    dashboardCardEl.style.display = 'block';
+    const s = scoreData;
+
+    // score number coloring
+    const colors = { strong_bull: '#00aa44', bull: '#4ec77b', neutral: '#888', bear: '#e88880', strong_bear: '#cc0000' };
+    scoreNumberEl.textContent = s.score != null ? Math.round(s.score) : '?';
+    scoreNumberEl.style.color = colors[s.signal] || '#888';
+
+    // signal
+    const labels = { strong_bull: '🟢🟢 强看多', bull: '🟢 看多', neutral: '⚪ 中性', bear: '🔴 看空', strong_bear: '🔴🔴 强看空' };
+    signalBadgeEl.textContent = labels[s.signal] || s.signal || '?';
+    signalBadgeEl.style.background = '';
+
+    // confidence
+    const confLabels = { high: '置信度：高', medium: '置信度：中', low: '置信度：低' };
+    const confBg = { high: '#d4edda', medium: '#fff3cd', low: '#f0f0f0' };
+    confidenceBadgeEl.textContent = confLabels[s.confidence] || '';
+    confidenceBadgeEl.style.background = confBg[s.confidence] || '';
+
+    // summary
+    summaryTextEl.textContent = s.one_line_summary || '';
+
+    // key_levels
+    const kl = s.key_levels || {};
+    supportLevelsEl.textContent = (kl.support || []).map(function(v) { return v.toFixed(2); }).join(' / ') || '-';
+    resistanceLevelsEl.textContent = (kl.resistance || []).map(function(v) { return v.toFixed(2); }).join(' / ') || '-';
+    if (kl.stop_loss != null) {
+      stopLossEl.textContent = kl.stop_loss.toFixed(2);
+      stopLossEl.style.color = '#cc0000';
+      stopLossEl.style.fontWeight = 'bold';
+    } else {
+      stopLossEl.textContent = '-';
+      stopLossEl.style.color = '';
+    }
+
+    // position_percentile
+    if (s.position_percentile != null) {
+      var pp = s.position_percentile;
+      positionPercentileEl.textContent = '位置 ' + pp.toFixed(1) + '%';
+      positionPercentileEl.style.background = pp < 30 ? '#d4edda' : pp > 70 ? '#f8d7da' : '#f0f0f0';
+      positionPercentileEl.style.padding = '2px 6px';
+      positionPercentileEl.style.borderRadius = '3px';
+    }
+
+    // trend
+    var trendMap = { uptrend: '上行趋势 ↗', downtrend: '下行趋势 ↘', sideways: '横盘 ↔', reversing: '趋势反转中 ⇄' };
+    trendLabelEl.textContent = trendMap[s.trend] || s.trend || '';
+  }
+
+  // ---------- render result ----------
   function renderResult(resp) {
     titleEl.textContent = `${escapeHtml(resp.name)} (${escapeHtml(resp.code)})`;
     reanalyzeEl.style.display = 'inline-block';
 
-    // 元信息条
+    // meta info bar
     const dtStr = resp.analyzedAt ? formatTime(resp.analyzedAt) : '';
     const badge = resp.cached
       ? '<span class="badge badge-cache">缓存</span>'
@@ -324,7 +518,7 @@
     metaEl.innerHTML = `${badge} ${periodLabel} ${escapeHtml(resp.monthKey || resp.bucket || '')} · ${dtStr} · ${providerLabel}(${escapeHtml(resp.model || '')})${styleLabel ? ' · ' + styleLabel : ''}${dbBadge}${dcBadge}`;
     metaEl.style.display = 'block';
 
-    // 概览条: 股票名+代码+当前价+位置百分位
+    // overview bar: stock name + code + current price + position percentile
     const currentPrice = extractCurrentPrice();
     const percentile = extractPositionPercentile(resp.analysis || '');
     ovNameEl.textContent = resp.name || '';
@@ -333,13 +527,17 @@
     ovPercentileEl.textContent = percentile !== null ? `P${Math.round(percentile)}` : '';
     overviewEl.style.display = 'flex';
 
-    // 卡片渲染
+    // dashboard
+    const scoreData = parseDashboardJSON(resp.analysis || '');
+    renderDashboard(scoreData);
+
+    // card rendering
     setBody(renderCards(resp.analysis || ''));
 
-    // 记录历史 ID 用于后续保存对话
+    // record history ID for later conversation save
     currentAnalysisId = resp.historyId || null;
 
-    // 初始化对话历史
+    // initialize conversation history
     const firstUserMsg = resp.prompt
       || `分析 ${resp.name || ''}(${resp.code || ''}) ${PERIOD_LABELS[resp.period] || resp.period || ''}`;
     conversationHistory = [
@@ -347,14 +545,14 @@
       { role: 'assistant', content: resp.analysis || '' },
     ];
 
-    // 显示对话区域
+    // show conversation area
     chatAreaEl.style.display = 'flex';
     chatWarningEl.style.display = 'none';
     chatInputEl.value = '';
     renderChatMessages();
   }
 
-  // ---------- 卡片折叠式渲染 ----------
+  // ---------- card foldable rendering ----------
   function renderCards(md) {
     const sections = parseSections(md);
     if (sections.length === 0) {
@@ -383,45 +581,46 @@
     }).join('');
   }
 
-  // Markdown 按 ## / ### 分段
+  // split Markdown by ## / ### headings
   function parseSections(md) {
     const lines = String(md).split('\n');
     const sections = [];
     let currentTitle = '';
     let currentLines = [];
-    let isFirstNonEmpty = true;
+    let skipJson = false;
 
     for (const line of lines) {
+      // inside a JSON skip block, wait for closing ```
+      if (skipJson) {
+        if (line.trim() === '```') skipJson = false;
+        continue;
+      }
+
       const h2 = line.match(/^##\s+(.*)$/);
       const h3 = line.match(/^###\s+(.*)$/);
       const h1 = line.match(/^#\s+(.*)$/);
 
       if (h1 || h2 || h3) {
-        // 保存上一个 section
+        // save previous section
         const bodyText = currentLines.join('\n').trim();
         if (currentTitle || bodyText) {
           sections.push({ title: currentTitle || '概述', body: bodyText });
         }
         currentTitle = (h1 || h2 || h3)[1].trim();
         currentLines = [];
-        isFirstNonEmpty = false;
         continue;
       }
 
-      // 跳过结构化 JSON 块
+      // skip structured JSON block (only effective at start of new section)
       if (currentLines.length === 0 && line.trim() === '```json') {
-        // 找到闭合的 ```
-        const closeIdx = lines.indexOf('```', lines.indexOf(line) + 1);
-        if (closeIdx > -1) {
-          lines.splice(lines.indexOf(line), closeIdx - lines.indexOf(line) + 1);
-          continue;
-        }
+        skipJson = true;
+        continue;
       }
 
       currentLines.push(line);
     }
 
-    // 最后一段
+    // last section
     const bodyText = currentLines.join('\n').trim();
     if (currentTitle || bodyText) {
       sections.push({ title: currentTitle || '概述', body: bodyText });
@@ -447,7 +646,7 @@
     trend: '趋势', counter: '反方', action: '操作', conclusion: '结论',
   };
 
-  // 卡片折叠点击
+  // card fold toggle click
   root.addEventListener('click', (e) => {
     const header = e.target.closest('[data-card-toggle]');
     if (!header) return;
@@ -465,7 +664,7 @@
     }
   });
 
-  // ---------- Markdown 渲染 ----------
+  // ---------- Markdown rendering ----------
   function setBody(html) { bodyEl.innerHTML = html; }
 
   function formatTime(ms) {
@@ -491,12 +690,12 @@
     const closeList = () => { if (inList) { out.push('</ul>'); inList = false; } };
 
     for (const raw of lines) {
-      // 跳过单个 ``` 标记
+      // skip bare ``` markers
       if (raw.trim() === '```' || raw.trim() === '```json') continue;
       const h = raw.match(/^(#{1,6})\s+(.*)$/);
       if (h) {
         closeList();
-        const level = Math.min(h[1].length + 2, 5); // 卡片内从 h3 开始
+        const level = Math.min(h[1].length + 2, 5); // start from h3 inside cards
         out.push(`<h${level}>${formatInline(h[2])}</h${level}>`);
         continue;
       }
@@ -506,7 +705,7 @@
         out.push(`<li>${formatInline(li[1])}</li>`);
         continue;
       }
-      // 编号列表
+      // numbered list
       const nli = raw.match(/^\d+[\.\)]\s+(.*)$/);
       if (nli) {
         if (!inList) { out.push('<ul>'); inList = true; }
@@ -529,7 +728,7 @@
     return x;
   }
 
-  // ---------- 多轮对话 ----------
+  // ---------- multi-turn conversation ----------
 
   function renderChatMessages() {
     if (conversationHistory.length === 0) {
@@ -537,7 +736,7 @@
       return;
     }
     chatMessagesEl.innerHTML = conversationHistory.map((msg, i) => {
-      // 跳过首次 prompt（太长，不渲染）
+      // skip first prompt (too long, don't render)
       if (i === 0 && msg.role === 'user') {
         return `<div class="chat-msg chat-msg-user chat-msg-first">
           <div class="chat-bubble">📊 首次分析 prompt（已提交，长度 ${msg.content.length} 字符）</div>
@@ -550,7 +749,7 @@
     }).join('');
     chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
 
-    // 20 条以上 warning
+    // warning for 20+ messages
     if (conversationHistory.length >= 20) {
       chatWarningEl.style.display = 'block';
       chatWarningEl.textContent = `⚠️ 对话已达 ${conversationHistory.length} 条，token 消耗较大。建议清空对话后重新开始。`;
@@ -566,11 +765,11 @@
     busy = true;
     chatSendEl.disabled = true;
 
-    // 渲染 user 消息
+    // render user message
     conversationHistory.push({ role: 'user', content: question });
     renderChatMessages();
 
-    // 添加加载占位
+    // add loading placeholder
     const loadingIdx = conversationHistory.length;
     conversationHistory.push({ role: 'assistant', content: '⏳ 思考中…' });
     renderChatMessages();
@@ -581,7 +780,7 @@
         question,
         history: conversationHistory.filter((m) => m.content !== '⏳ 思考中…').slice(0, -1),
       });
-      // 移除加载占位
+      // remove loading placeholder
       conversationHistory.splice(loadingIdx, 1);
 
       if (!resp || !resp.ok) {
@@ -602,13 +801,13 @@
 
   function clearChat() {
     if (conversationHistory.length <= 2) return;
-    // 保留前两条（首次 prompt + 首次分析结果）
+    // keep first two messages (initial prompt + initial analysis)
     conversationHistory = conversationHistory.slice(0, 2);
     renderChatMessages();
     chatInputEl.focus();
   }
 
-  // 保存对话到历史
+  // save conversation to history
   async function saveConversationToHistory() {
     if (!currentAnalysisId) {
       chatSaveEl.textContent = '⚠️';
@@ -637,7 +836,7 @@
     }, 1500);
   }
 
-  // 对话事件
+  // conversation events
   chatSendEl.addEventListener('click', sendFollowUp);
   chatClearEl.addEventListener('click', clearChat);
   chatSaveEl.addEventListener('click', saveConversationToHistory);
@@ -648,7 +847,7 @@
     }
   });
 
-  // ---------- URL 变化监听 ----------
+  // ---------- URL change monitoring ----------
   let lastUrl = location.href;
 
   function onUrlChange() {
@@ -662,7 +861,7 @@
 
   window.addEventListener('popstate', onUrlChange);
 
-  // Monkey-patch pushState / replaceState
+  // monkey-patch pushState / replaceState
   const _pushState = history.pushState;
   history.pushState = function (...args) {
     _pushState.apply(this, args);
@@ -674,8 +873,8 @@
     onUrlChange();
   };
 
-  // ---------- 自动触发 ----------
-  // 页面加载完成后自动分析
+  // ---------- auto-trigger ----------
+  // auto-analyze after page loads
   if (document.readyState === 'complete') {
     setTimeout(() => analyze(false), 800);
   } else {

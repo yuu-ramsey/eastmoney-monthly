@@ -3,11 +3,14 @@
   "name": "东方财富月线 AI 分析助手",
   "version": "0.1.0",
   "description": "在东方财富个股页面注入悬浮按钮,一键调用 Anthropic Claude 分析月线走势",
-  "permissions": ["storage"],
+  "permissions": ["storage", "alarms"],
   "host_permissions": [
     "*://push2his.eastmoney.com/*",
+    "*://push2.eastmoney.com/*",
     "https://api.anthropic.com/*",
-    "https://api.deepseek.com/*"
+    "https://api.deepseek.com/*",
+    "https://quotes.sina.cn/*",
+    "https://web.ifzq.gtimg.cn/*"
   ],
   "background": {
     "service_worker": "background.js",

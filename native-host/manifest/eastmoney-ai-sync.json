@@ -1,0 +1,9 @@
+{
+  "name": "com.eastmoney_ai.sync",
+  "description": "东方财富 AI 分析数据同步",
+  "path": "LAUNCHER_PATH_PLACEHOLDER",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://EXTENSION_ID_PLACEHOLDER/"
+  ]
+}

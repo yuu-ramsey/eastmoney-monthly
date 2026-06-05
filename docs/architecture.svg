@@ -1,0 +1,98 @@
+<svg width="100%" viewBox="0 0 680 720" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>Regime-Adaptive MoE Architecture</title>
+<desc>Four-layer architecture: Perception, Regime Detection with 3-detector voting, Expert Pool with mechanical gating, and Output with LLM interpretation isolated from signal chain.</desc>
+
+<style>
+  text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  .title { font-size: 16px; font-weight: 600; fill: #24292f; }
+  .heading { font-size: 13px; font-weight: 600; }
+  .body { font-size: 11px; font-weight: 400; }
+  .note { font-size: 11px; font-weight: 400; fill: #656d76; }
+  .arr { stroke: #656d76; stroke-width: 1.5; }
+  @media (prefers-color-scheme: dark) {
+    .title { fill: #e6edf3; }
+    .note { fill: #8b949e; }
+    .arr { stroke: #8b949e; }
+  }
+</style>
+
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+<path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</marker>
+</defs>
+
+<text class="title" x="340" y="28" text-anchor="middle">Regime-Adaptive Mixture-of-Experts</text>
+
+<!-- Layer 1: Perception -->
+<rect x="40" y="48" width="600" height="75" rx="10" fill="#E6F1FB" stroke="#85B7EB" stroke-width="0.5"/>
+<text class="heading" x="340" y="72" text-anchor="middle" fill="#0C447C">Layer 1: perception</text>
+<text class="body" x="340" y="108" text-anchor="middle" fill="#185FA5">Monthly · weekly · daily · sentiment → standardized feature matrix</text>
+
+<line x1="340" y1="123" x2="340" y2="148" class="arr" marker-end="url(#a)"/>
+
+<!-- Layer 2: Regime Detection -->
+<rect x="40" y="153" width="600" height="168" rx="10" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="0.5"/>
+<text class="heading" x="340" y="177" text-anchor="middle" fill="#085041">Layer 2: regime detection (no LLM in the loop)</text>
+
+<rect x="70" y="192" width="155" height="48" rx="8" fill="#9FE1CB" stroke="#5DCAA5" stroke-width="0.5"/>
+<text class="heading" x="147" y="211" text-anchor="middle" fill="#085041">HMM</text>
+<text class="body" x="147" y="228" text-anchor="middle" fill="#0F6E56">3-state model</text>
+
+<rect x="262" y="192" width="155" height="48" rx="8" fill="#9FE1CB" stroke="#5DCAA5" stroke-width="0.5"/>
+<text class="heading" x="340" y="211" text-anchor="middle" fill="#085041">Vol regime</text>
+<text class="body" x="340" y="228" text-anchor="middle" fill="#0F6E56">Volatility quantile</text>
+
+<rect x="455" y="192" width="155" height="48" rx="8" fill="#9FE1CB" stroke="#5DCAA5" stroke-width="0.5"/>
+<text class="heading" x="532" y="211" text-anchor="middle" fill="#085041">Trend regime</text>
+<text class="body" x="532" y="228" text-anchor="middle" fill="#0F6E56">MA60 + volume</text>
+
+<line x1="147" y1="240" x2="270" y2="270" class="arr" marker-end="url(#a)"/>
+<line x1="340" y1="240" x2="340" y2="270" class="arr" marker-end="url(#a)"/>
+<line x1="532" y1="240" x2="410" y2="270" class="arr" marker-end="url(#a)"/>
+
+<rect x="250" y="270" width="180" height="34" rx="8" fill="#F1EFE8" stroke="#B4B2A9" stroke-width="0.5"/>
+<text class="heading" x="340" y="291" text-anchor="middle" fill="#444441">⅔ majority vote</text>
+
+<line x1="340" y1="321" x2="340" y2="348" class="arr" marker-end="url(#a)"/>
+
+<!-- Layer 3: Expert Pool -->
+<rect x="40" y="353" width="600" height="195" rx="10" fill="#EEEDFE" stroke="#AFA9EC" stroke-width="0.5"/>
+<text class="heading" x="340" y="377" text-anchor="middle" fill="#3C3489">Layer 3: expert pool + gating (mechanical lookup)</text>
+
+<rect x="65" y="392" width="100" height="44" rx="8" fill="#CECBF6" stroke="#AFA9EC" stroke-width="0.5"/>
+<text class="heading" x="115" y="418" text-anchor="middle" fill="#3C3489">Kronos</text>
+
+<rect x="180" y="392" width="100" height="44" rx="8" fill="#CECBF6" stroke="#AFA9EC" stroke-width="0.5"/>
+<text class="heading" x="230" y="418" text-anchor="middle" fill="#3C3489">Reversal</text>
+
+<rect x="295" y="392" width="100" height="44" rx="8" fill="#CECBF6" stroke="#AFA9EC" stroke-width="0.5"/>
+<text class="heading" x="345" y="418" text-anchor="middle" fill="#3C3489">Momentum</text>
+
+<rect x="410" y="392" width="100" height="44" rx="8" fill="#CECBF6" stroke="#AFA9EC" stroke-width="0.5"/>
+<text class="heading" x="460" y="418" text-anchor="middle" fill="#3C3489">GRU</text>
+
+<rect x="525" y="392" width="85" height="44" rx="8" fill="#CECBF6" stroke="#AFA9EC" stroke-width="0.5"/>
+<text class="heading" x="567" y="418" text-anchor="middle" fill="#3C3489">LLM sig</text>
+
+<text class="note" x="340" y="462" text-anchor="middle">Each expert validated per-regime · max weight ≤ 40% · transition period = all reduced</text>
+
+<rect x="210" y="478" width="260" height="32" rx="8" fill="#F1EFE8" stroke="#B4B2A9" stroke-width="0.5"/>
+<text class="heading" x="340" y="499" text-anchor="middle" fill="#444441">Regime → weight table</text>
+
+<text class="note" x="340" y="535" text-anchor="middle">No model decides the weights — hardcoded from validation data</text>
+
+<line x1="340" y1="548" x2="340" y2="575" class="arr" marker-end="url(#a)"/>
+
+<!-- Layer 4: Output -->
+<rect x="40" y="580" width="290" height="72" rx="10" fill="#FAECE7" stroke="#F0997B" stroke-width="0.5"/>
+<text class="heading" x="185" y="608" text-anchor="middle" fill="#712B13">Weighted signal</text>
+<text class="body" x="185" y="638" text-anchor="middle" fill="#993C1D">Direction + confidence (math)</text>
+
+<rect x="350" y="580" width="290" height="72" rx="10" fill="#F1EFE8" stroke="#B4B2A9" stroke-width="0.5"/>
+<text class="heading" x="495" y="608" text-anchor="middle" fill="#444441">LLM interpretation</text>
+<text class="body" x="495" y="638" text-anchor="middle" fill="#5F5E5A">Explanation only (isolated)</text>
+
+<text class="note" x="340" y="688" text-anchor="middle">Layer 4: output — LLM never touches signal routing or weighting</text>
+
+</svg>

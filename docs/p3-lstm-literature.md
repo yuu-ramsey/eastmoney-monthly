@@ -35,12 +35,34 @@
 波动率 = cutoff 前 60 日月线 high-low range 的 ema std
 ```
 
-### GRU baseline 确认任务可学性
+### GRU baseline 确认任务可学性（审核后细化）
 
-日线 500 stocks × 10dim features（同现有：returns/vol/volume ratio/range/RSI），Triple-Barrier 3-class labels，CrossEntropy loss。若 GRU-1@32 val accuracy < 33%（随机）→ 任务不可学，如实报告。
+日线 500 stocks × 10dim features，Triple-Barrier 3-class labels，CrossEntropy loss。
+
+**σ 定义（审核要求）**: 各股 cutoff 前 12 个月月收益的 std，point-in-time，不用全样本/未来数据。
+
+**三分类验收（审核要求，不用 33%）**:
+- 报：各类占比（涨/跌/震荡 %）+ 混淆矩阵 + balanced accuracy + macro-F1
+- baseline: "always predict majority class" 的 balanced acc / macro-F1
+- **判读**: balanced acc > always-majority → 任务可学；≈ always-majority → 模型只学会输出最大类（同回归版"预测均值"），诚实停。
+
+### 两级门控
+
+| 级 | 指标 | 通过条件 | 不过则 |
+|----|------|---------|--------|
+| 1 可学性 | balanced acc vs always-majority | > always-majority | **停**, 任务不可学 |
+| 2 选股 | v2 池 test spread CI | CI 不含 0 | 如实报, 不停 |
+
+## 实现步骤
+
+1. 修缩进 bug + 1-epoch 烟雾测试确认管线无 NaN
+2. 正式 train GRU-1@32 on 日线 500 stocks
+3. 混淆矩阵 + balanced acc 验收
+4. 若过 1 级 → v2 池 spread + CI 门控
 
 ## 硬停点
 
-1. 文献方案审核 → 进阶段 2 实现
-2. GRU baseline 确认可学 → 进 v2 池门控
-3. test CI 不含 0 → 过 hold-out
+1. ~~文献方案审核~~ ✓ 已审核（2026-05-30）
+2. 烟雾测试通过 → 正式 train
+3. 1 级门控通过（balanced acc > always-majority）→ 进 2 级
+4. 2 级门控通过（test CI 不含 0）→ LSTM 最终过

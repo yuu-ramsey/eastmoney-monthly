@@ -1,4 +1,4 @@
-"""Smoke test: 小规模验证所有模块"""
+"""Smoke test: small-scale validation of all modules"""
 import warnings; warnings.filterwarnings('ignore')
 import sys, os, json, tempfile; sys.path.insert(0, 'lib')
 import torch, numpy as np, pandas as pd, sqlite3, time

@@ -1,4 +1,4 @@
-"""通宵实验核心模块 — import 不触发执行。"""
+"""Overnight experiment core module — import does not trigger execution."""
 import warnings; warnings.filterwarnings('ignore')
 import torch, torch.nn as nn
 import numpy as np, pandas as pd, json
@@ -9,7 +9,7 @@ import pywt
 
 LOOKBACK, BATCH_SIZE = 60, 1024
 
-# ═══ 日线 LSTM ═══
+# ═══ Daily LSTM ═══
 class DailyLSTM(nn.Module):
     def __init__(self, d=8, h=64, n_layers=2, dropout=0.3):
         super().__init__()
@@ -76,7 +76,7 @@ def lstm_predict(model, X_te_t, device, batch=BATCH_SIZE):
         return np.concatenate([model(X_te_t[i:i+batch]).cpu().numpy()
                                for i in range(0, len(X_te_t), batch)])
 
-# ═══ 月线特征 + 集成 ═══
+# ═══ Monthly features + ensemble ═══
 def wdenoise(signal):
     coeffs = pywt.wavedec(signal, 'db4', level=2)
     sigma = np.median(np.abs(coeffs[-1])) / 0.6745
@@ -149,7 +149,7 @@ def train_monthly_ensemble(X_tr, y_tr, X_te, y_te):
     ridge_m = Ridge(alpha=1.0); ridge_m.fit(X_tr, y_tr); p_ridge = ridge_m.predict(X_te)
     return (p_lgb + p_xgb + p_ridge) / 3
 
-# ═══ 工具 ═══
+# ═══ Utilities ═══
 def cs_ic_helper(pred, true, dates):
     months = np.unique(dates); ics = []
     for m in months:

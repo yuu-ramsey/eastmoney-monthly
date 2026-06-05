@@ -1,4 +1,4 @@
-"""分析 LLM 24tp 门控结果"""
+"""Analyze LLM 24tp gate results"""
 import json, numpy as np
 from pathlib import Path
 from collections import Counter
@@ -14,21 +14,21 @@ for line in open(RESULTS, encoding='utf-8'):
 
 print(f"Total: {len(rows)}")
 
-# 信号分布
+# Signal distribution
 sigs = Counter(r['signal'] for r in rows)
 print(f"\nSignal distribution:")
 for s, n in sigs.most_common():
     print(f"  {s}: {n} ({n/len(rows)*100:.1f}%)")
 
-# 成本
+# Cost
 total_cost = sum(r.get('cost', 0) for r in rows)
 print(f"\nTotal cost: ¥{total_cost:.2f}")
 
-# 排除 parse_failed 和 api_error
+# Exclude parse_failed and api_error
 valid = [r for r in rows if r['signal'] not in ('parse_failed', 'api_error')]
 print(f"Valid: {len(valid)}/{len(rows)}")
 
-# ── 分桶分析 ──
+# ── Bucket analysis ──
 def winsorize(arr, pct=1):
     s = sorted(arr)
     lo = s[max(0, len(s) // (100//pct) - 1)]
@@ -41,7 +41,7 @@ def wins_mean(arr):
 
 signal_map = {'strong_bull': 2, 'bull': 1, 'neutral': 0, 'bear': -1, 'strong_bear': -2}
 
-# 分桶
+# Bucket
 buckets = {'strong_bull': [], 'bull': [], 'neutral': [], 'bear': [], 'strong_bear': []}
 for r in valid:
     buckets[r['signal']].append(r['alpha'])
@@ -90,13 +90,13 @@ lo, hi, mean, nb = block_ci(valid, ascending=True)
 print(f"\n=== LLM 24tp Block CI ===")
 print(f"  CI [{lo:+.1f}, {hi:+.1f}] mean={mean:+.1f}% nBlocks={nb}")
 
-# 方向命中率
+# Direction hit rate
 correct = sum(1 for r in valid if signal_map.get(r['signal'], 0) != 0
               and np.sign(signal_map.get(r['signal'], 0)) == np.sign(r['alpha']))
 total_nz = sum(1 for r in valid if signal_map.get(r['signal'], 0) != 0 and r['alpha'] != 0)
 print(f"\n  Direction hit: {correct}/{total_nz} = {correct/total_nz*100:.1f}%" if total_nz else "")
 
-# 门控判定
+# Gate verdict
 print(f"\n=== VERDICT ===")
 if lo > 0:
     print(f"  LLM 24tp CI [{lo:+.1f}, {hi:+.1f}] > 0 -> GATE PASSED")

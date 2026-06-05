@@ -1,4 +1,4 @@
-"""6 项诊断 — python scripts/diagnose_overnight.py"""
+"""6 diagnostic checks — python scripts/diagnose_overnight.py"""
 import warnings; warnings.filterwarnings('ignore')
 import sys; sys.path.insert(0, 'lib')
 import torch, numpy as np, pandas as pd, sqlite3, time
@@ -36,7 +36,7 @@ tr_m = (dates_m>='2015-01')&(dates_m<='2021-12')
 va_m = (dates_m>='2022-01')&(dates_m<='2023-12')
 te_m = (dates_m>='2024-01')
 
-# 全局 numpy.str_ → Python str 转换，防 pd.Timestamp 崩溃
+# Convert numpy.str_ to Python str globally, prevent pd.Timestamp crash
 dates_d = np.array([str(d) for d in dates_d])
 dates_m = np.array([str(d) for d in dates_m])
 results = {}  # check_name -> (pass, detail)

@@ -1,8 +1,8 @@
-// service worker: 接收 content script 消息,fetch 东财 K 线 + 调 LLM API
-// 带结果缓存:同股同周期同时段二次分析直接读 chrome.storage.local,不再调 API
-// provider 抽象层支持多 LLM 提供商
+// service worker: receives content script messages, fetches Eastmoney K-lines + calls LLM API
+// with result cache: re-analysis of the same stock/period/timeframe reads from chrome.storage.local directly, no API call
+// provider abstraction layer supports multiple LLM providers
 //
-// 缓存 key 格式:analysis:<market>.<code>:<period>:<bucket>:<style>:<mode>
+// cache key format: analysis:<market>.<code>:<period>:<bucket>:<style>:<mode>
 
 import { parseStockUrl } from './lib/parse-url.js';
 import { parseKlines } from './lib/parse-klines.js';
@@ -32,22 +32,22 @@ const ERR = {
   EASTMONEY: '获取东财 K 线数据失败',
 };
 
-// ---- 旧字段迁移（v3a）----
+// ---- migrate legacy fields (v3a) ----
 
 async function migrateSettings() {
   const items = await chrome.storage.local.get(['apiKey', 'model', 'provider', 'migrated:v3a']);
   if (items['migrated:v3a']) return;
 
   const updates = {};
-  // 旧 apiKey → apiKey:anthropic
+  // old apiKey → apiKey:anthropic
   if (typeof items.apiKey === 'string' && items.apiKey.length > 0) {
     updates['apiKey:anthropic'] = items.apiKey;
   }
-  // 旧 model → model:anthropic
+  // old model → model:anthropic
   if (typeof items.model === 'string' && items.model.length > 0) {
     updates['model:anthropic'] = items.model;
   }
-  // provider 默认 anthropic
+  // default provider to anthropic
   if (!items.provider) {
     updates.provider = 'anthropic';
   }
@@ -56,16 +56,16 @@ async function migrateSettings() {
   if (Object.keys(updates).length > 1 || !items['migrated:v3a']) {
     await chrome.storage.local.set(updates);
   }
-  // 删除旧字段
+  // delete old fields
   if (items.apiKey !== undefined || items.model !== undefined) {
     await chrome.storage.local.remove(['apiKey', 'model']);
   }
 }
 
-// service worker 启动时执行一次
+// run once on service worker startup
 migrateSettings().catch(() => {});
 
-// ---- 消息路由 ----
+// ---- message routing ----
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === 'ANALYZE') {
@@ -113,7 +113,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return false;
 });
 
-// ---- 分析主流程 ----
+// ---- main analysis flow ----
 
 async function handleAnalyze(pageUrl, opts = {}) {
   const force = !!opts.force;
@@ -132,7 +132,7 @@ async function handleAnalyze(pageUrl, opts = {}) {
   const style = settings.analysisStyle || 'technical';
   const period = settings.period || 'monthly';
   const isMulti = period === 'multi';
-  const debateMode = isMulti ? false : !!settings.debateMode; // 多周期下辩论自动禁用
+  const debateMode = isMulti ? false : !!settings.debateMode; // debate auto-disabled for multi-period
   const decisionMode = !!settings.decisionMode;
   const mode = debateMode ? 'debate' : 'single';
   const decision = decisionMode ? 'on' : 'off';
@@ -140,12 +140,12 @@ async function handleAnalyze(pageUrl, opts = {}) {
   const PERIOD_LABELS = { monthly: '月线', weekly: '周线', daily: '日线', multi: '多周期' };
   const periodLabel = PERIOD_LABELS[period] || '月线';
 
-  // ---- 多周期共振分支 ----
+  // ---- multi-period resonance branch ----
   if (isMulti) {
     return handleMultiPeriod({ market, code, settings, style, decisionMode, decision, extraContext: { events: pageEvents } });
   }
 
-  // 取数据（个股 + 沪深300 并行）
+  // fetch data (stock + HS300 in parallel)
   const [eastmoney, hs300Data] = await Promise.all([
     fetchEastmoneyKlines(market, code, settings.klineLimit, period),
     fetchHS300Klines(settings.klineLimit, period),
@@ -153,7 +153,7 @@ async function handleAnalyze(pageUrl, opts = {}) {
   const klines = parseKlines(eastmoney.klines);
   if (klines.length === 0) throw new Error(ERR.EASTMONEY);
 
-  // 沪深300 指标计算
+  // HS300 indicator calculation
   let hs300IndexData = null;
   const hs300Klines = parseKlines(hs300Data ? hs300Data.klines : []);
   if (hs300Klines.length > 0) {
@@ -172,7 +172,7 @@ async function handleAnalyze(pageUrl, opts = {}) {
   const bucket = timeBucket(latestDate, period);
   const key = cacheKey(market, code, period, bucket, style, mode, decision);
 
-  // 命中缓存
+  // cache hit
   if (!force) {
     const stored = (await chrome.storage.local.get([key]))[key];
     if (stored?.analysis) {
@@ -180,7 +180,7 @@ async function handleAnalyze(pageUrl, opts = {}) {
     }
   }
 
-  // 计算指标
+  // compute indicators
   const closes = klines.map((k) => k.close);
   const ma5 = computeMA(closes, 5);
   const ma20 = computeMA(closes, 20);
@@ -194,28 +194,28 @@ async function handleAnalyze(pageUrl, opts = {}) {
   const model = settings.model || provider.defaultModel;
   const extraContext = { events: pageEvents };
 
-  // ---- 自我回测（仅 single 模式，数据 ≥36 根） ----
+  // ---- self-backtest (single mode only, >= 36 bars) ----
   if (settings.enableSelfBacktest && mode === 'single' && klines.length >= 36) {
     try {
       const cutoffIndexes = klines.length >= 48
         ? [klines.length - 24, klines.length - 12]
         : [klines.length - 12];
 
-      console.log(`[backtest] 开始自我回测，cutoff=${cutoffIndexes.join(',')}，K线=${klines.length}根`);
+      console.log(`[backtest] Starting self-backtest, cutoff=${cutoffIndexes.join(',')}, klines=${klines.length}`);
 
       const backtestResults = [];
       for (const cutoff of cutoffIndexes) {
         try {
-          // 先查缓存（仅缓存 LLM 判断，actual return 实时计算）
+          // check cache first (only cache LLM judgment, actual return computed live)
           const cacheKey = backtestCacheKey(code, settings.template, cutoff, settings.provider);
           const cached = await getBacktestCache(chrome.storage.local, cacheKey);
 
           let judgmentResult;
           if (cached) {
-            console.log(`[backtest] cutoff=${cutoff} 命中缓存`);
+            console.log(`[backtest] cutoff=${cutoff} cache hit`);
             judgmentResult = cached;
           } else {
-            console.log(`[backtest] cutoff=${cutoff} 调 LLM...`);
+            console.log(`[backtest] cutoff=${cutoff} calling LLM...`);
             judgmentResult = await runHistoricalAnalysis(
               klinesWithMA, cutoff, settings.template,
               settings.provider,
@@ -224,7 +224,7 @@ async function handleAnalyze(pageUrl, opts = {}) {
             await setBacktestCache(chrome.storage.local, cacheKey, { date: judgmentResult.date, judgment: judgmentResult.judgment, keyLevels: judgmentResult.keyLevels });
           }
 
-          // 计算实际涨跌（不缓存，随价格实时变化）
+          // compute actual return (not cached, changes with live price)
           const actualReturn = calculateActualReturn(
             klinesWithMA, cutoff, klinesWithMA.length - 1,
             hs300IndexData ? hs300IndexData.klines : null,
@@ -237,22 +237,22 @@ async function handleAnalyze(pageUrl, opts = {}) {
             actualReturn,
           });
         } catch (err) {
-          console.warn(`[backtest] cutoff=${cutoff} 失败，跳过：`, err.message);
+          console.warn(`[backtest] cutoff=${cutoff} failed, skipped:`, err.message);
         }
       }
 
       if (backtestResults.length > 0) {
         extraContext.backtestBlock = buildSelfCalibrationBlock(backtestResults);
-        console.log(`[backtest] 生成校准段，${backtestResults.length} 个时点`);
+        console.log(`[backtest] Generated calibration block, ${backtestResults.length} time points`);
       }
     } catch (err) {
-      console.warn('[backtest] 回测流程失败，跳过：', err.message);
+      console.warn('[backtest] Backtest flow failed, skipped:', err.message);
     }
   }
 
-  console.log(`[analyze] ${settings.provider}/${model} K线尾3行:`,
+  console.log(`[analyze] ${settings.provider}/${model} K-line tail 3:`,
     klinesWithMA.slice(-3).map((k) => `${k.date} O=${k.open} H=${k.high} L=${k.low} C=${k.close}`));
-  console.log(`[analyze] ${settings.provider}/${model} mode=${mode} K线:${klinesWithMA.length}根`);
+  console.log(`[analyze] ${settings.provider}/${model} mode=${mode} klines:${klinesWithMA.length}`);
 
   let analysis;
   let cost = 0;
@@ -261,7 +261,7 @@ async function handleAnalyze(pageUrl, opts = {}) {
   let prompt = null;
 
   if (debateMode) {
-    // 多 Agent 辩论路径
+    // multi-agent debate path
     const debateCtx = {
       name: eastmoney.name,
       code,
@@ -279,7 +279,7 @@ async function handleAnalyze(pageUrl, opts = {}) {
       maxTokens: DEFAULT_MAX_TOKENS,
       checkpointKey,
     });
-    // 渲染：Judge 主输出 > 三段拼接退路
+    // render: Judge main output > three-agent fallback
     if (debateResult.judge) {
       analysis = debateResult.judge.text;
     } else {
@@ -294,7 +294,7 @@ async function handleAnalyze(pageUrl, opts = {}) {
     }
     cost = debateResult.totalCost;
 
-    // 月度用量统计:累加所有成功 Agent（含 Judge）
+    // monthly usage stats: accumulate all successful agents (incl. Judge)
     for (const agentResult of Object.values(debateResult.partials)) {
       if (agentResult?.usage) {
         await accumulateUsage(settings.provider, model, agentResult.usage, agentResult.cost);
@@ -304,8 +304,8 @@ async function handleAnalyze(pageUrl, opts = {}) {
       await accumulateUsage(settings.provider, model, debateResult.judge.usage, debateResult.judge.cost);
     }
   } else {
-    // 单次分析路径
-    // 尝试获取行业 alpha（通过 Native Messaging 查询 SQLite）
+    // single analysis path
+    // attempt to fetch sector alpha (via Native Messaging querying SQLite)
     let sectorAlphaData = null;
     try {
       const alphaResp = await chrome.runtime.sendNativeMessage(NATIVE_HOST, {
@@ -318,10 +318,10 @@ async function handleAnalyze(pageUrl, opts = {}) {
         sectorAlphaData = alphaResp.data;
       }
     } catch (_) {
-      // Native host 不可用时静默降级
+      // silent degrade when Native host unavailable
     }
 
-    // Kronos 信号注入（默认 ON — hold-out 验证通过，参见 docs/p3-kronos-confirm.md）
+    // Kronos signal injection (default ON — hold-out validation passed, see docs/p3-kronos-confirm.md)
     const ENABLE_KRONOS_SIGNAL = true;
     let kronosSignalData = null;
     if (ENABLE_KRONOS_SIGNAL) {
@@ -332,12 +332,12 @@ async function handleAnalyze(pageUrl, opts = {}) {
         if (krResp && krResp.type === 'read_result' && krResp.data) {
           kronosSignalData = { prediction_6m_pct: krResp.data.prediction_6m_pct, direction: krResp.data.direction };
         }
-      } catch (_) { /* 降级 */ }
+      } catch (_) { /* degrade */ }
     }
 
-    // 反转因子已撤出（24tp 池翻负 -19.2%，参见 docs/p3-signal-gating.md）
+    // Reversal factor withdrawn (24tp pool turned negative -19.2%, see docs/p3-signal-gating.md)
 
-    // LSTM 信号注入开关（默认 OFF — 训练数据存在时间窗泄漏，参见 docs/p1-lstm-leak-check.md）
+    // LSTM signal injection switch (default OFF — training data has time-window leakage, see docs/p1-lstm-leak-check.md)
     const ENABLE_LSTM_SIGNAL = false;
 
     let lstmSignalData = null;
@@ -351,7 +351,7 @@ async function handleAnalyze(pageUrl, opts = {}) {
           const d = mcResp.data;
           const ulevel = d.uncertainty_level || 'medium';
           if (ulevel === 'high') {
-            console.log(`[analyze] MC Dropout high uncertainty for ${code}, 跳过 LSTM 信号`);
+            console.log(`[analyze] MC Dropout high uncertainty for ${code}, skipping LSTM signal`);
             lstmSignalData = null;
           } else {
             lstmSignalData = {
@@ -374,19 +374,19 @@ async function handleAnalyze(pageUrl, opts = {}) {
           }
         }
       } catch (_) {
-        // Native host 不可用或数据未预计算时静默降级
+        // silent degrade when Native host unavailable or data not pre-computed
       }
     }
 
     prompt = await buildPromptByTemplate({ templateKey: settings.template, name: eastmoney.name, code, market, klines: klinesWithMA, period, provider: settings.provider, extraContext, decisionMode, indexData: hs300IndexData, sectorAlphaData, lstmSignalData, kronosSignalData });
-    console.log(`[analyze] ${settings.provider}/${model} prompt长度:${prompt.length}`);
+    console.log(`[analyze] ${settings.provider}/${model} prompt length:${prompt.length}`);
 
-    // 仅 Anthropic provider 启用 tool_use
+    // enable tool_use only for Anthropic provider
     const tools = settings.provider === 'anthropic'
       ? [getFinancialsTool, getMoneyFlowTool]
       : undefined;
 
-    // 流式进度 + 工具调用跟踪
+    // streaming progress + tool call tracking
     const toolCalls = [];
     let toolCallSeq = 0;
     const onProgress = tabId ? (event) => {
@@ -394,7 +394,7 @@ async function handleAnalyze(pageUrl, opts = {}) {
         const seq = ++toolCallSeq;
         toolCalls.push({ seq, name: event.name, input: event.input, result: null, startMs: Date.now() });
       } else if (event.type === 'tool_result') {
-        // 从后往前找同名且未填充的，避免同名混淆
+        // search from back for same name and unfilled, to avoid same-name confusion
         for (let i = toolCalls.length - 1; i >= 0; i--) {
           if (toolCalls[i].name === event.name && toolCalls[i].result === null) {
             toolCalls[i].result = event.result;
@@ -405,10 +405,10 @@ async function handleAnalyze(pageUrl, opts = {}) {
       }
       try {
         chrome.tabs.sendMessage(tabId, { type: 'STREAM_PROGRESS', event });
-      } catch (_) { /* tab 可能已关闭 */ }
+      } catch (_) { /* tab may have been closed */ }
     } : undefined;
 
-    // 流式期间用 alarm 保持 SW 唤醒
+    // keep SW awake with alarm during streaming
     let alarmName = null;
     if (tabId) {
       alarmName = `stream_${Date.now()}`;
@@ -426,7 +426,7 @@ async function handleAnalyze(pageUrl, opts = {}) {
         enableThinking: settings.enableThinking,
       });
     } finally {
-      // 无论成功/失败，清理 alarm + 通知 content
+      // whether success or failure, clean up alarm + notify content
       if (alarmName) {
         try { chrome.alarms.clear(alarmName); } catch (_) { /* ignore */ }
         try { chrome.tabs.sendMessage(tabId, { type: 'STREAM_PROGRESS', event: { type: 'done' } }); } catch (_) { /* ignore */ }
@@ -437,7 +437,7 @@ async function handleAnalyze(pageUrl, opts = {}) {
     usage = result.usage || null;
     cost = result.usage ? estimateCost(settings.provider, model, result.usage) : 0;
 
-    // 调试日志（仅当开关开启）
+    // debug log (only when switch enabled)
     if (settings.enableDebugLog) {
       try {
         const debugRecord = {
@@ -466,13 +466,13 @@ async function handleAnalyze(pageUrl, opts = {}) {
     }
   }
 
-  // 结构化输出提取 + 跨级别一致性校验
+  // structured output extraction + cross-level consistency check
   const structured = extractStructuredOutput(analysis);
   const crossLevelWarnings = [];
   if (structured.data) {
-    // TODO: structured key 维度（仅 market/code/period）少于 analysis key（7 维度），
-    // 切换 style 时新分析会覆盖旧 structured 数据。
-    // 若不同风格输出的 structured 质量差异大，需将 style 加入 key。
+    // TODO: structured key dimensions (only market/code/period) are fewer than analysis key (7 dimensions),
+    // switching style causes new analysis to overwrite old structured data.
+    // If structured output quality varies significantly across styles, add style to the key.
     const structuredKey = `structured:${market}.${code}:${period}`;
     await chrome.storage.local.set({
       [structuredKey]: { data: structured.data, timestamp: Date.now() },
@@ -490,10 +490,10 @@ async function handleAnalyze(pageUrl, opts = {}) {
     }
   }
 
-  // 历史记录 ID
+  // history record ID
   const historyId = generateHistoryId();
 
-  // 写缓存
+  // write cache
   const record = {
     name: eastmoney.name,
     code,
@@ -520,12 +520,12 @@ async function handleAnalyze(pageUrl, opts = {}) {
   };
   await chrome.storage.local.set({ [key]: record });
 
-  // 辩论 checkpoint 清理：正式缓存已写入，不再需要续跑数据
+  // debate checkpoint cleanup: formal cache written, no longer need resume data
   if (debateMode) {
     try { await clearDebateCheckpoint(`debate-wip:${market}.${code}:${period}:${bucket}:${style}:${decision}`); } catch (_) { /* ignore */ }
   }
 
-  // 写入分析历史（不含 conversationHistory，后续由 content.js 补充）
+  // write to analysis history (without conversationHistory, to be supplemented by content.js later)
   await saveToHistory({
     id: historyId,
     code,
@@ -542,7 +542,7 @@ async function handleAnalyze(pageUrl, opts = {}) {
   return { ...record, cached: false, historyId };
 }
 
-// ---- 多轮对话 ----
+// ---- multi-turn conversation ----
 
 async function handleFollowUp(msg) {
   const settings = await loadSettings();
@@ -554,7 +554,7 @@ async function handleFollowUp(msg) {
   const messages = Array.isArray(msg.history) ? [...msg.history] : [];
   messages.push({ role: 'user', content: msg.question });
 
-  console.log(`[followup] ${settings.provider}/${model} history:${msg.history?.length || 0}条`);
+  console.log(`[followup] ${settings.provider}/${model} history:${msg.history?.length || 0} messages`);
 
   const result = await provider.call(messages, {
     model,
@@ -570,13 +570,13 @@ async function handleFollowUp(msg) {
   return { text: result.text, usage: result.usage || null, cost };
 }
 
-// ---- 缓存 key ----
+// ---- cache key ----
 
 function cacheKey(market, code, period, bucket, style, mode = 'single', decision = 'off') {
   return `analysis:${market}.${code}:${period}:${bucket}:${style}:${mode}:${decision}`;
 }
 
-// ---- 时间 bucket ----
+// ---- time bucket ----
 
 function timeBucket(dateStr, period) {
   switch (period) {
@@ -600,7 +600,7 @@ function isoWeekFromDate(dateStr) {
   return `${year}-W${String(weekNum).padStart(2, '0')}`;
 }
 
-// ---- 东财 K 线 ----
+// ---- Eastmoney K-lines ----
 
 async function fetchEastmoneyKlines(market, code, limit, period) {
   const klt = PERIOD_KLTS[period] || '103';
@@ -629,7 +629,7 @@ async function fetchEastmoneyKlines(market, code, limit, period) {
   return { name: data.name || code, klines: data.klines };
 }
 
-// ---- 沪深300 K 线 ----
+// ---- HS300 K-lines ----
 
 async function fetchHS300Klines(limit, period) {
   const klt = PERIOD_KLTS[period] || '103';
@@ -652,12 +652,12 @@ async function fetchHS300Klines(limit, period) {
     if (!data || !Array.isArray(data.klines)) return null;
     return { name: data.name || '沪深300', klines: data.klines };
   } catch (_) {
-    // 大盘数据获取失败不阻塞主流程
+    // index data fetch failure does not block main flow
     return null;
   }
 }
 
-// ---- 月度用量统计 ----
+// ---- monthly usage statistics ----
 
 async function accumulateUsage(providerId, model, usage, cost) {
   const monthKey = new Date().toISOString().slice(0, 7);
@@ -698,12 +698,12 @@ export async function getMonthlyUsage(providerId, monthKey) {
   return items[`usage:${providerId}:${monthKey}`] || null;
 }
 
-// ---- 多周期共振 ----
+// ---- multi-period resonance ----
 
 async function handleMultiPeriod({ market, code, settings, style, decisionMode, decision, extraContext }) {
   const limit = settings.klineLimit;
 
-  // 三周期并发抓取 + 沪深300 月线
+  // three-period concurrent fetch + HS300 monthly
   const [monthlyData, weeklyData, dailyData, hs300Data] = await Promise.all([
     fetchEastmoneyKlines(market, code, limit, 'monthly'),
     fetchEastmoneyKlines(market, code, limit, 'weekly'),
@@ -719,7 +719,7 @@ async function handleMultiPeriod({ market, code, settings, style, decisionMode, 
     throw new Error(ERR.EASTMONEY);
   }
 
-  // 各自计算 MA + MACD
+  // compute MA + MACD for each
   function attachIndicators(klines) {
     const closes = klines.map((k) => k.close);
     const ma5 = computeMA(closes, 5);
@@ -735,7 +735,7 @@ async function handleMultiPeriod({ market, code, settings, style, decisionMode, 
   const weeklyWithMA = attachIndicators(weeklyKlines);
   const dailyWithMA = attachIndicators(dailyKlines);
 
-  // 沪深300 月线数据
+  // HS300 monthly data
   let hs300IndexData = null;
   const hs300Klines = hs300Data ? parseKlines(hs300Data.klines) : [];
   if (hs300Klines.length > 0) {
@@ -743,14 +743,14 @@ async function handleMultiPeriod({ market, code, settings, style, decisionMode, 
     hs300IndexData = { name: hs300Data.name || '沪深300', klines: hs300WithMA };
   }
 
-  // 桶取日线最新日期（最细精度）
+  // bucket by daily latest date (finest granularity)
   const latestDate = dailyKlines.length > 0 ? dailyKlines[dailyKlines.length - 1].date
     : (weeklyKlines.length > 0 ? weeklyKlines[weeklyKlines.length - 1].date
       : monthlyKlines[monthlyKlines.length - 1].date);
   const bucket = timeBucket(latestDate, 'daily');
   const key = cacheKey(market, code, 'multi', bucket, style, 'single', decision);
 
-  // multi 模式暂不缓存（prompt 体积大，缓存价值低）
+  // multi mode not cached for now (prompt is large, low cache value)
 
   if (!settings.apiKey) throw new Error(ERR.NO_KEY);
 
@@ -770,12 +770,12 @@ async function handleMultiPeriod({ market, code, settings, style, decisionMode, 
   const provider = getProvider(settings.provider);
   const model = settings.model || provider.defaultModel;
 
-  console.log(`[analyze] multi/${settings.provider}/${model} 月:${monthlyKlines.length} 周:${weeklyKlines.length} 日:${dailyKlines.length} prompt:${prompt.length}`);
+  console.log(`[analyze] multi/${settings.provider}/${model} monthly:${monthlyKlines.length} weekly:${weeklyKlines.length} daily:${dailyKlines.length} prompt:${prompt.length}`);
 
   const result = await provider.call(prompt, {
     model,
     apiKey: settings.apiKey,
-    maxTokens: DEFAULT_MAX_TOKENS * 2, // 多周期输出需要更多 token
+    maxTokens: DEFAULT_MAX_TOKENS * 2, // multi-period output needs more tokens
   });
 
   const analysis = result.text;
@@ -786,7 +786,7 @@ async function handleMultiPeriod({ market, code, settings, style, decisionMode, 
     await accumulateUsage(settings.provider, model, result.usage, cost);
   }
 
-  // 历史记录 ID
+  // history record ID
   const historyId = generateHistoryId();
 
   const record = {
@@ -815,7 +815,7 @@ async function handleMultiPeriod({ market, code, settings, style, decisionMode, 
 
   await chrome.storage.local.set({ [key]: record });
 
-  // 写入分析历史
+  // write to analysis history
   await saveToHistory({
     id: historyId,
     code,
@@ -832,10 +832,10 @@ async function handleMultiPeriod({ market, code, settings, style, decisionMode, 
   return { ...record, cached: false, historyId };
 }
 
-// ---- 设置 ----
+// ---- settings ----
 
 async function loadSettings() {
-  // 先跑迁移（幂等）
+  // run migration first (idempotent)
   await migrateSettings();
 
   const allItems = await chrome.storage.local.get([
@@ -849,10 +849,10 @@ async function loadSettings() {
   const provider = allItems.provider || 'anthropic';
   const analysisDepth = allItems.analysisDepth || 'standard';
 
-  // 模型选择优先级：
-  // 1. 用户手动填写的 model:${provider}（非空）
-  // 2. analysisDepth 映射（仅 Anthropic）：standard → claude-sonnet-4-6, deep → claude-opus-4-7
-  // 3. provider 默认模型
+  // model selection priority:
+  // 1. user manually entered model:${provider} (non-empty)
+  // 2. analysisDepth mapping (Anthropic only): standard → claude-sonnet-4-6, deep → claude-opus-4-7
+  // 3. provider default model
   let model = allItems[`model:${provider}`] || '';
   if (!model && provider === 'anthropic') {
     model = analysisDepth === 'deep' ? 'claude-opus-4-7' : 'claude-sonnet-4-6';
@@ -874,13 +874,13 @@ async function loadSettings() {
   };
 }
 
-// ---- 分析历史 ----
+// ---- analysis history ----
 
 async function saveToHistory(entry) {
   const items = await chrome.storage.local.get([HISTORY_KEY]);
   let list = Array.isArray(items[HISTORY_KEY]) ? items[HISTORY_KEY] : [];
 
-  // 去重：同一 code + template + timestamp（秒级）视为重复
+  // dedup: same code + template + timestamp (second-level) treated as duplicate
   const dupIdx = list.findIndex((e) => e.code === entry.code && e.template === entry.template && Math.abs((e.timestamp || 0) - (entry.timestamp || 0)) < 2000);
   if (dupIdx >= 0) {
     list[dupIdx] = entry;
@@ -890,13 +890,13 @@ async function saveToHistory(entry) {
 
   list.push(entry);
 
-  // 容量管理
+  // capacity management
   list = trimHistory(list);
   await persistHistory(list);
 }
 
 async function persistHistory(list) {
-  // trimHistory 已处理条数上限，这里只做体积检查
+  // trimHistory already handles count limit, here only check size
   let json = JSON.stringify(list);
   while (json.length > MAX_HISTORY_BYTES && list.length > 1) {
     list.shift();
@@ -912,7 +912,7 @@ async function handleSaveConversation(id, conversationHistory) {
   const idx = list.findIndex((e) => e.id === id);
   if (idx < 0) throw new Error('历史记录不存在');
   list[idx].conversationHistory = conversationHistory;
-  // 更新时间戳
+  // update timestamp
   list[idx].timestamp = Date.now();
   await persistHistory(list);
 }
@@ -920,7 +920,7 @@ async function handleSaveConversation(id, conversationHistory) {
 async function handleGetHistory() {
   const items = await chrome.storage.local.get([HISTORY_KEY]);
   const list = Array.isArray(items[HISTORY_KEY]) ? items[HISTORY_KEY] : [];
-  // 估算占用
+  // estimate usage
   let bytes = 0;
   try {
     bytes = JSON.stringify(list).length;
@@ -949,22 +949,22 @@ async function handleExportHistory(id) {
   const items = await chrome.storage.local.get([HISTORY_KEY]);
   const list = Array.isArray(items[HISTORY_KEY]) ? items[HISTORY_KEY] : [];
   if (id) {
-    // 导出单条
+    // export single
     const entry = list.find((e) => e.id === id);
     if (!entry) throw new Error('记录不存在');
     const md = historyToMarkdown(entry);
     return { markdown: md, filename: `${entry.name || entry.code}_${formatHistoryDate(entry.timestamp)}.md` };
   }
-  // 导出全部
+  // export all
   const md = list.map(historyToMarkdown).join('\n\n---\n\n');
   return { markdown: md, filename: `分析历史_${formatHistoryDate(Date.now())}.md`, count: list.length };
 }
 
-// ---- Native Messaging 自动同步到 Node 端 ----
+// ---- Native Messaging auto-sync to Node side ----
 
 const NATIVE_HOST = 'com.eastmoney_ai.sync';
 
-// 不同步的敏感 key 前缀
+// sensitive key prefixes not to sync
 const SYNC_SKIP_PREFIXES = [
   'apiKey:',
   'model:',
@@ -975,7 +975,7 @@ function shouldSyncKey(key) {
   return !SYNC_SKIP_PREFIXES.some((prefix) => key.startsWith(prefix));
 }
 
-// 防抖：同一 key 的变更累积，500ms 后批量发送
+// debounce: accumulate changes for same key, batch-send after 500ms
 const syncQueue = new Map();
 let syncTimer = null;
 
@@ -1000,12 +1000,12 @@ async function flushSync() {
       items,
     });
   } catch (_) {
-    // Native host 未安装或启动失败，静默忽略
-    // 数据仍在 chrome.storage.local 中，下次成功同步时会补上
+    // Native host not installed or startup failed, silently ignore
+    // data remains in chrome.storage.local, will sync on next successful attempt
   }
 }
 
-// 监听 storage 变化（content.js / popup.js 写入时触发自动同步）
+// listen for storage changes (trigger auto-sync when content.js / popup.js writes)
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== 'local') return;
   for (const [key, change] of Object.entries(changes)) {
@@ -1014,4 +1014,3 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     }
   }
 });
-

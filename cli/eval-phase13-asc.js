@@ -138,7 +138,7 @@ async function main() {
         ma5: ma5[i], ma20: ma20[i], ma60: ma60[i], dif: dif[i], dea: dea[i], hist: hist[i],
       }));
 
-      const prompt = buildPromptByTemplate({
+      const prompt = await buildPromptByTemplate({
         templateKey: tpl, name: stock.name || tp.stockCode, code: tp.stockCode,
         klines: kwi, period: 'monthly', provider: 'deepseek', decisionMode: false,
       });

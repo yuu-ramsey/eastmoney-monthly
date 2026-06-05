@@ -1,4 +1,4 @@
-"""通宵实验管线 — python scripts/run_overnight.py"""
+"""Overnight experiment pipeline — python scripts/run_overnight.py"""
 import warnings; warnings.filterwarnings('ignore')
 import sys; sys.path.insert(0, 'lib')
 import torch, numpy as np, pandas as pd, sqlite3, json, time

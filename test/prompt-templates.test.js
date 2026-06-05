@@ -109,3 +109,14 @@ test('4 个模板分析任务标题正确', () => {
     assert.ok(text.includes(kw), `${key}: 标题不含"${kw}"`);
   }
 });
+
+// ---- 估值模板不再自相矛盾 ----
+
+test('估值模板允许使用 PE/PB 等基本面数据', () => {
+  const text = buildTemplatePrompt('valuation', '月线', '月', DW, true);
+  assert.ok(text.includes('PE/PB'), '估值模板应提及 PE/PB');
+  assert.ok(text.includes('基本面指标'), '估值模板应提及基本面指标');
+  assert.ok(text.includes('get_financials'), '估值模板应提及 get_financials 工具');
+  assert.ok(!text.includes('不涉及 PE/PB'), '估值模板不应再说"不涉及 PE/PB"');
+  assert.ok(!text.includes('不引用 PE/PB'), '估值模板不应再说"不引用 PE/PB"');
+});

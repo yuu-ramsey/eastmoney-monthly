@@ -1,9 +1,9 @@
-"""LLM 24tp 重新门控 — 最小 prompt，纯 LLM 技术分析能力。
-与 Phase C 12tp 方法论一致，改用 24tp 池。
-DeepSeek only, 可断点续跑。
-用法: python scripts/p3-llm-gate-24tp.py [--sample N] [--dry]
-  --sample N   只跑 N 对（默认全量 test set）
-  --dry        不调 API，验证数据就绪
+"""LLM 24tp re-gating — minimal prompt, pure LLM technical analysis capability.
+Same methodology as Phase C 12tp, switched to 24tp pool.
+DeepSeek only, resumable from checkpoint.
+Usage: python scripts/p3-llm-gate-24tp.py [--sample N] [--dry]
+  --sample N   Only run N pairs (default: full test set)
+  --dry        Do not call API, verify data readiness
 """
 import json, os, sys, time, re
 from pathlib import Path
@@ -11,14 +11,14 @@ from datetime import datetime
 
 PROJECT = Path(__file__).resolve().parent.parent
 
-# ── 加载数据 ──
+# ── Load data ──
 pool = json.load(open(PROJECT / 'data' / 'frozen-eval-lowpos-v2-24tp.json'))
 kcache = json.load(open(PROJECT / 'data' / 'baostock-klines-cache.json'))
 
 TRAIN = {'2018-03','2018-06','2018-09','2018-12','2019-03','2019-06','2019-09',
          '2020-09','2021-03','2021-06','2022-03','2022-06'}
 
-# 去重 + 过滤
+# Deduplicate + filter
 unique = {}
 for tp in pool['testPoints']:
     if tp.get('alpha') is None: continue
@@ -49,7 +49,7 @@ if sample_n and sample_n < len(test_pairs):
     test_pairs = random.sample(test_pairs, sample_n)
     print(f"Sampled: {len(test_pairs)} pairs")
 
-# ── 构建最小 prompt ──
+# ── Build minimal prompt ──
 def get_klines(code, cutoff_date):
     full_key = None
     for k in kcache:
@@ -82,7 +82,7 @@ def build_prompt(tp):
         f"signal必五选一。"
     )
 
-# ── 验证数据就绪 ──
+# ── Verify data readiness ──
 ready = sum(1 for tp in test_pairs if build_prompt(tp))
 print(f"Ready: {ready}/{len(test_pairs)} pairs have kline data")
 
@@ -157,7 +157,7 @@ def parse_signal(text):
         pass
     return 'parse_failed'
 
-# ── 断点续跑 ──
+# ── Checkpoint / resume ──
 RUNS_DIR = PROJECT / '.eastmoney-ai' / 'eval' / 'runs'
 RUNS_DIR.mkdir(parents=True, exist_ok=True)
 RUN_ID = f"p3-llm-gate-24tp-{datetime.now().strftime('%Y%m%d-%H%M%S')}"

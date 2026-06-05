@@ -49,10 +49,7 @@
       margin-bottom: -2px;
       transition: color 0.15s, border-color 0.15s;
     }
-    .tab-btn.active {
-      color: #f7931e;
-      border-bottom-color: #f7931e;
-    }
+    .tab-btn.active { color: #f7931e; border-bottom-color: #f7931e; }
     .tab-btn:hover { color: #555; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
@@ -60,7 +57,7 @@
     /* 成本面板 */
     .cost-panel {
       background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px;
-      padding: 10px 12px; margin-bottom: 4px; cursor: pointer;
+      padding: 10px 12px; margin-bottom: 8px; cursor: pointer;
     }
     .cost-panel:hover { background: #f0f1f3; }
     .cost-summary { display: flex; justify-content: space-between; align-items: center; }
@@ -74,15 +71,45 @@
     .cost-detail .other-link { font-size: 11px; color: #3498db; cursor: pointer; margin-top: 4px; display: inline-block; }
     .cost-detail .other-link:hover { text-decoration: underline; }
 
-    /* 容量横幅 */
+    /* 使用模式 */
+    .preset-bar {
+      display: flex; gap: 0; margin-bottom: 8px;
+      border: 1px solid #dee2e6; border-radius: 6px; overflow: hidden;
+    }
+    .preset-btn {
+      flex: 1; padding: 8px 0; text-align: center;
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      color: #666; background: #fff; border: none;
+      border-right: 1px solid #e8ecf1;
+      transition: background 0.15s, color 0.15s;
+    }
+    .preset-btn:last-child { border-right: none; }
+    .preset-btn:hover { background: #f8f9fa; }
+    .preset-btn.active { background: #f7931e; color: #fff; }
+    .preset-summary {
+      font-size: 11px; color: #555; background: #f8f9fa;
+      border: 1px solid #e9ecef; border-radius: 4px;
+      padding: 6px 10px; margin-bottom: 10px;
+    }
+
+    /* 详细设置折叠 */
+    .settings-toggle {
+      font-size: 11px; color: #3498db; cursor: pointer;
+      display: flex; align-items: center; gap: 4px;
+      margin-bottom: 8px; user-select: none;
+    }
+    .settings-toggle:hover { color: #2980b9; }
+    .settings-group { display: none; }
+    .settings-group.open { display: block; }
+    .opt-hidden { display: none; }
+
+    /* 容量横幅 / 历史 / 调试 */
     .capacity-bar {
       background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 4px;
       padding: 6px 10px; margin-bottom: 10px; font-size: 11px; color: #888;
       display: flex; justify-content: space-between; align-items: center;
     }
     .capacity-bar.warn { background: #fffbeb; border-color: #fde68a; color: #d97706; }
-
-    /* 历史列表 */
     .history-empty { color: #999; font-size: 12px; text-align: center; padding: 12px 0; }
     .history-item {
       border: 1px solid #e8ecf1; border-radius: 6px; margin-bottom: 8px;
@@ -91,8 +118,7 @@
     .history-header {
       display: flex; align-items: center; justify-content: space-between;
       padding: 8px 10px; cursor: pointer; user-select: none;
-      background: #fafbfc;
-      gap: 6px;
+      background: #fafbfc; gap: 6px;
     }
     .history-header:hover { background: #f0f3f6; }
     .history-header .hi-info { flex: 1; min-width: 0; }
@@ -125,10 +151,7 @@
     .h-btn-export:hover { background: #2980b9; }
     .h-btn-del { background: #ecf0f1; color: #555; }
     .h-btn-del:hover { background: #d5dbdb; color: #333; }
-
-    .history-actions-global {
-      display: flex; gap: 8px; margin-top: 12px;
-    }
+    .history-actions-global { display: flex; gap: 8px; margin-top: 12px; }
     .h-btn-global {
       flex: 1; padding: 8px; font-size: 12px; border-radius: 4px;
       border: none; cursor: pointer; color: #fff;
@@ -138,27 +161,55 @@
     .h-btn-clear-all { background: #95a5a6; }
     .h-btn-clear-all:hover { background: #7f8c8d; }
 
-    /* 追问记录 */
     .conv-section { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #e0e5ea; }
     .conv-section h4 { font-size: 12px; color: #555; margin: 0 0 6px; }
     .conv-msg { margin: 4px 0; padding: 4px 8px; border-radius: 4px; font-size: 11px; }
     .conv-msg.user { background: #eef2ff; color: #333; }
     .conv-msg.assistant { background: #f8f9fa; color: #333; }
+
+    .debug-section {
+      border: 1px solid #e8ecf1; border-radius: 4px; margin-bottom: 6px;
+    }
+    .debug-section-header {
+      padding: 6px 10px; font-size: 12px; font-weight: 600;
+      color: #555; cursor: pointer; background: #fafbfc;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .debug-section-header:hover { background: #f0f3f6; }
+    .debug-pre {
+      margin: 0; padding: 8px 10px; background: #f8f8f8;
+      font-size: 10px; line-height: 1.3; max-height: 300px;
+      overflow: auto; white-space: pre-wrap; word-break: break-all;
+    }
+    .debug-copy-btn {
+      font-size: 10px; padding: 2px 8px; cursor: pointer;
+      background: #3498db; color: #fff; border: none; border-radius: 3px;
+    }
+    .debug-copy-btn:hover { background: #2980b9; }
+    .debug-tool-item {
+      padding: 6px 10px; border-bottom: 1px solid #f0f0f0; font-size: 11px;
+    }
+    .debug-tool-item:last-child { border-bottom: none; }
+    .debug-tool-name { font-weight: 600; color: #333; }
+    .debug-tool-meta { color: #888; font-size: 10px; margin-top: 2px; }
+    .debug-tool-result {
+      margin-top: 4px; padding: 4px 6px; background: #f8f8f8;
+      font-size: 10px; max-height: 60px; overflow-y: auto; white-space: pre-wrap;
+    }
   </style>
 </head>
 <body>
   <h1>K线 AI 分析</h1>
 
-  <!-- Tab 切换 -->
   <div class="tab-bar">
     <button class="tab-btn active" data-tab="settings">设置</button>
     <button class="tab-btn" data-tab="history">历史</button>
+    <button class="tab-btn" data-tab="debug">调试</button>
   </div>
 
   <!-- ====== 设置 Tab ====== -->
   <div class="tab-content active" id="tab-settings">
 
-    <!-- 成本面板 -->
     <div class="cost-panel" id="costPanel">
       <div class="cost-summary">
         <span class="label"><span class="cost-nav" id="costNavPrev">◂</span><span id="costLabel">本月使用情况</span><span class="cost-nav" id="costNavNext">▸</span></span>
@@ -170,94 +221,184 @@
       </div>
     </div>
 
-    <h2>设置</h2>
-
-    <label for="provider">模型提供商</label>
-    <select id="provider">
-      <option value="anthropic">Anthropic (Claude)</option>
-      <option value="deepseek">DeepSeek</option>
-    </select>
-
-    <label for="apiKey" id="apiKeyLabel">API Key</label>
-    <input type="password" id="apiKey" autocomplete="off">
-    <div class="hint" id="apiKeyHint"></div>
-
-    <label for="model">模型</label>
-    <input type="text" id="model" autocomplete="off">
-    <div class="hint">手动填写模型 ID，留空则跟随下方"分析深度"自动选择</div>
-
-    <label>分析深度（仅 Anthropic Claude）</label>
-    <div style="display:flex; gap:16px; margin:6px 0;">
-      <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-weight:400;">
-        <input type="radio" name="analysisDepth" value="standard" checked> 标准 (Sonnet)
-      </label>
-      <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-weight:400;">
-        <input type="radio" name="analysisDepth" value="deep"> 深度 (Opus)
-      </label>
+    <!-- 快速导航 -->
+    <div style="display:flex; gap:6px; margin-bottom:8px;">
+      <input type="text" id="navCode" placeholder="输入股票代码，如 600522" autocomplete="off" style="flex:1;">
+      <button id="navOpenBtn" style="flex:0;padding:6px 10px;background:#f7931e;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;white-space:nowrap;">打开</button>
     </div>
-    <div class="hint" style="color:#d97706;">深度模式约 4-5 倍价格，但分析质量更高。仅 Anthropic 有效，DeepSeek 始终用 deepseek-chat。</div>
+    <div class="hint" id="navHint" style="margin-top:-6px;margin-bottom:6px;"></div>
 
-    <label for="period">分析周期</label>
-    <select id="period">
-      <option value="monthly">月线</option>
-      <option value="weekly">周线</option>
-      <option value="daily">日线</option>
-      <option value="multi">多周期共振（月+周+日）</option>
-    </select>
-    <div class="hint" id="multiHint" style="display:none; color:#d97706;">
-      ⚠️ 多周期共振模式会在一次 LLM 调用中分析三个周期的 K 线，prompt 体积约为单周期的 3 倍，建议使用 Anthropic Sonnet 或 Opus 以保证大上下文准确度。多周期模式下辩论模式自动禁用。
+    <!-- 使用模式 -->
+    <h2>使用模式</h2>
+    <div class="preset-bar" id="presetBar">
+      <button class="preset-btn" data-preset="quick">快速</button>
+      <button class="preset-btn active" data-preset="deep">深度</button>
+      <button class="preset-btn" data-preset="debate">辩论</button>
+      <button class="preset-btn" data-preset="custom">自定义</button>
+    </div>
+    <div class="preset-summary" id="presetSummary"></div>
+
+    <!-- 详细设置折叠入口 -->
+    <div class="settings-toggle" id="settingsToggle">
+      <span id="settingsToggleIcon">▶</span> <span id="settingsToggleLabel">展开详细设置</span>
     </div>
 
-    <label for="template">分析维度（单次分析）</label>
-    <select id="template">
-      <option value="technical">技术面</option>
-      <option value="trend">趋势判断</option>
-      <option value="valuation">估值面</option>
-      <option value="sentiment">情绪面</option>
-    </select>
-    <div class="hint">仅在单次分析模式下生效，辩论模式始终使用旧风格体系</div>
+    <!-- 详细设置 -->
+    <div class="settings-group" id="settingsGroup">
+      <h2>设置</h2>
 
-    <label for="analysisStyle">分析风格（辩论模式）</label>
-    <select id="analysisStyle">
-      <option value="technical">技术分析</option>
-      <option value="chanlun">缠论</option>
-      <option value="value">价值视角</option>
-      <option value="comprehensive">综合</option>
-    </select>
-    <div class="hint" id="styleHint" style="display:none; color:#d97706;"></div>
+      <label for="provider">模型提供商</label>
+      <select id="provider">
+        <option value="anthropic">Anthropic (Claude)</option>
+        <option value="deepseek">DeepSeek</option>
+      </select>
 
-    <div style="margin:12px 0 8px;">
-      <label style="display:flex; align-items:center; gap:6px; font-weight:500; cursor:pointer;">
-        <input type="checkbox" id="debateMode">
-        启用辩论模式（多智能体）
-      </label>
-      <div class="hint">
-        ⚠️ 辩论模式会调用 4 次 LLM（Bull/Bear/Predictor 并发 + Judge 综合），成本约为单次分析的 4 倍，时间约 1.5-2 倍。
+      <label for="apiKey" id="apiKeyLabel">API Key</label>
+      <input type="password" id="apiKey" autocomplete="off">
+      <div class="hint" id="apiKeyHint"></div>
+
+      <label for="model">模型</label>
+      <input type="text" id="model" autocomplete="off">
+      <div class="hint" id="modelHint">手动填写模型 ID，留空则跟随"分析深度"自动选择</div>
+
+      <div id="rowDepth">
+        <label>分析深度（仅 Anthropic Claude）</label>
+        <div style="display:flex; gap:16px; margin:6px 0;">
+          <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-weight:400;">
+            <input type="radio" name="analysisDepth" value="standard" checked> 标准 (Sonnet)
+          </label>
+          <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-weight:400;">
+            <input type="radio" name="analysisDepth" value="deep"> 深度 (Opus)
+          </label>
+        </div>
+        <div class="hint" style="color:#d97706;" id="depthHint">深度模式约 4-5 倍价格，但分析质量更高。仅 Anthropic 有效，DeepSeek 始终用 deepseek-chat。</div>
+      </div>
+
+      <label for="period">分析周期</label>
+      <select id="period">
+        <option value="monthly">月线</option>
+        <option value="weekly">周线</option>
+        <option value="daily">日线</option>
+        <option value="multi">多周期共振（月+周+日）</option>
+      </select>
+      <div class="hint" id="multiHint" style="display:none; color:#d97706;">
+        ⚠️ 多周期共振模式会在一次 LLM 调用中分析三个周期的 K 线，prompt 体积约为单周期的 3 倍，建议使用 Anthropic Sonnet 或 Opus 以保证大上下文准确度。多周期模式下辩论模式自动禁用。
+      </div>
+
+      <div id="rowTemplate">
+        <label for="template">分析维度（单次分析）</label>
+        <select id="template">
+          <option value="technical">技术面</option>
+          <option value="trend">趋势判断</option>
+          <option value="valuation">估值面</option>
+          <option value="sentiment">情绪面</option>
+        </select>
+        <div class="hint">仅在单次分析模式下生效</div>
+      </div>
+
+      <div id="rowAnalysisStyle">
+        <label for="analysisStyle">分析风格</label>
+        <select id="analysisStyle">
+          <option value="technical">技术分析</option>
+          <option value="chanlun">缠论</option>
+          <option value="value">价值视角</option>
+          <option value="comprehensive">综合</option>
+        </select>
+        <div class="hint" id="styleHint" style="display:none; color:#d97706;"></div>
+      </div>
+
+      <div id="rowDebateMode" style="margin:12px 0 8px;">
+        <label style="display:flex; align-items:center; gap:6px; font-weight:500; cursor:pointer;">
+          <input type="checkbox" id="debateMode">
+          启用辩论模式（多智能体）
+        </label>
+        <div class="hint">
+          ⚠️ 辩论模式会调用 4 次 LLM，成本约为单次分析的 4 倍。
+        </div>
+      </div>
+
+      <div id="rowSelfBacktest" style="margin:12px 0 8px;">
+        <label style="display:flex; align-items:center; gap:6px; font-weight:500; cursor:pointer;">
+          <input type="checkbox" id="enableSelfBacktest" checked>
+          自我回测（增强判断质量，成本 +200%）
+        </label>
+        <div class="hint">仅单次分析模式 + K 线 ≥36 根时生效。</div>
+      </div>
+
+      <div id="rowThinking" style="margin:12px 0 8px;">
+        <label style="display:flex; align-items:center; gap:6px; font-weight:500; cursor:pointer;">
+          <input type="checkbox" id="enableThinking">
+          启用扩展思考（仅 Opus，成本 +20%）
+        </label>
+        <div class="hint">仅在 Anthropic Opus 模型下生效。</div>
+      </div>
+
+      <div style="margin:12px 0 8px;">
+        <label style="display:flex; align-items:center; gap:6px; font-weight:500; cursor:pointer;">
+          <input type="checkbox" id="enableDebugLog">
+          启用调试日志（占用 storage）
+        </label>
+        <div class="hint">每次分析后保存完整 prompt / 工具调用 / LLM 原始输出到调试面板。</div>
+      </div>
+
+      <div style="margin:12px 0 8px;">
+        <label style="display:flex; align-items:center; gap:6px; font-weight:500; cursor:pointer;">
+          <input type="checkbox" id="decisionMode">
+          个人决策模式（输出明确操作建议）
+        </label>
+        <div class="hint" style="color:#d97706;">
+          ⚠️ 仅供工具持有者本人研究使用，不构成对外投资建议。
+        </div>
+      </div>
+
+      <label for="klineLimit">K线根数</label>
+      <input type="number" id="klineLimit" min="12" max="240" placeholder="60" autocomplete="off">
+
+      <div class="row">
+        <button class="save" id="saveBtn">保存</button>
+        <button class="clear" id="clearBtn">清除 Key</button>
+      </div>
+      <div class="status" id="status"></div>
+
+      <div id="structuredDebug" style="margin-top:12px; border-top:1px solid #eee; padding-top:8px;">
+        <span class="other-link" id="structuredDebugLink" style="font-size:11px; cursor:pointer;">📋 查看结构化数据</span>
+        <div id="structuredDebugContent" style="display:none;"></div>
       </div>
     </div>
+  </div>
 
-    <div style="margin:12px 0 8px;">
-      <label style="display:flex; align-items:center; gap:6px; font-weight:500; cursor:pointer;">
-        <input type="checkbox" id="decisionMode">
-        个人决策模式（输出明确操作建议）
-      </label>
-      <div class="hint" style="color:#d97706;">
-        ⚠️ 开启后输出会包含具体的加仓/减仓/止损位建议。仅供工具持有者本人研究使用，不构成对外投资建议。市场有风险，决策由你本人独立承担。
+  <!-- ====== 调试 Tab ====== -->
+  <div class="tab-content" id="tab-debug">
+    <div id="debugEmpty" class="history-empty">暂无调试数据（需在设置中开启"启用调试日志"后运行一次分析）</div>
+    <div id="debugContent" style="display:none;">
+      <div id="debugSummary" style="font-size:12px;color:#555;margin-bottom:10px;"></div>
+      <div class="debug-section">
+        <div class="debug-section-header" data-action="toggle-debug" data-target="debugPrompt">
+          📝 完整 Prompt <button class="debug-copy-btn" data-copy="debugPromptContent">复制</button>
+        </div>
+        <pre class="debug-pre" id="debugPrompt" style="display:none;"><code id="debugPromptContent"></code></pre>
       </div>
-    </div>
-
-    <label for="klineLimit">K线根数</label>
-    <input type="number" id="klineLimit" min="12" max="240" placeholder="60" autocomplete="off">
-
-    <div class="row">
-      <button class="save" id="saveBtn">保存</button>
-      <button class="clear" id="clearBtn">清除 Key</button>
-    </div>
-    <div class="status" id="status"></div>
-
-    <div id="structuredDebug" style="margin-top:12px; border-top:1px solid #eee; padding-top:8px;">
-      <span class="other-link" id="structuredDebugLink" style="font-size:11px; cursor:pointer;">📋 查看结构化数据</span>
-      <div id="structuredDebugContent" style="display:none;"></div>
+      <div class="debug-section">
+        <div class="debug-section-header" data-action="toggle-debug" data-target="debugToolCalls">
+          🔧 工具调用日志
+        </div>
+        <div id="debugToolCalls" style="display:none;"></div>
+      </div>
+      <div class="debug-section">
+        <div class="debug-section-header" data-action="toggle-debug" data-target="debugRawResponse">
+          📄 LLM 原始输出 <button class="debug-copy-btn" data-copy="debugRawResponseContent">复制</button>
+        </div>
+        <pre class="debug-pre" id="debugRawResponse" style="display:none;"><code id="debugRawResponseContent"></code></pre>
+      </div>
+      <div class="debug-section">
+        <div class="debug-section-header" data-action="toggle-debug" data-target="debugUsage">
+          📊 Token 用量明细
+        </div>
+        <div id="debugUsage" style="display:none;padding:8px 10px;font-size:12px;"></div>
+      </div>
+      <div style="margin-top:12px; text-align:right;">
+        <button id="clearDebugBtn" style="font-size:11px;padding:4px 12px;background:#e74c3c;color:#fff;border:none;border-radius:4px;cursor:pointer;">🗑 清空调试日志</button>
+      </div>
     </div>
   </div>
 

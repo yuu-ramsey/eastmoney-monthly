@@ -11,6 +11,7 @@ B, LR, WD, EPOCHS = 128, 5e-4, 1e-4, 30
 
 conn = sqlite3.connect('.eastmoney-ai/db/klines-v2.sqlite')
 codes = [r[0] for r in conn.execute('SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
+print(f"Training on {len(codes)} stocks (all DB with >=84 months)")
 params_str = ','.join('?' * len(codes))
 df = pd.read_sql_query(f"SELECT code, date, open, high, low, close, volume FROM monthly_klines WHERE code IN ({params_str}) AND date >= '2010-01' ORDER BY code, date", conn, params=codes)
 conn.close()
@@ -55,10 +56,10 @@ Xtr, ytr = X[train_m], y[train_m]; Xtr, ytr = Xtr[~np.isnan(ytr).any(axis=1)], y
 Xte, yte = X[test_m], y[test_m]; Xte, yte = Xte[~np.isnan(yte).any(axis=1)], yte[~np.isnan(yte).any(axis=1)]
 print(f"Train: {Xtr.shape}, Test: {Xte.shape}")
 
-if len(Xtr) > 200000:
-    idx = np.random.choice(len(Xtr), 200000, replace=False)
+if len(Xtr) > 300000:
+    idx = np.random.choice(len(Xtr), 300000, replace=False)
     Xtr, ytr = Xtr[idx], ytr[idx]
-    print(f"Subsampled to 200K")
+    print(f"Subsampled to 300K")
 
 torch.manual_seed(456); np.random.seed(456)
 train_ds = torch.utils.data.TensorDataset(torch.from_numpy(Xtr), torch.from_numpy(ytr))

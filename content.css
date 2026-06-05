@@ -458,3 +458,137 @@
   opacity: 0.6;
   cursor: wait;
 }
+
+/* 思考流 */
+.thinking-stream {
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  background: #fafbfc;
+  overflow: hidden;
+}
+.thinking-header {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  gap: 6px;
+  background: #f0f2f5;
+  cursor: pointer;
+}
+.thinking-icon { font-size: 14px; }
+.thinking-status {
+  flex: 1;
+  font-size: 12px;
+  color: #555;
+  font-weight: 500;
+}
+.thinking-toggle {
+  font-size: 11px;
+  cursor: pointer;
+  background: none;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 2px 8px;
+  color: #666;
+}
+.thinking-body {
+  padding: 8px 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #555;
+}
+.stream-thinking {
+  color: #999;
+  font-style: italic;
+}
+.stream-text {
+  color: #444;
+}
+.stream-tool {
+  color: #3498db;
+  font-weight: 500;
+}
+.stream-tool-done {
+  color: #27ae60;
+  font-weight: 500;
+}
+
+/* 仪表盘卡片 */
+.dashboard-card {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+.dashboard-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.dashboard-score {
+  text-align: center;
+  min-width: 70px;
+}
+.score-number {
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1;
+}
+.score-label {
+  font-size: 10px;
+  color: #888;
+  margin-top: 2px;
+}
+.dashboard-signal {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+}
+.dashboard-confidence {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.dashboard-summary {
+  font-size: 12px;
+  color: #555;
+  margin-bottom: 8px;
+  padding: 4px 0;
+}
+.dashboard-levels {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.level-item {
+  flex: 1;
+  background: #fff;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  padding: 6px 8px;
+  text-align: center;
+}
+.level-label {
+  font-size: 9px;
+  color: #999;
+  display: block;
+  margin-bottom: 2px;
+}
+.level-values {
+  font-size: 11px;
+  font-weight: 500;
+  color: #333;
+}
+.dashboard-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: #666;
+}

@@ -1,0 +1,54 @@
+# 敏感配置
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+native-host/manifest/eastmoney-ai-sync-installed.json
+.claude/settings.local.json
+
+# 评估数据 + 预算 + 草稿（含隐私信息，严禁提交）
+.eastmoney-ai/
+data/frozen-eval-*.json
+
+# 模型权重（大文件 + 潜在许可证问题）
+kronos/*.pt
+kronos/*.safetensors
+lib/lstm/*.pt
+*.onnx
+
+# 依赖
+node_modules/
+package-lock.json.bak
+
+# 测试/临时
+.eval-cache/
+*.test.local.js
+tmp_*.js
+_test_*.js
+v*-eval.js
+v*-verify-eval.js
+v*-verify.js
+v*-full.js
+
+# 日志
+logs/
+*.log
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# Chrome 扩展禁止 _ 开头文件名
+_*
+=
+
+# Kronos venv（可重建）
+kronos/venv/
+
+# IDE 配置
+.vscode/
+.idea/
+*.swp
+kronos/venv/
+kronos/weights/

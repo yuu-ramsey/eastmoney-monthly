@@ -208,7 +208,7 @@ async function runOneMode({ mode, runMode, dataset, apiKey, model, db, calcSecto
       }
 
       // 构建 prompt
-      const prompt = buildPromptByTemplate({
+      const prompt = await buildPromptByTemplate({
         templateKey: tpl,
         name: stock.name || tp.stockCode,
         code: tp.stockCode,

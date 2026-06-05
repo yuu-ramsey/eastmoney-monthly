@@ -1,0 +1,19 @@
+{
+  "monthly": {
+    "maPeriod": 60,
+    "slopeLookback": 5,
+    "slopeMinDegree": 0
+  },
+  "weekly": {
+    "maPeriod": 20,
+    "slopeLookback": 5,
+    "slopeMinDegree": 0
+  },
+  "daily": {
+    "maPeriod": 20,
+    "slopeLookback": 5,
+    "slopeMinDegree": 0,
+    "rsiMin": 30,
+    "rsiMax": 70
+  }
+}

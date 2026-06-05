@@ -1,0 +1,58 @@
+{
+  "version": "1.0",
+  "description": "40只A股种子股票，6类形态各5-8只，上市≥5年",
+  "stocks": {
+    "trend_strong": [
+      { "code": "600519", "market": "1", "name": "贵州茅台", "industry": "白酒" },
+      { "code": "300750", "market": "0", "name": "宁德时代", "industry": "电池" },
+      { "code": "002594", "market": "0", "name": "比亚迪", "industry": "汽车" },
+      { "code": "601012", "market": "1", "name": "隆基绿能", "industry": "光伏" },
+      { "code": "300760", "market": "0", "name": "迈瑞医疗", "industry": "医疗器械" },
+      { "code": "603259", "market": "1", "name": "药明康德", "industry": "CXO" },
+      { "code": "600809", "market": "1", "name": "山西汾酒", "industry": "白酒" }
+    ],
+    "trend_weak": [
+      { "code": "601398", "market": "1", "name": "工商银行", "industry": "银行" },
+      { "code": "601318", "market": "1", "name": "中国平安", "industry": "保险" },
+      { "code": "600036", "market": "1", "name": "招商银行", "industry": "银行" },
+      { "code": "601939", "market": "1", "name": "建设银行", "industry": "银行" },
+      { "code": "600900", "market": "1", "name": "长江电力", "industry": "电力" },
+      { "code": "601088", "market": "1", "name": "中国神华", "industry": "煤炭" },
+      { "code": "600887", "market": "1", "name": "伊利股份", "industry": "乳业" }
+    ],
+    "sideways": [
+      { "code": "000895", "market": "0", "name": "双汇发展", "industry": "食品" },
+      { "code": "600690", "market": "1", "name": "海尔智家", "industry": "家电" },
+      { "code": "000333", "market": "0", "name": "美的集团", "industry": "家电" },
+      { "code": "603288", "market": "1", "name": "海天味业", "industry": "调味品" },
+      { "code": "002027", "market": "0", "name": "分众传媒", "industry": "广告" }
+    ],
+    "high_volatility": [
+      { "code": "002049", "market": "0", "name": "紫光国微", "industry": "芯片" },
+      { "code": "300014", "market": "0", "name": "亿纬锂能", "industry": "电池" },
+      { "code": "603986", "market": "1", "name": "兆易创新", "industry": "存储" },
+      { "code": "002371", "market": "0", "name": "北方华创", "industry": "半导体设备" },
+      { "code": "300274", "market": "0", "name": "阳光电源", "industry": "逆变器" },
+      { "code": "688981", "market": "1", "name": "中芯国际", "industry": "晶圆代工" }
+    ],
+    "value": [
+      { "code": "600585", "market": "1", "name": "海螺水泥", "industry": "水泥" },
+      { "code": "000002", "market": "0", "name": "万科A", "industry": "地产" },
+      { "code": "000651", "market": "0", "name": "格力电器", "industry": "空调" },
+      { "code": "601166", "market": "1", "name": "兴业银行", "industry": "银行" },
+      { "code": "600016", "market": "1", "name": "民生银行", "industry": "银行" },
+      { "code": "601818", "market": "1", "name": "光大银行", "industry": "银行" },
+      { "code": "601668", "market": "1", "name": "中国建筑", "industry": "基建" }
+    ],
+    "cyclical": [
+      { "code": "601225", "market": "1", "name": "陕西煤业", "industry": "煤炭" },
+      { "code": "600309", "market": "1", "name": "万华化学", "industry": "化工" },
+      { "code": "600019", "market": "1", "name": "宝钢股份", "industry": "钢铁" },
+      { "code": "000630", "market": "0", "name": "铜陵有色", "industry": "有色" },
+      { "code": "601899", "market": "1", "name": "紫金矿业", "industry": "黄金" },
+      { "code": "600031", "market": "1", "name": "三一重工", "industry": "机械" },
+      { "code": "000338", "market": "0", "name": "潍柴动力", "industry": "重卡" },
+      { "code": "002460", "market": "0", "name": "赣锋锂业", "industry": "锂矿" }
+    ]
+  }
+}

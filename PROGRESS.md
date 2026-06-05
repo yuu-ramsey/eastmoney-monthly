@@ -1192,6 +1192,40 @@ Node.js CLI: ema analyze <code>
 
 关键发现: 反转 +6.6% 来自 12tp 池, 扩到 24tp 翻负至 -19.2%。Kronos 唯一 test CI 排除 0 + decay 健康 + r(LLM)=0.069。A/B 测试 Kronos 4/4 分歧票改变 LLM 方向。
 
-Runtime: Kronos=ON, 反转=ON(需撤), LSTM=OFF。
+Runtime: Kronos=ON, 反转=OFF(已撤), LSTM=OFF。
+
+### LLM 方向信号 24tp 重新门控（2026-06-05）
+
+LLM 自身方向预测（最小 prompt，不注入外部信号）在 24tp 池上重新评估：
+
+- 1613 test pairs, DeepSeek, ¥0.42
+- 信号分布: neutral 70.9%, bull 25.9%, strong_bull 1.9%, bear 1.4%, strong_bear 0%
+- 极端保守: 几乎不选方向, strong_bear 零次
+
+| 信号 | 12tp (Phase C) | 24tp (本次) |
+|------|---------------|------------|
+| LLM spread | +8.9% CI[+3.7,+14.1] ✓ | +1.6% CI[-3.4,+6.6] ✗ |
+| strong_bull α | — | +26.0% (n=30) |
+| 方向命中率 | — | 57.5% |
+
+**结论**: LLM 在 24tp 池上方向信号不显著（CI 含 0）。strong_bull 30 次预测 alpha +26% 极高但样本太少。LLM 不适合作为方向判断的独立依据。
+
+### 角色变更（2026-06-05）
+
+- **Kronos**: 主方向信号 — 24tp 唯一通过门控
+- **LLM**: 辅助解读 — 提供技术面分析、事件解读、基本面逻辑，不独立给方向
+- **反转**: 已从 runtime 撤出（24tp 翻负）
+- **Kronos prompt 块更新**: "若 Kronos 与技术面分歧，优先参考 Kronos 方向，用技术面解释可能原因"
+
+### 改动文件（2026-06-05）
+
+| 文件 | 改动 |
+|------|------|
+| `background.js` | 删除反转因子计算块 + reversalSignalData 传参 |
+| `lib/build-prompt.js` | 移除 buildReversalSignalBlock import/调用/渲染 |
+| `lib/prompt-templates.js` | 反转函数废弃, Kronos 块重写: 定位为主方向信号 |
+| `scripts/p3-kronos-clean-ab.py` | 新增: Kronos 零成本互补性分析 |
+| `scripts/p3-llm-gate-24tp.py` | 新增: LLM 24tp 门控 runner |
+| `scripts/p3-analyze-llm-gate.py` | 新增: LLM 门控结果分析 |
 
 

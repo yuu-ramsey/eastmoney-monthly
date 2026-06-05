@@ -1,8 +1,8 @@
 """
-Kronos core modules — BSQ quantizer, attention mechanism, Transformer blocks, embedding layers
+Kronos core modules - BSQ quantizer, attention mechanism, Transformer blocks, embedding layers
 
 Reproduced from Kronos original repo (github.com/shiyu-coder/Kronos) model/module.py.
-为兼容 HuggingFace 预训练权重，类名和 __init__ 签名与原 repo 完全一致。
+Class names and __init__ signatures match the original repo for HuggingFace pretrained weight compatibility.
 """
 
 # Reproduced from Kronos (https://github.com/shiyu-coder/Kronos)

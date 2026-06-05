@@ -1,8 +1,8 @@
 """
-Data adapter — reads monthly kline data from project SQLite, converts to Kronos Predictor input format
+Data adapter - reads monthly kline data from project SQLite, converts to Kronos Predictor input format
 
 Input: Monthly kline records for a stock from SQLite
-输出: pandas DataFrame
+Output: pandas DataFrame
   columns = ['open','high','low','close','volume','amount']
   index 为 DatetimeIndex（月线日期）
 """

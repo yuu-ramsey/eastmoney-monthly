@@ -1,11 +1,11 @@
 """
-Kronos weight download CLI — downloads pretrained models from HuggingFace Hub
+Kronos weight download CLI - downloads pretrained models from HuggingFace Hub
 
 Usage:
-    python -m kronos.download_weights                        # 下载 tokenizer + model
-    python -m kronos.download_weights --tokenizer-only       # 仅下载 tokenizer
-    python -m kronos.download_weights --model-only           # 仅下载 model
-    python -m kronos.download_weights --model-size large     # 下载 Kronos-large
+    python -m kronos.download_weights                        # download tokenizer + model
+    python -m kronos.download_weights --tokenizer-only       # 仅download tokenizer
+    python -m kronos.download_weights --model-only           # 仅download model
+    python -m kronos.download_weights --model-size large     # download Kronos-large
     python -m kronos.download_weights --no-verify            # 跳过验证
 """
 
@@ -40,7 +40,7 @@ MODEL_DIR = WEIGHTS_DIR / "model"
 
 
 def download_tokenizer() -> Path:
-    """下载 KronosTokenizer 权重，返回保存路径"""
+    """download KronosTokenizer 权重，返回保存路径"""
     print(f"[1/4] 从 {REPO_TOKENIZER} 加载 tokenizer 配置...")
     tokenizer = KronosTokenizer.from_pretrained(REPO_TOKENIZER)
     print(f"  配置: s1_bits={tokenizer.s1_bits}, s2_bits={tokenizer.s2_bits}, "
@@ -54,7 +54,7 @@ def download_tokenizer() -> Path:
 
 
 def download_model(model_size: str = "base") -> Path:
-    """下载 Kronos 预测模型权重，返回保存路径"""
+    """download Kronos 预测模型权重，返回保存路径"""
     repo = REPO_MODEL_LARGE if model_size == "large" else REPO_MODEL_BASE
     print(f"[3/4] 从 {repo} 加载 model 配置...")
     model = Kronos.from_pretrained(repo)
@@ -122,16 +122,16 @@ def verify(tokenizer_path: Path, model_path: Path) -> bool:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="下载 Kronos 预训练权重 (HuggingFace)"
+        description="download Kronos 预训练权重 (HuggingFace)"
     )
     parser.add_argument("--tokenizer-only", action="store_true",
-                        help="仅下载 tokenizer 权重")
+                        help="仅download tokenizer 权重")
     parser.add_argument("--model-only", action="store_true",
-                        help="仅下载 model 权重")
+                        help="仅download model 权重")
     parser.add_argument("--model-size", choices=["base", "large"],
                         default="base", help="model 规模 (default: base)")
     parser.add_argument("--no-verify", action="store_true",
-                        help="下载后不跑验证")
+                        help="download后不跑验证")
     args = parser.parse_args()
 
     tokenizer_path: Path | None = None

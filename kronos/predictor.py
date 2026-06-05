@@ -1,8 +1,8 @@
 """
-Kronos inference wrapper — autoregressive generation of predicted K-lines
+Kronos inference wrapper - autoregressive generation of predicted K-lines
 
 Inference pipeline:
-1. Tokenizer.encode(历史 OHLCV) → s1/s2 token 序列
+1. Tokenizer.encode(historical OHLCV) -> s1/s2 token sequence
 2. 逐 token 自回归：decode_s1 预测 s1 → 采样 → decode_s2 预测 s2 → 采样
 3. Tokenizer.decode(s1, s2) → 预测期 OHLCV 重建
 4. 多采样取均值得最终预测（降低单次采样的随机波动）
@@ -106,14 +106,14 @@ def auto_regressive_inference(
     """
     自回归推理：逐 token 预测未来序列。
 
-    为了避免重复前向传播整个历史序列，使用滑动窗口缓存：
+    为了避免重复前向传播整个historical序列，使用滑动窗口缓存：
     每预测一个 token 后将其追加到序列末尾，超出 max_context 时丢弃最早的 token。
 
     Args:
         model: Kronos 预测模型
         device: 计算设备
-        s1_history: [1, history_len] 历史 s1 token
-        s2_history: [1, history_len] 历史 s2 token
+        s1_history: [1, history_len] historical s1 token
+        s2_history: [1, history_len] historical s2 token
         pred_len: 预测步数
         stamp: [1, pred_len, 5] 未来时间戳（可选）
         temperature: 采样温度
@@ -239,7 +239,7 @@ class KronosPredictor:
         tokenizer: KronosTokenizer 实例
         model: Kronos 实例
         device: 计算设备 ("cuda" / "cpu")
-        max_context: 自回归生成时最大保留的历史长度
+        max_context: 自回归生成时最大保留的historical长度
     """
 
     def __init__(
@@ -275,10 +275,10 @@ class KronosPredictor:
         Args:
             df: 包含 OHLCV 列的 DataFrame（至少需要 open/high/low/close/volume/amount），
                 按时间升序排列
-            x_timestamp: 历史数据截止时间 (如 "2024-01-01")
+            x_timestamp: historical数据截止时间 (如 "2024-01-01")
             y_timestamp: 预测起始时间 (如 "2024-02-01")
             pred_len: 预测 K 线数量
-            context_len: 使用的历史 K 线数量（从 x_timestamp 往前取）
+            context_len: 使用的historical K 线数量（从 x_timestamp 往前取）
             top_p: nucleus 采样阈值
             top_k: top-k 过滤（0=不限制）
             temperature: 采样温度
@@ -290,11 +290,11 @@ class KronosPredictor:
         x_ts = pd.Timestamp(x_timestamp)
         y_ts = pd.Timestamp(y_timestamp)
 
-        # 提取历史数据（截止 x_timestamp）
+        # 提取historical数据（截止 x_timestamp）
         hist_df = df[df.index <= x_ts].tail(context_len).copy()
         if len(hist_df) < context_len:
             raise ValueError(
-                f"历史数据不足: 需要 {context_len} 条，实际 {len(hist_df)} 条"
+                f"historical数据不足: 需要 {context_len} 条，实际 {len(hist_df)} 条"
             )
 
         # 提取 OHLCV 列（标准化列名）

@@ -1,5 +1,5 @@
 """
-KronosPredictor end-to-end inference test — synthetic data validation
+KronosPredictor end-to-end inference test - synthetic data validation
 
 Validation: run full inference pipeline on synthetic K-line data, verify output DataFrame columns and shape.
 """
@@ -21,7 +21,7 @@ from kronos.transformer import Kronos
 
 
 class TestTopKTopPFiltering:
-    """采样过滤函数测试"""
+    """Sampling filter function test"""
 
     def test_top_k_filtering(self):
         logits = torch.tensor([[1.0, 2.0, 3.0, 0.5, 0.1]])
@@ -146,7 +146,7 @@ class TestKronosPredictor:
 
     def test_insufficient_data(self, tokenizer, model, df):
         predictor = KronosPredictor(tokenizer, model, device="cpu")
-        with pytest.raises(ValueError, match="历史数据不足"):
+        with pytest.raises(ValueError, match="historical数据不足"):
             predictor.predict(
                 df, x_timestamp="2020-02-01", y_timestamp="2020-03-01",
                 pred_len=3, context_len=400,

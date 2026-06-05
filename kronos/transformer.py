@@ -1,8 +1,8 @@
 """
-Kronos autoregressive Transformer — hierarchical token prediction model
+Kronos autoregressive Transformer - hierarchical token prediction model
 
 Decoder-only architecture:
-1. 输入 s1+s2 token → HierarchicalEmbedding + TemporalEmbedding
+1. Input s1+s2 token -> HierarchicalEmbedding + TemporalEmbedding
 2. N 层 TransformerBlock 处理
 3. decode_s1: 先预测 s1（粗粒度趋势），采样得到 s1
 4. decode_s2: 用 s1 作为条件，经 DependencyAwareLayer 预测 s2（细粒度波动）
@@ -36,7 +36,7 @@ class Kronos(nn.Module, PyTorchModelHubMixin):
     """
     Kronos 预测模型：自回归预测 K线 token 序列
 
-    输入历史 token → Transformer → 逐 token 生成未来序列。
+    输入historical token → Transformer → 逐 token 生成未来序列。
     s1/s2 双级解码：先定趋势 (s1) 再定细节 (s2)。
 
     Args:

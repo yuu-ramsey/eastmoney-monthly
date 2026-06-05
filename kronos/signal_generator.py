@@ -1,8 +1,8 @@
 """
-Signal generator — aggregates multiple independent Kronos K-line predictions into trading signals
+Signal generator - aggregates multiple independent Kronos K-line predictions into trading signals
 
 Input: list of N prediction DataFrames (independent samples, each sample_count=1)
-输出: dict { direction, predicted_change_pct, predicted_high,
+Output: dict { direction, predicted_change_pct, predicted_high,
              predicted_low, confidence, volatility }
 
 置信度：N 次采样中，方向与最终判定一致的比例

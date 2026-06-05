@@ -2,12 +2,12 @@
 Kronos local offline prediction CLI
 
 Usage:
-    python cli_predict.py 600519                    # 文本输出
+    python cli_predict.py 600519                    # text output
     python cli_predict.py 600519 --json             # JSON 输出（供 Node.js 消费）
     python cli_predict.py 600519 --n-samples 20     # 自定义采样次数
     python cli_predict.py 600519 --pred-len 6       # 预测 6 根月线
 
-前置条件: 先运行 download_weights.py 下载预训练权重到 kronos/weights/
+前置条件: 先运行 download_weights.py download预训练权重到 kronos/weights/
 """
 
 # Reproduced from Kronos (https://github.com/shiyu-coder/Kronos)
@@ -93,7 +93,7 @@ def main():
     parser.add_argument("--temperature", type=float, default=0.6, help="采样温度 (default: 0.6)")
     parser.add_argument("--top-k", type=int, default=30, help="top-k 过滤 (default: 30)")
     parser.add_argument("--device", default="cuda", choices=["cuda", "cpu"])
-    parser.add_argument("--x-timestamp", default=None, help="历史截止时间 (default: 自动取最新月)")
+    parser.add_argument("--x-timestamp", default=None, help="historical截止时间 (default: 自动取最新月)")
     parser.add_argument("--y-timestamp", default=None, help="预测起始时间 (default: x_timestamp + 1月)")
     parser.add_argument("--db", default=None, help="SQLite 数据库路径")
     args = parser.parse_args()

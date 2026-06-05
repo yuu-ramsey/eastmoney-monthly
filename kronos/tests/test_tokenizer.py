@@ -1,8 +1,8 @@
 """
-KronosTokenizer unit test — weight loading + encode/decode validation
+KronosTokenizer unit test - weight loading + encode/decode validation
 
 Validation: after loading HuggingFace pretrained weights, encode->decode output dimensions correct,
-重建数据在合理量级范围内。
+Reconstructed data within reasonable magnitude range.
 """
 
 import pytest
@@ -10,14 +10,14 @@ import torch
 
 from kronos.tokenizer import KronosTokenizer
 
-# 跳过标记：需要已下载的权重
+# 跳过标记：需要已download的权重
 _tokenizer_weights_dir = (
     __import__("pathlib").Path(__file__).resolve().parent.parent
     / "weights" / "tokenizer"
 )
 requires_weights = pytest.mark.skipif(
     not _tokenizer_weights_dir.exists(),
-    reason="未下载权重，请先运行 download_weights.py"
+    reason="未download权重，请先运行 download_weights.py"
 )
 
 

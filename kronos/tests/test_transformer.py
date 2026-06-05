@@ -1,8 +1,8 @@
 """
-Kronos prediction model unit test — weight loading + forward pass validation
+Kronos prediction model unit test - weight loading + forward pass validation
 
 Validation: after loading HuggingFace pretrained weights, forward / decode_s1 / decode_s2
-输出维度正确，logits 值在合理范围。
+Output dimensions correct, logits values within reasonable range.
 """
 
 import pytest
@@ -16,7 +16,7 @@ _model_weights_dir = (
 )
 requires_weights = pytest.mark.skipif(
     not _model_weights_dir.exists(),
-    reason="未下载权重，请先运行 download_weights.py"
+    reason="未download权重，请先运行 download_weights.py"
 )
 
 

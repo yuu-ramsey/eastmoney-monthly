@@ -1,8 +1,8 @@
 """
-Kronos Tokenizer — K-line data → BSQ hierarchical discrete tokens
+Kronos Tokenizer - K-line data -> BSQ hierarchical discrete tokens
 
 Core pipeline:
-1. 线性嵌入：OHLCV(6维) → d_model
+1. Linear embedding: OHLCV(6-dim) -> d_model
 2. Encoder Transformer → 压缩到 codebook_dim
 3. BSQuantizer：L2归一化 → sign量化 → s1(粗粒度)+s2(细粒度) token
 4. Decoder Transformer → 重建 OHLCV

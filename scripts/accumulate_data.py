@@ -188,7 +188,7 @@ def main():
         log("重建 v2 dataset...")
         import subprocess
         result = subprocess.run(
-            ['D:/node.js/node.exe', 'scripts/build-frozen-dataset-v2.js', '--match-v1'],
+            ['node', 'scripts/build-frozen-dataset-v2.js', '--match-v1'],
             cwd=str(PROJECT), capture_output=True, text=True,
         )
         if result.returncode == 0:

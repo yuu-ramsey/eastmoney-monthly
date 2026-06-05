@@ -1,16 +1,16 @@
 #!/usr/bin/env node
-// ema CLI — 自学习闭环命令行工具
-// 用法：
-//   ema nightly                  — 跑夜间作业
-//   ema scheduled                — 跑当日调度任务
-//   ema sync check               — 检查 Native Messaging 同步状态
-//   ema review draft             — 立即生成新草稿
-//   ema review list              — 列所有草稿
-//   ema review show {date}       — 看某天草稿
-//   ema review approve {date}    — 审核通过，生成 Claude 精修
-//   ema budget show              — 看预算
-//   ema budget set --monthly 80  — 改限额
-//   ema db init --scope hs300    — 建本地 K 线库（阶段 8）
+// ema CLI — self-learning loop CLI tool
+// Usage:
+//   ema nightly                  — run nightly job
+//   ema scheduled                — run daily scheduled tasks
+//   ema sync check               — check Native Messaging sync status
+//   ema review draft             — generate new draft immediately
+//   ema review list              — list all drafts
+//   ema review show {date}       — view draft for a date
+//   ema review approve {date}    — approve and generate Claude refinement
+//   ema budget show              — view budget
+//   ema budget set --monthly 80  — change limit
+//   ema db init --scope hs300    — initialize local K-line database (Phase 8)
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -74,12 +74,12 @@ async function main() {
       }
 
       default:
-        console.error(`未知命令: ${cmd}`);
+        console.error(`Unknown command: ${cmd}`);
         printUsage();
         process.exit(1);
     }
   } catch (err) {
-    console.error('错误:', err.message);
+    console.error('Error:', err.message);
     if (process.env.EMA_DEBUG) console.error(err.stack);
     process.exit(1);
   }
@@ -88,9 +88,9 @@ async function main() {
 // ---- nightly ----
 
 async function handleNightly(args) {
-  console.log('=== 夜间作业 ===');
+  console.log('=== Nightly Job ===');
 
-  // 1. 读 history
+  // 1. read history
   const historyPath = path.join(STORAGE_DIR, 'history.json');
   let historyEntries = [];
   if (fs.existsSync(historyPath)) {
@@ -98,34 +98,34 @@ async function handleNightly(args) {
       const raw = fs.readFileSync(historyPath, 'utf-8');
       historyEntries = JSON.parse(raw);
       if (!Array.isArray(historyEntries)) historyEntries = [];
-      console.log(`读取 history: ${historyEntries.length} 条`);
+      console.log(`Loaded history: ${historyEntries.length} entries`);
     } catch (err) {
-      console.warn(`读取 history 失败: ${err.message}`);
+      console.warn(`Failed to load history: ${err.message}`);
     }
   }
 
   if (historyEntries.length === 0) {
-    console.warn('警告: 本地无 history 数据。');
+    console.warn('Warning: no local history data.');
     console.warn('');
-    console.warn('可能原因:');
-    console.warn('  1. Native Messaging 尚未配置（运行 ema sync check 检查）');
-    console.warn('  2. Chrome 扩展尚未做任何分析');
-    console.warn('  3. 手动从 Chrome 扩展导出 history 后放入:');
+    console.warn('Possible causes:');
+    console.warn('  1. Native Messaging not configured (run `ema sync check`)');
+    console.warn('  2. Chrome extension has not performed any analysis yet');
+    console.warn('  3. Manually export history from the Chrome extension and place it in:');
     console.warn(`     ${historyPath}`);
     return;
   }
 
-  // 2. 构造 fetchers（本地库优先，在线 fallback）
+  // 2. build fetchers (local DB first, online fallback)
   const fetchKlines = await makeKlinesFetcher();
   const fetchIndexKlines = () => fetchKlines('1', '000300');
 
-  // 3. DeepSeek 调用（强制 deepseek-chat 控成本）
+  // 3. DeepSeek call (force deepseek-chat to control cost)
   const { getProvider } = await import('../lib/llm/index.js');
 
   async function callDeepSeek(prompt) {
     const provider = getProvider('deepseek');
     const apiKey = process.env.DEEPSEEK_API_KEY;
-    if (!apiKey) throw new Error('请设置 DEEPSEEK_API_KEY 环境变量');
+    if (!apiKey) throw new Error('Please set DEEPSEEK_API_KEY environment variable');
 
     try {
       const result = await provider.call(prompt, {
@@ -135,13 +135,13 @@ async function handleNightly(args) {
       });
       return { text: result.text, usage: result.usage };
     } catch (err) {
-      if (err.message.includes('401')) throw new Error('DeepSeek API key 无效，检查 DEEPSEEK_API_KEY');
-      if (err.message.includes('429')) throw new Error('DeepSeek 限流，稍后重试');
+      if (err.message.includes('401')) throw new Error('DeepSeek API key invalid, check DEEPSEEK_API_KEY');
+      if (err.message.includes('429')) throw new Error('DeepSeek rate limited, retry later');
       throw err;
     }
   }
 
-  // 4. 跑夜间作业
+  // 4. run nightly job
   const { runNightlyJob } = await import('../lib/evaluation/nightly.js');
 
   try {
@@ -153,14 +153,14 @@ async function handleNightly(args) {
     });
 
     console.log('');
-    console.log('=== 夜间作业完成 ===');
-    console.log('状态:', result.status);
-    if (result.newEvals != null) console.log('新增评估:', result.newEvals, '条');
-    if (result.totalEvals != null) console.log('评估总数:', result.totalEvals, '条');
-    if (result.draftPath) console.log('草稿:', result.draftPath);
-    if (result.cost != null) console.log('成本: ¥' + result.cost.toFixed(4));
+    console.log('=== Nightly Job Complete ===');
+    console.log('Status:', result.status);
+    if (result.newEvals != null) console.log('New evaluations:', result.newEvals);
+    if (result.totalEvals != null) console.log('Total evaluations:', result.totalEvals);
+    if (result.draftPath) console.log('Draft:', result.draftPath);
+    if (result.cost != null) console.log('Cost: ¥' + result.cost.toFixed(4));
   } catch (err) {
-    console.error('夜间作业失败:', err.message);
+    console.error('Nightly job failed:', err.message);
     process.exit(1);
   }
 }
@@ -168,73 +168,73 @@ async function handleNightly(args) {
 // ---- scheduled ----
 
 async function handleScheduled(args) {
-  console.log('=== 当日调度 ===');
+  console.log('=== Daily Schedule ===');
 
   const { getScheduleForDate, loadSafetyConfig } = await import('../lib/scanner/scheduler.js');
 
   const schedule = getScheduleForDate();
   const safety = loadSafetyConfig();
 
-  console.log('日期:', new Date().toISOString().slice(0, 10));
-  console.log('调度:', schedule.reason);
-  console.log('安全:', JSON.stringify(safety));
+  console.log('Date:', new Date().toISOString().slice(0, 10));
+  console.log('Schedule:', schedule.reason);
+  console.log('Safety:', JSON.stringify(safety));
 
   if (safety.emergencyStop) {
-    console.log('emergencyStop=true，终止所有自动任务');
+    console.log('emergencyStop=true, aborting all automated tasks');
     return;
   }
 
   if (!safety.enabled) {
-    console.log('enabled=false，跳过');
+    console.log('enabled=false, skipping');
     return;
   }
 
-  // 1. 跑 evaluation（始终先跑，免费）
-  console.log('\n[1/4] 跑 evaluation...');
+  // 1. run evaluation (always first, free)
+  console.log('\n[1/4] Running evaluation...');
   try {
-    // 先跑 nightly（内部做 evaluateBatch）
+    // run nightly first (internally calls evaluateBatch)
     await handleNightly([]);
   } catch (err) {
-    console.warn('evaluation 失败:', err.message);
+    console.warn('Evaluation failed:', err.message);
   }
 
-  // 2. HS300 扫描
+  // 2. HS300 scan
   if (schedule.runHs300 && !safety.skipHs300) {
-    console.log('\n[2/4] 跑 HS300 批量扫描...');
+    console.log('\n[2/4] Running HS300 batch scan...');
     try {
       await runBatchScan('hs300');
     } catch (err) {
-      console.warn('HS300 扫描失败:', err.message);
+      console.warn('HS300 scan failed:', err.message);
     }
   } else {
-    console.log('\n[2/4] HS300 扫描跳过（非 HS300 周或安全开关关闭）');
+    console.log('\n[2/4] HS300 scan skipped (not HS300 week or safety switch off)');
   }
 
-  // 3. 自选股扫描
+  // 3. Watchlist scan
   if (schedule.runWatchlist && !safety.skipWatchlist) {
-    console.log('\n[3/4] 跑自选股批量扫描...');
+    console.log('\n[3/4] Running watchlist batch scan...');
     try {
       await runBatchScan('watchlist');
     } catch (err) {
-      console.warn('自选股扫描失败:', err.message);
+      console.warn('Watchlist scan failed:', err.message);
     }
   } else {
-    console.log('\n[3/4] 自选股扫描跳过（非周日或安全开关关闭）');
+    console.log('\n[3/4] Watchlist scan skipped (not Sunday or safety switch off)');
   }
 
-  // 4. 日报
+  // 4. Daily report
   if (schedule.runDailyReport && !safety.skipDailyReport) {
-    console.log('\n[4/4] 生成日报...');
+    console.log('\n[4/4] Generating daily report...');
     try {
       await generateDailyReport();
     } catch (err) {
-      console.warn('日报生成失败:', err.message);
+      console.warn('Daily report generation failed:', err.message);
     }
   } else {
-    console.log('\n[4/4] 日报跳过');
+    console.log('\n[4/4] Daily report skipped');
   }
 
-  console.log('\n=== 调度完成 ===');
+  console.log('\n=== Schedule Complete ===');
 }
 
 async function runBatchScan(scope) {
@@ -246,26 +246,26 @@ async function runBatchScan(scope) {
   let stockList;
   if (scope === 'hs300') {
     stockList = await fetchHS300Constituents();
-    console.log(`  HS300 成分股: ${stockList.length} 只`);
+    console.log(`  HS300 constituents: ${stockList.length}`);
   } else {
     const wl = loadWatchlist();
     stockList = wl.stocks || [];
-    console.log(`  自选股: ${stockList.length} 只`);
+    console.log(`  Watchlist: ${stockList.length}`);
   }
 
   if (stockList.length === 0) {
-    console.log('  无股票，跳过');
+    console.log('  No stocks, skipping');
     return;
   }
 
-  // 构造 fetchers（本地库优先）
+  // build fetchers (local DB first)
   const fetchKlines = await makeKlinesFetcher();
   const fetchIndexKlines = () => fetchKlines('1', '000300');
 
-  // 强制 deepseek-chat
+  // force deepseek-chat
   const provider = getProvider('deepseek');
   const apiKey = process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) throw new Error('请设置 DEEPSEEK_API_KEY 环境变量');
+  if (!apiKey) throw new Error('Please set DEEPSEEK_API_KEY environment variable');
 
   const callLLM = async (prompt) => {
     const r = await provider.call(prompt, { model: 'deepseek-chat', apiKey, maxTokens: 2000 });
@@ -277,12 +277,12 @@ async function runBatchScan(scope) {
     fetchIndexKlines,
     callLLM,
     onProgress: ({ idx, total, code, status }) => {
-      if (idx % 50 === 0) console.log(`  进度: ${idx}/${total}`);
+      if (idx % 50 === 0) console.log(`  Progress: ${idx}/${total}`);
     },
   };
 
   const result = await runBatchScan(stockList, options);
-  console.log('  完成:', result.succeeded, '/', result.total, '成功');
+  console.log('  Complete:', result.succeeded, '/', result.total, 'succeeded');
 }
 
 async function generateDailyReport() {
@@ -293,20 +293,20 @@ async function generateDailyReport() {
   if (!fs.existsSync(reportDir)) fs.mkdirSync(reportDir, { recursive: true });
   const reportPath = path.join(reportDir, `report-${date}.md`);
   fs.writeFileSync(reportPath, report, 'utf-8');
-  console.log('  日报已保存:', reportPath);
+  console.log('  Daily report saved:', reportPath);
 }
 
 // ---- sync check ----
 
 async function handleSyncCheck() {
-  console.log('=== 同步状态检查 ===');
+  console.log('=== Sync Status Check ===');
   console.log('');
 
   const historyPath = path.join(STORAGE_DIR, 'history.json');
   const exists = fs.existsSync(historyPath);
 
-  console.log('存储目录:', STORAGE_DIR);
-  console.log('history 文件:', exists ? '存在' : '不存在');
+  console.log('Storage directory:', STORAGE_DIR);
+  console.log('History file:', exists ? 'exists' : 'not found');
 
   if (exists) {
     try {
@@ -314,33 +314,33 @@ async function handleSyncCheck() {
       const hoursAgo = (Date.now() - stat.mtimeMs) / 3600000;
       const raw = fs.readFileSync(historyPath, 'utf-8');
       const entries = JSON.parse(raw);
-      console.log('条数:', Array.isArray(entries) ? entries.length : '?');
-      console.log('最后更新:', stat.mtime.toISOString());
+      console.log('Entries:', Array.isArray(entries) ? entries.length : '?');
+      console.log('Last updated:', stat.mtime.toISOString());
       if (hoursAgo > 24) {
-        console.warn(`警告: 超过 ${hoursAgo.toFixed(1)} 小时未更新，数据可能过时`);
+        console.warn(`Warning: not updated for ${hoursAgo.toFixed(1)} hours, data may be stale`);
       } else {
-        console.log(`新鲜度: ${hoursAgo.toFixed(1)} 小时前（OK）`);
+        console.log(`Freshness: ${hoursAgo.toFixed(1)} hours ago (OK)`);
       }
     } catch (err) {
-      console.warn('读取失败:', err.message);
+      console.warn('Read failed:', err.message);
     }
   } else {
     console.log('');
-    console.log('同步未配置。请按以下步骤设置:');
-    console.log('  1. 打开 chrome://extensions，找到本扩展');
-    console.log('  2. 复制扩展 ID（32 位小写字母）');
-    console.log('  3. 运行: node native-host/install.js <扩展ID>');
-    console.log('  4. 重启 Chrome');
-    console.log('  5. 在东方财富页面做一次分析');
-    console.log('  6. 再次运行 ema sync check 验证');
+    console.log('Sync not configured. Follow these steps to set up:');
+    console.log('  1. Open chrome://extensions, find this extension');
+    console.log('  2. Copy the extension ID (32 lowercase letters)');
+    console.log('  3. Run: node native-host/install.js <extensionID>');
+    console.log('  4. Restart Chrome');
+    console.log('  5. Perform an analysis on an Eastmoney page');
+    console.log('  6. Run `ema sync check` again to verify');
   }
 
-  // 检查所有存储文件
+  // check all storage files
   if (fs.existsSync(STORAGE_DIR)) {
     const files = fs.readdirSync(STORAGE_DIR).filter(f => f.endsWith('.json'));
     if (files.length > 0) {
       console.log('');
-      console.log('存储文件列表:');
+      console.log('Storage file list:');
       for (const f of files) {
         const fp = path.join(STORAGE_DIR, f);
         const size = fs.statSync(fp).size;
@@ -376,13 +376,13 @@ async function handleDb(sub, args) {
     }
 
     case 'update': {
-      console.log('db update 将在后续实现');
+      console.log('db update will be implemented later');
       break;
     }
 
     default:
-      console.error(`未知 db 子命令: ${sub}`);
-      console.log('可用: init | status | update');
+      console.error(`Unknown db subcommand: ${sub}`);
+      console.log('Available: init | status | update');
       process.exit(1);
   }
 }
@@ -401,7 +401,7 @@ async function handleSector(sub, args) {
     case 'alpha': {
       const code = args[0];
       if (!code) {
-        console.error('用法: ema sector alpha <股票代码> [period] [lookback]');
+        console.error('Usage: ema sector alpha <stock_code> [period] [lookback]');
         process.exit(1);
       }
       const period = args[1] || 'monthly';
@@ -412,7 +412,7 @@ async function handleSector(sub, args) {
       try {
         const result = calcSectorAlpha(db, code, period, lookback);
         if (!result) {
-          console.log(`${code} 无行业映射数据`);
+          console.log(`${code} has no industry mapping data`);
         } else {
           console.log(JSON.stringify(result, null, 2));
         }
@@ -423,8 +423,8 @@ async function handleSector(sub, args) {
     }
 
     default:
-      console.error(`未知 sector 子命令: ${sub}`);
-      console.log('可用: init | alpha <code>');
+      console.error(`Unknown sector subcommand: ${sub}`);
+      console.log('Available: init | alpha <code>');
       process.exit(1);
   }
 }
@@ -436,18 +436,18 @@ async function handleReview(sub, args) {
 
   switch (sub) {
     case 'draft': {
-      console.log('立即生成草稿需要 Chrome 运行时。');
-      console.log('请用 `ema nightly` 触发夜间作业，或 `ema scheduled` 跑完整调度。');
+      console.log('Immediate draft generation requires Chrome runtime.');
+      console.log('Use `ema nightly` to trigger the nightly job, or `ema scheduled` to run the full schedule.');
       break;
     }
 
     case 'list': {
       if (!fs.existsSync(reviewDir)) {
-        console.log('暂无草稿');
+        console.log('No drafts yet');
         return;
       }
       const files = fs.readdirSync(reviewDir).filter((f) => f.startsWith('draft-')).sort().reverse();
-      if (files.length === 0) console.log('暂无草稿');
+      if (files.length === 0) console.log('No drafts yet');
       else files.forEach((f) => console.log(' ', f));
       break;
     }
@@ -456,7 +456,7 @@ async function handleReview(sub, args) {
       const date = args[0] || new Date().toISOString().slice(0, 10);
       const p = path.join(reviewDir, `draft-${date}.md`);
       if (!fs.existsSync(p)) {
-        console.error(`草稿不存在: ${date}`);
+        console.error(`Draft not found: ${date}`);
         process.exit(1);
       }
       console.log(fs.readFileSync(p, 'utf-8'));
@@ -467,7 +467,7 @@ async function handleReview(sub, args) {
       const date = args[0] || new Date().toISOString().slice(0, 10);
       const draftPath = path.join(reviewDir, `draft-${date}.md`);
       if (!fs.existsSync(draftPath)) {
-        console.error(`草稿不存在: ${date}`);
+        console.error(`Draft not found: ${date}`);
         process.exit(1);
       }
 
@@ -475,21 +475,21 @@ async function handleReview(sub, args) {
       const { approved } = parseUserReview(draftPath);
 
       if (approved.length === 0) {
-        console.log('未找到审核通过的建议。请在草稿中将 [ ] 改为 [x] 并标注"通过"。');
-        console.log(`草稿路径: ${draftPath}`);
+        console.log('No approved suggestions found. In the draft, change [ ] to [x] and mark "approved".');
+        console.log(`Draft path: ${draftPath}`);
         process.exit(0);
       }
 
-      console.log(`找到 ${approved.length} 条通过的建议：`);
+      console.log(`Found ${approved.length} approved suggestions:`);
       approved.forEach((s, i) => console.log(`  ${i + 1}. ${s}`));
       console.log('');
-      console.log('Claude Opus 精修需要 API key。请设置环境变量 ANTHROPIC_API_KEY。');
+      console.log('Claude Opus refinement requires an API key. Please set the ANTHROPIC_API_KEY environment variable.');
       break;
     }
 
     default:
-      console.error(`未知 review 子命令: ${sub}`);
-      console.log('可用: draft | list | show <date> | approve <date>');
+      console.error(`Unknown review subcommand: ${sub}`);
+      console.log('Available: draft | list | show <date> | approve <date>');
       process.exit(1);
   }
 }
@@ -502,12 +502,12 @@ async function handleBudget(sub, args) {
   switch (sub) {
     case 'show': {
       const summary = getBudgetSummary();
-      console.log(`月度预算 (${summary.currentMonth}):`);
-      console.log(`  已花: ¥${summary.monthSpent} / ¥${summary.monthlyBudget}`);
-      console.log(`  剩余: ¥${summary.monthRemaining}`);
-      console.log('今日:');
-      console.log(`  已花: ¥${summary.todaySpent} / ¥${summary.dailyBudget}`);
-      console.log(`  剩余: ¥${summary.todayRemaining}`);
+      console.log(`Monthly budget (${summary.currentMonth}):`);
+      console.log(`  Spent: ¥${summary.monthSpent} / ¥${summary.monthlyBudget}`);
+      console.log(`  Remaining: ¥${summary.monthRemaining}`);
+      console.log('Today:');
+      console.log(`  Spent: ¥${summary.todaySpent} / ¥${summary.dailyBudget}`);
+      console.log(`  Remaining: ¥${summary.todayRemaining}`);
       break;
     }
 
@@ -521,22 +521,22 @@ async function handleBudget(sub, args) {
         }
       }
       if (Object.keys(updates).length === 0) {
-        console.log('用法: ema budget set --monthly 80 --daily 5');
+        console.log('Usage: ema budget set --monthly 80 --daily 5');
         process.exit(1);
       }
       setBudgetConfig(updates);
-      console.log('预算已更新:', updates);
+      console.log('Budget updated:', updates);
       break;
     }
 
     default:
-      console.error(`未知 budget 子命令: ${sub}`);
-      console.log('可用: show | set --monthly <n> --daily <n>');
+      console.error(`Unknown budget subcommand: ${sub}`);
+      console.log('Available: show | set --monthly <n> --daily <n>');
       process.exit(1);
   }
 }
 
-// 构造本地优先的 K 线获取器
+// build local-first K-line fetcher
 async function makeKlinesFetcher() {
   const { getKlines } = await import('../lib/db/klines-repo.js');
   const { fetchKlinesWithFallback } = await import('../lib/data-sources/dispatcher.js');
@@ -551,7 +551,7 @@ async function makeKlinesFetcher() {
       const result = await getKlines({ code, market, period, limit, onlineFetcher });
       return result.klines || [];
     } catch (err) {
-      console.warn(`  K 线获取失败 ${code}: ${err.message}`);
+      console.warn(`  K-line fetch failed ${code}: ${err.message}`);
       return [];
     }
   };
@@ -561,15 +561,15 @@ async function makeKlinesFetcher() {
 
 async function handleAnalyze(sub, args) {
   if (!sub) {
-    console.error('用法: ema analyze <股票代码>');
-    console.error('例如: ema analyze 600519');
+    console.error('Usage: ema analyze <stock_code>');
+    console.error('Example: ema analyze 600519');
     process.exit(1);
   }
 
   const code = sub;
   const { execSync } = await import('node:child_process');
 
-  // 1. 获取股票名称
+  // 1. get stock name
   let stockName = '';
   try {
     const { getDb, closeDb } = await import('../lib/db/connection.js');
@@ -581,22 +581,22 @@ async function handleAnalyze(sub, args) {
       closeDb();
     }
   } catch (_) {
-    // stocks 表可能不存在，忽略
+    // stocks table may not exist, ignore
   }
 
-  // 2. 获取月线数据用于技术指标计算
+  // 2. get monthly kline data for technical indicator computation
   const fetchKlines = await makeKlinesFetcher();
   let klines = [];
   try {
-    // 市场推断: 6 开头 → sh, 0/3 开头 → sz
+    // market inference: 6-prefix → SH, 0/3-prefix → SZ
     const market = code.startsWith('6') ? '1' : '0';
     klines = await fetchKlines(market, code, 'monthly', 60);
   } catch (err) {
-    console.warn(`获取 K 线失败: ${err.message}`);
+    console.warn(`Failed to fetch K-lines: ${err.message}`);
   }
 
-  // 3. 计算技术信号
-  let techSignal = '（无数据）';
+  // 3. compute technical signals
+  let techSignal = '(no data)';
   let techDirection = '';
   if (klines.length >= 20) {
     try {
@@ -606,11 +606,11 @@ async function handleAnalyze(sub, args) {
       techSignal = summary.text;
       techDirection = summary.direction;
     } catch (err) {
-      techSignal = `（指标计算失败: ${err.message}）`;
+      techSignal = `(indicator calculation failed: ${err.message})`;
     }
   }
 
-  // 4. 调用 Kronos Python CLI
+  // 4. call Kronos Python CLI
   const pythonExe = path.join(
     PROJECT_DIR, 'kronos', 'venv', 'Scripts', 'python.exe'
   );
@@ -628,49 +628,49 @@ async function handleAnalyze(sub, args) {
     kronosError = err.stderr || err.message;
   }
 
-  // 5. 综合研判
+  // 5. combined assessment
   let combined = '';
   if (kronosSignal && techDirection) {
     const aiDir = kronosSignal.direction;
     if (aiDir === 'up' && techDirection === 'bull') {
-      combined = '技术 + AI 共振，强烈看多';
+      combined = 'Technical + AI resonance, strongly bullish';
     } else if (aiDir === 'down' && techDirection === 'bear') {
-      combined = '技术 + AI 共振，强烈看空';
+      combined = 'Technical + AI resonance, strongly bearish';
     } else if (aiDir === techDirection) {
-      combined = '技术 + AI 同向，温和看' + (aiDir === 'up' ? '多' : '空');
+      combined = 'Technical + AI aligned, moderately ' + (aiDir === 'up' ? 'bullish' : 'bearish');
     } else if (aiDir === 'flat') {
-      combined = 'AI 预测震荡，技术面' + (techDirection === 'bull' ? '偏多' : '偏空') + '，方向不明';
+      combined = 'AI predicts sideways, technical ' + (techDirection === 'bull' ? 'bullish' : 'bearish') + ', direction unclear';
     } else {
-      combined = '技术与 AI 信号分歧，建议观望';
+      combined = 'Technical and AI signals diverge, suggest wait-and-see';
     }
   } else if (kronosSignal) {
-    const aiLabel = { up: '看多', down: '看空', flat: '震荡' };
-    combined = '仅 AI 信号: ' + (aiLabel[kronosSignal.direction] || kronosSignal.direction);
+    const aiLabel = { up: 'bullish', down: 'bearish', flat: 'sideways' };
+    combined = 'AI only: ' + (aiLabel[kronosSignal.direction] || kronosSignal.direction);
   } else {
-    combined = techDirection === 'bull' ? '仅技术信号: 偏多' :
-               techDirection === 'bear' ? '仅技术信号: 偏空' : '信号不足';
+    combined = techDirection === 'bull' ? 'Technical only: bullish' :
+               techDirection === 'bear' ? 'Technical only: bearish' : 'insufficient signals';
   }
 
-  // 6. 输出
-  const heading = `=== ${code}${stockName ? ' ' + stockName : ''} 月线分析 ===`;
+  // 6. output
+  const heading = `=== ${code}${stockName ? ' ' + stockName : ''} Monthly Analysis ===`;
   console.log(heading);
-  console.log(`【技术信号】${techSignal} → ${techDirection === 'bull' ? '看多' : techDirection === 'bear' ? '看空' : '待定'}`);
+  console.log(`[Technical] ${techSignal} → ${techDirection === 'bull' ? 'Bullish' : techDirection === 'bear' ? 'Bearish' : 'Undecided'}`);
 
   if (kronosSignal) {
-    const aiDirLabel = { up: '看多', down: '看空', flat: '震荡' };
+    const aiDirLabel = { up: 'Bullish', down: 'Bearish', flat: 'Sideways' };
     console.log(
-      `【AI预测】未来${kronosSignal.pred_len}月预测涨幅 ${kronosSignal.predicted_change_pct}%，`
-      + `置信度 ${(kronosSignal.confidence * 100).toFixed(0)}%`
+      `[AI Prediction] ${kronosSignal.pred_len}mo forecast change ${kronosSignal.predicted_change_pct}%, `
+      + `confidence ${(kronosSignal.confidence * 100).toFixed(0)}%`
       + ` → ${aiDirLabel[kronosSignal.direction] || kronosSignal.direction}`
     );
   } else {
-    console.log(`【AI预测】不可用: ${kronosError || '请先下载权重并启动服务'}`);
+    console.log(`[AI Prediction] Unavailable: ${kronosError || 'Please download weights and start the service first'}`);
   }
 
-  console.log(`【综合研判】${combined}`);
+  console.log(`[Combined Assessment] ${combined}`);
 }
 
-/** 从指标数据中提取技术面摘要文本 */
+/** Extract technical summary text from indicator data */
 function summarizeTechnicalSignal(indicators, klines) {
   const last = klines.length - 1;
   const prev = last - 1;
@@ -684,55 +684,55 @@ function summarizeTechnicalSignal(indicators, klines) {
 
   const parts = [];
 
-  // 均线排列
+  // MA alignment
   if (ma5[last] != null && ma20[last] != null && ma60[last] != null) {
     if (ma5[last] > ma20[last] && ma20[last] > ma60[last]) {
-      parts.push('均线多头排列');
+      parts.push('MA bullish alignment');
     } else if (ma5[last] < ma20[last] && ma20[last] < ma60[last]) {
-      parts.push('均线空头排列');
+      parts.push('MA bearish alignment');
     } else {
-      parts.push('均线交织');
+      parts.push('MA intertwined');
     }
   }
 
-  // MACD 金叉/死叉
+  // MACD golden cross / death cross
   if (macdHist && macdHist[last] != null && macdHist[prev] != null) {
     if (macdHist[prev] <= 0 && macdHist[last] > 0) {
-      parts.push('MACD 金叉');
+      parts.push('MACD golden cross');
     } else if (macdHist[prev] >= 0 && macdHist[last] < 0) {
-      parts.push('MACD 死叉');
+      parts.push('MACD death cross');
     }
   } else if (indicators.macd?.dif && indicators.macd?.dea) {
     const dif = indicators.macd.dif;
     const dea = indicators.macd.dea;
     if (dif[last] != null && dea[last] != null && dif[prev] != null && dea[prev] != null) {
-      if (dif[prev] <= dea[prev] && dif[last] > dea[last]) parts.push('MACD 金叉');
-      else if (dif[prev] >= dea[prev] && dif[last] < dea[last]) parts.push('MACD 死叉');
+      if (dif[prev] <= dea[prev] && dif[last] > dea[last]) parts.push('MACD golden cross');
+      else if (dif[prev] >= dea[prev] && dif[last] < dea[last]) parts.push('MACD death cross');
     }
   }
 
-  // RSI 超买/超卖
+  // RSI overbought/oversold
   if (rsi14[last] != null) {
-    if (rsi14[last] > 80) parts.push('RSI 超买');
-    else if (rsi14[last] < 20) parts.push('RSI 超卖');
+    if (rsi14[last] > 80) parts.push('RSI overbought');
+    else if (rsi14[last] < 20) parts.push('RSI oversold');
   }
 
-  // KDJ 金叉/死叉
+  // KDJ golden cross / death cross
   if (kdj && kdj.k[last] != null && kdj.d[last] != null) {
-    if (kdj.k[prev] <= kdj.d[prev] && kdj.k[last] > kdj.d[last]) parts.push('KDJ 金叉');
-    else if (kdj.k[prev] >= kdj.d[prev] && kdj.k[last] < kdj.d[last]) parts.push('KDJ 死叉');
+    if (kdj.k[prev] <= kdj.d[prev] && kdj.k[last] > kdj.d[last]) parts.push('KDJ golden cross');
+    else if (kdj.k[prev] >= kdj.d[prev] && kdj.k[last] < kdj.d[last]) parts.push('KDJ death cross');
   }
 
-  const text = parts.length > 0 ? parts.join('，') : '无明确信号';
+  const text = parts.length > 0 ? parts.join(', ') : 'no clear signal';
 
-  // 方向判定：统计看多/看空信号
+  // Direction assessment: count bullish/bearish signals
   let bullScore = 0, bearScore = 0;
-  if (text.includes('多头排列')) bullScore += 2;
-  if (text.includes('空头排列')) bearScore += 2;
-  if (text.includes('金叉')) bullScore += 1;
-  if (text.includes('死叉')) bearScore += 1;
-  if (text.includes('超卖')) bullScore += 1;
-  if (text.includes('超买')) bearScore += 1;
+  if (text.includes('bullish alignment')) bullScore += 2;
+  if (text.includes('bearish alignment')) bearScore += 2;
+  if (text.includes('golden cross')) bullScore += 1;
+  if (text.includes('death cross')) bearScore += 1;
+  if (text.includes('oversold')) bullScore += 1;
+  if (text.includes('overbought')) bearScore += 1;
 
   let direction = '';
   if (bullScore > bearScore) direction = 'bull';
@@ -742,22 +742,22 @@ function summarizeTechnicalSignal(indicators, klines) {
 }
 
 function printUsage() {
-  console.log('ema — 东方财富月线 AI 分析 CLI');
+  console.log('ema — Eastmoney Monthly AI Analysis CLI');
   console.log('');
-  console.log('  ema analyze <code>            技术指标 + Kronos AI 综合研判');
-  console.log('  ema nightly                    跑夜间作业');
-  console.log('  ema scheduled                  跑当日调度任务');
-  console.log('  ema sync check                 检查 Native Messaging 同步状态');
-  console.log('  ema review draft               生成新草稿');
-  console.log('  ema review list                列所有草稿');
-  console.log('  ema review show [date]         看某天草稿');
-  console.log('  ema review approve [date]      审核通过（生成精修）');
-  console.log('  ema db init --scope hs300       建本地K线库');
-  console.log('  ema db status                   数据库状态');
-  console.log('  ema sector init                 抓取申万行业映射+市值快照');
-  console.log('  ema sector init --force         强制重建映射');
-  console.log('  ema budget show                看预算');
-  console.log('  ema budget set --monthly 80    改限额');
+  console.log('  ema analyze <code>            Technical indicators + Kronos AI combined assessment');
+  console.log('  ema nightly                    Run nightly job');
+  console.log('  ema scheduled                  Run daily scheduled tasks');
+  console.log('  ema sync check                 Check Native Messaging sync status');
+  console.log('  ema review draft               Generate new draft');
+  console.log('  ema review list                List all drafts');
+  console.log('  ema review show [date]         View draft for a date');
+  console.log('  ema review approve [date]      Approve (generate refinement)');
+  console.log('  ema db init --scope hs300       Initialize local K-line database');
+  console.log('  ema db status                   Database status');
+  console.log('  ema sector init                 Fetch Shenwan industry mapping + market cap snapshot');
+  console.log('  ema sector init --force         Force rebuild mapping');
+  console.log('  ema budget show                 View budget');
+  console.log('  ema budget set --monthly 80     Change limit');
 }
 
 main();

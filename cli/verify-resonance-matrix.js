@@ -1,15 +1,15 @@
-// Phase 11 共振矩阵可信度验证
-// a. 样本量矩阵
-// b. HS300 等权基准对照 (alpha = stock_return - benchmark_return)
-// c. mild_bear 时间分布
-// d. 修正 Long-Short Sharpe (扣除基准 beta)
+// Phase 11 Resonance Matrix Credibility Verification
+// a. Sample size matrix
+// b. HS300 equal-weight benchmark comparison (alpha = stock_return - benchmark_return)
+// c. mild_bear time distribution
+// d. Corrected Long-Short Sharpe (deducting benchmark beta)
 
 import { getDb } from '../lib/db/connection.js';
 import { calculateAll } from '../lib/indicators/calculate.js';
 
 const db = getDb();
 
-// 方向判断 — 完全复刻 lib/multi-period/direction.js
+// Direction judgment — exact replica of lib/multi-period/direction.js
 function slope(series, n) {
   const valid = series.filter(v => v != null);
   if (valid.length < n) return 0;
@@ -140,9 +140,8 @@ for (const asOf of evalMonths) {
   benchmarkReturns.set(asOf, bm);
 }
 
-// 加载共振数据 (从之前的脚本缓存...不,重新计算)
-// 因为需要 sample counts、time distribution、benchmark alpha
-// 简化: 重新计算方向但这次收集全量数据
+// Load resonance data (recompute — need sample counts, time distribution, benchmark alpha)
+// Simplified: recompute direction but collect full data this time
 
 console.log('\nComputing directions...');
 const SIGNALS = ['strong_bull', 'mild_bull', 'strong_bear', 'mild_bear'];

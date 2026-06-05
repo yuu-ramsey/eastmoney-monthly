@@ -1,8 +1,8 @@
-// Phase 11 共振约束预测力矩阵
+// Phase 11 Resonance Predictive Power Matrix
 // 4 resonance levels × 4 holding periods = 16 cells
-// 指标: avg forward return / Hit Rate / Long-Short Sharpe
-// 严格 walk-forward, 零 LLM 调用
-// 使用 lib/multi-period/ 完全相同的方向判断逻辑
+// Metrics: avg forward return / Hit Rate / Long-Short Sharpe
+// Strict walk-forward, zero LLM calls
+// Uses the exact same direction logic as lib/multi-period/
 
 import { getDb } from '../lib/db/connection.js';
 import { calculateAll, tailIndicators } from '../lib/indicators/calculate.js';
@@ -10,7 +10,7 @@ import { calculateAll, tailIndicators } from '../lib/indicators/calculate.js';
 const db = getDb();
 
 // ============================================================
-// 1. 方向判断 — 完全复刻 lib/multi-period/direction.js
+// 1. Direction judgment — exact replica of lib/multi-period/direction.js
 // ============================================================
 
 function slope(series, n) {
@@ -90,7 +90,7 @@ function calcResonance(monthly, weekly, daily) {
   };
 }
 
-// 组合信号: e.g. "strong_bull" = strong resonance + dominant bull
+// combined signal: e.g. "strong_bull" = strong resonance + dominant bull
 // "mild_bull" = partial resonance + dominant bull
 // "strong_bear" = strong resonance + dominant bear
 // "mild_bear" = partial resonance + dominant bear
@@ -105,15 +105,15 @@ function getSignal(r) {
 }
 
 // ============================================================
-// 2. 数据加载
+// 2. Data loading
 // ============================================================
 
 const stockList = db.prepare(`
   SELECT DISTINCT stock_code FROM stock_industry_mapping
 `).all().map(r => r.stock_code);
-console.log(`HS300 股票: ${stockList.length}`);
+console.log(`HS300 stocks: ${stockList.length}`);
 
-// 加载所有月线 K 线
+// load all monthly klines
 const monthlyData = new Map();
 const mRows = db.prepare(`
   SELECT code, date, open, close, high, low, volume FROM monthly_klines
@@ -125,9 +125,9 @@ for (const r of mRows) {
   if (!monthlyData.has(r.code)) monthlyData.set(r.code, []);
   monthlyData.get(r.code).push(r);
 }
-console.log(`月线: ${mRows.length} 条`);
+console.log(`Monthly: ${mRows.length} bars`);
 
-// 加载所有周线 K 线
+// load all weekly klines
 const weeklyData = new Map();
 const wRows = db.prepare(`
   SELECT code, date, open, close, high, low, volume FROM weekly_klines
@@ -139,9 +139,9 @@ for (const r of wRows) {
   if (!weeklyData.has(r.code)) weeklyData.set(r.code, []);
   weeklyData.get(r.code).push(r);
 }
-console.log(`周线: ${wRows.length} 条`);
+console.log(`Weekly: ${wRows.length} bars`);
 
-// 加载所有日线 K 线 (最近 2 年足够，因为日线只看方向)
+// load all daily klines (last 2 years is enough since daily only checks direction)
 const dailyData = new Map();
 const dRows = db.prepare(`
   SELECT code, date, open, close, high, low, volume FROM daily_klines
@@ -153,14 +153,14 @@ for (const r of dRows) {
   if (!dailyData.has(r.code)) dailyData.set(r.code, []);
   dailyData.get(r.code).push(r);
 }
-console.log(`日线: ${dRows.length} 条`);
+console.log(`Daily: ${dRows.length} bars`);
 
 // ============================================================
-// 3. 每个评估点计算共振信号
+// 3. Compute resonance signals for each eval point
 // ============================================================
 
 function sliceKlinesUpTo(klines, cutoffDate) {
-  // 只取 ≤ cutoffDate 的 K 线
+  // only take klines <= cutoffDate
   const sliced = [];
   for (const k of klines) {
     if (k.date > cutoffDate) break;
@@ -170,8 +170,8 @@ function sliceKlinesUpTo(klines, cutoffDate) {
 }
 
 function getForwardReturnMonthly(klines, asOfDate, holdingMonths) {
-  // asOfDate 是 "YYYY-MM" 格式
-  // 找 asOfDate 在 klines 中的索引
+  // asOfDate is "YYYY-MM" format
+  // find asOfDate index in klines
   let idx = -1;
   for (let i = 0; i < klines.length; i++) {
     if (klines[i].date > asOfDate) { idx = i - 1; break; }
@@ -187,15 +187,15 @@ function getForwardReturnMonthly(klines, asOfDate, holdingMonths) {
   return (endPrice - startPrice) / startPrice;
 }
 
-// 预计算每个 stock 每个月的方向
-console.log('\n预计算方向...');
-const directionCache = new Map(); // stockCode → Map<dateStr, resonance>
+// precompute direction for each stock for each month
+console.log('\nPrecomputing directions...');
+const directionCache = new Map(); // stockCode -> Map<dateStr, resonance>
 
 const evalMonths = [];
 for (const d of [...new Set(mRows.map(r => r.date))].sort()) {
   if (d >= '2018-01' && d <= '2024-12') evalMonths.push(d);
 }
-console.log(`评估月份: ${evalMonths.length}`);
+console.log(`Eval months: ${evalMonths.length}`);
 
 let stockProcessed = 0;
 for (const code of stockList) {
@@ -205,7 +205,7 @@ for (const code of stockList) {
 
   const stockDirs = new Map();
 
-  // 为每个评估月计算共振
+  // compute resonance for each eval month
   for (const month of evalMonths) {
     const mSlice = sliceKlinesUpTo(mKlines, month);
     const wSlice = sliceKlinesUpTo(wKlines, month);
@@ -229,14 +229,14 @@ for (const code of stockList) {
 
   directionCache.set(code, stockDirs);
   stockProcessed++;
-  if (stockProcessed % 50 === 0) console.log(`  方向: ${stockProcessed}/${stockList.length}`);
+  if (stockProcessed % 50 === 0) console.log(`  Direction: ${stockProcessed}/${stockList.length}`);
 }
 
 // ============================================================
-// 4. 构建观察数据
+// 4. Build observation data
 // ============================================================
 
-console.log('\n构建观察...');
+console.log('\nBuilding observations...');
 const HOLDINGS = [1, 3, 6, 12];
 const observations = [];
 
@@ -266,10 +266,10 @@ for (const code of stockList) {
   }
 }
 
-console.log(`观察数: ${observations.length}`);
+console.log(`Observations: ${observations.length}`);
 
 // ============================================================
-// 5. 指标计算
+// 5. Metric computation
 // ============================================================
 
 function mean(arr) { return arr.reduce((a,b)=>a+b,0)/arr.length; }
@@ -281,7 +281,7 @@ function std(arr) {
 const SIGNALS = ['strong_bull', 'mild_bull', 'strong_bear', 'mild_bear'];
 
 console.log('\n' + '='.repeat(80));
-console.log('=== 共振预测力矩阵 ===');
+console.log('=== Resonance Predictive Power Matrix ===');
 console.log('='.repeat(80));
 
 const matrix = {};
@@ -332,7 +332,7 @@ for (const h of HOLDINGS) {
   console.log(`  hold=${h}m: spread=${(spread*100).toFixed(2)}% Sharpe=${lsSharpe != null ? lsSharpe.toFixed(3) : 'N/A'} (bull=${bullObs.length}, bear=${bearObs.length})`);
 }
 
-// 矩阵表格
+// matrix tables
 console.log('\n' + '='.repeat(80));
 console.log('=== Avg Forward Return (%) ===');
 console.log('='.repeat(80));
@@ -385,20 +385,20 @@ for (const sig of SIGNALS) {
 }
 
 // ============================================================
-// 6. 最终对比 Phase 12 + 结论
+// 6. Final Phase 11 vs Phase 12 comparison + conclusion
 // ============================================================
 console.log('\n' + '='.repeat(80));
-console.log('=== Phase 11 vs Phase 12 对比 ===');
+console.log('=== Phase 11 vs Phase 12 Comparison ===');
 console.log('='.repeat(80));
-console.log('Phase 12 sector alpha: |IC| max = 0.074 (反向), Hit Rate 47.8-51.4%, all Sharpe negative');
+console.log('Phase 12 sector alpha: |IC| max = 0.074 (negative), Hit Rate 47.8-51.4%, all Sharpe negative');
 console.log('Phase 11 resonance: see above matrix');
 
-// 找最强信号
+// find strongest signal
 const best = Object.values(matrix)
   .filter(m => m.sharpe != null)
   .sort((a, b) => Math.abs(b.sharpe) - Math.abs(a.sharpe));
 if (best.length > 0) {
-  console.log(`\n共振最强组合: ${best[0].signal}_${best[0].holding}m Sharpe=${best[0].sharpe.toFixed(3)} avgRet=${(best[0].avgRet*100).toFixed(2)}% HR=${(best[0].hitRate*100).toFixed(1)}%`);
+  console.log(`\nStrongest resonance combo: ${best[0].signal}_${best[0].holding}m Sharpe=${best[0].sharpe.toFixed(3)} avgRet=${(best[0].avgRet*100).toFixed(2)}% HR=${(best[0].hitRate*100).toFixed(1)}%`);
 }
 
-console.log('\n完成。');
+console.log('\nDone.');

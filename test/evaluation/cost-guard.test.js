@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 
 // mock 预算路径
-const testBudgetPath = 'D:/ClaudeProjects/eastmoney-monthly-ai/test/evaluation/_test_budget.json';
+const testBudgetPath = path.join(os.tmpdir(), '_test_eastmoney_budget.json');
 
 // ---- 直接测试纯函数 ----
 

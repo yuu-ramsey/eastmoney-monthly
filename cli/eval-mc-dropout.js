@@ -1,5 +1,5 @@
-// MC Dropout 评估 — 对比 With/Without MC Dropout 数据对 LLM 预测质量的影响
-// 用法：
+// MC Dropout eval — compare With/Without MC Dropout data impact on LLM prediction quality
+// Usage:
 //   node cli/eval-mc-dropout.js --dry-run     (3 stocks)
 //   node cli/eval-mc-dropout.js               (full 40 stocks)
 import * as fs from 'node:fs';
@@ -26,7 +26,7 @@ const RETRY_DELAYS_MS = [1000, 4000, 16000];
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// ---- 解析 .env ----
+// ---- parse .env ----
 function loadEnv() {
   const envPath = path.join(PROJECT_DIR, '.env');
   if (!fs.existsSync(envPath)) return {};
@@ -40,7 +40,7 @@ function loadEnv() {
   return env;
 }
 
-// ---- LLM 调用 ----
+// ---- LLM call ----
 async function callDeepSeek(prompt, apiKey, model = 'deepseek-chat') {
   const resp = await fetch('https://api.deepseek.com/chat/completions', {
     method: 'POST',
@@ -63,7 +63,7 @@ async function callWithRetry(prompt, apiKey, model) {
   throw lastErr;
 }
 
-// ---- 解析 LLM JSON 输出 ----
+// ---- parse LLM JSON output ----
 function parseSignal(rawResponse) {
   let scoreData = null;
   try { const m = rawResponse.match(/```json\s*([\s\S]*?)```/); if (m) scoreData = JSON.parse(m[1].trim()); } catch (_) {}
@@ -84,9 +84,10 @@ function appendResult(fp, r) { fs.mkdirSync(path.dirname(fp), { recursive: true 
 
 // ---- 加载 MC Dropout 数据 ----
 function loadMcDropoutCache() {
-  if (!fs.existsSync(PARQUET_PATH)) { console.warn('MC Dropout parquet 不存在，跳过'); return new Map(); }
+  if (!fs.existsSync(PARQUET_PATH)) { console.warn('MC Dropout parquet not found, skipping'); return new Map(); }
   return new Promise((resolve) => {
-    const py = spawn('D:/p语言/python.exe', ['-c', `
+    const pythonPath = process.env.PYTHON_PATH || 'python';
+    const py = spawn(pythonPath, ['-c', `
 import pandas as pd, json
 df = pd.read_parquet('${PARQUET_PATH}')
 result = {}
@@ -126,7 +127,7 @@ async function main() {
   console.log('=== MC Dropout A/B 评估 ===');
   console.log(`模式: ${dryRun ? 'DRY-RUN (3 stocks)' : 'FULL (40 stocks)'}`);
 
-  // 加载数据集
+  // Load dataset
   const dataset = loadFrozenDataset({ version: 'v1', subsetStocks: dryRun ? 3 : null });
   const { testPoints, stocks } = dataset;
   const stockMap = new Map(stocks.map(s => [s.code, s]));

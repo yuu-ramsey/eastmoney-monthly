@@ -2,6 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 
 // ---- KlinesCache ----
 test('KlinesCache: 基本存取', async () => {
@@ -96,7 +98,7 @@ test('groundTruth: alpha阈值', async () => {
 test('generateEvalReport: 基本格式+预测分布', async () => {
   const { generateEvalReport } = await import('../../lib/eval/report.js');
 
-  const runDir = 'D:/ClaudeProjects/eastmoney-monthly-ai/.eastmoney-ai/eval/runs';
+  const runDir = path.join(os.tmpdir(), 'eastmoney-eval-test');
   fs.mkdirSync(runDir, { recursive: true });
   const runId = 'test-mock-run-v2';
   const lines = [];
@@ -127,7 +129,7 @@ test('generateEvalReport: 基本格式+预测分布', async () => {
 
 test('compareRuns: 对比两个版本', async () => {
   const { compareRuns } = await import('../../lib/eval/report.js');
-  const runDir = 'D:/ClaudeProjects/eastmoney-monthly-ai/.eastmoney-ai/eval/runs';
+  const runDir = path.join(os.tmpdir(), 'eastmoney-eval-compare');
   fs.mkdirSync(runDir, { recursive: true });
 
   // 写 v1
@@ -163,7 +165,8 @@ test('compareRuns: 对比两个版本', async () => {
 // ---- seed-stocks ----
 
 test('seed-stocks: 6类齐全≥40只', () => {
-  const seeds = JSON.parse(fs.readFileSync('D:/ClaudeProjects/eastmoney-monthly-ai/lib/eval/seed-stocks.json', 'utf-8'));
+  const seedPath = path.join(__dirname, '..', '..', 'lib', 'eval', 'seed-stocks.json');
+  const seeds = JSON.parse(fs.readFileSync(seedPath, 'utf-8'));
   const categories = Object.keys(seeds.stocks);
   assert.equal(categories.length, 6);
   let total = 0;

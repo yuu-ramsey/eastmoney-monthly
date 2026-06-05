@@ -1,6 +1,6 @@
-// ema db init — 一次性建库
-// 用法: node cli/db-init.js --scope hs300 [--periods monthly,weekly,daily]
-// 自适应限流：检测到东财拒绝后自动暂停，恢复后继续
+// ema db init — one-time DB initialization
+// Usage: node cli/db-init.js --scope hs300 [--periods monthly,weekly,daily]
+// Adaptive rate limiting: auto-pause on Eastmoney rejection, resume when clear
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -12,44 +12,44 @@ const DATA_DIR = path.join(PROJECT_DIR, '.eastmoney-ai');
 const DB_DIR = path.join(DATA_DIR, 'db');
 const PROGRESS_PATH = path.join(DB_DIR, 'init-progress.json');
 
-const CONCURRENCY = 2;         // 降低并发避免触发限流
-const BATCH_DELAY_MS = 5000;   // 批次间 5 秒
+const CONCURRENCY = 2;         // limit concurrency to avoid rate limiting
+const BATCH_DELAY_MS = 5000;   // 5s delay between batches
 const LOG_INTERVAL = 50;
-const RATE_LIMIT_PAUSE_MS = 5 * 60 * 1000; // 限流暂停 5 分钟
-const RATE_LIMIT_FAIL_THRESHOLD = 0.6;     // 批次 60% 失败 → 视为限流
+const RATE_LIMIT_PAUSE_MS = 5 * 60 * 1000; // pause 5 min on rate limit
+const RATE_LIMIT_FAIL_THRESHOLD = 0.6;     // 60% batch failure → treat as rate limit
 
 export async function runDbInit(scope = 'hs300', periods = ['monthly', 'weekly', 'daily'], sourceName = 'baidu', onlyFailed = false) {
-  console.log(`=== 建库开始 ===`);
-  console.log(`范围: ${scope} | 周期: ${periods.join(', ')} | 源: ${sourceName} | 并发: ${CONCURRENCY} | 批间隔: ${BATCH_DELAY_MS}ms`);
+  console.log(`=== DB init start ===`);
+  console.log(`Scope: ${scope} | Periods: ${periods.join(', ')} | Source: ${sourceName} | Concurrency: ${CONCURRENCY} | Batch interval: ${BATCH_DELAY_MS}ms`);
 
   const stockList = await fetchStockList(scope);
-  if (stockList.length === 0) { console.log('无股票，退出'); return; }
-  console.log(`股票清单: ${stockList.length} 只`);
+  if (stockList.length === 0) { console.log('no stocks, exit'); return; }
+  console.log(`Stock list: ${stockList.length}`);
 
   const progress = loadProgress();
   const done = new Set(progress.done || []);
   const pending = stockList.filter((s) => !done.has(s.code));
-  console.log(`已完成: ${done.size} | 待处理: ${pending.length}`);
-  if (pending.length === 0) { console.log('全部完成，退出'); return; }
+  console.log(`Done: ${done.size} | Pending: ${pending.length}`);
+  if (pending.length === 0) { console.log('all done, exit'); return; }
 
   const { getDb, closeDb } = await import('../lib/db/connection.js');
   const { saveKlinesSync } = await import('../lib/db/klines-repo.js');
   const { tableForPeriod } = await import('../lib/db/schema.js');
   const db = getDb();
 
-  // 直连指定源（不降级，保持纯度）
+  // direct connect to specified source (no fallback, keep purity)
   let fetchKlinesDirect;
   try {
     const srcMod = await import(`../lib/data-sources/${sourceName}.js`);
     fetchKlinesDirect = srcMod.fetchKlines;
   } catch (err) {
-    console.error(`数据源 "${sourceName}" 不可用: ${err.message}`);
+    console.error(`Data source "${sourceName}" unavailable: ${err.message}`);
     return;
   }
 
   let completed = done.size;
   let failed = 0;
-  let successful = 0; // 有 K 线数据的股票数
+  let successful = 0; // stocks with kline data
   let totalKlines = 0;
   const startTime = Date.now();
   let pauseCount = 0;
@@ -71,7 +71,7 @@ export async function runDbInit(scope = 'hs300', periods = ['monthly', 'weekly',
         if (count === 0) {
           failed++;
           batchFailures++;
-          const errMsg = errors.length > 0 ? errors.slice(0, 2).join('; ') : '不明原因';
+          const errMsg = errors.length > 0 ? errors.slice(0, 2).join('; ') : 'unknown reason';
           if (failed <= 10 || failed % 100 === 0) {
             console.warn(`  ✗ ${stock.code}(${stock.name}): ${errMsg}`);
           }
@@ -88,15 +88,15 @@ export async function runDbInit(scope = 'hs300', periods = ['monthly', 'weekly',
 
     saveProgress({ done: [...done], failed, updatedAt: new Date().toISOString() });
 
-    // 进度日志
+    // progress log
     if (completed % LOG_INTERVAL === 0 || completed === stockList.length) {
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
       const rate = (completed / (Math.max(elapsed, 1) / 3600)).toFixed(0);
       const successCount = completed - failed;
-      console.log(`[${completed}/${stockList.length}] ${elapsed}s | 成功 ${successCount} | 失败 ${failed} | K线 ${totalKlines} | 暂停 ${pauseCount}次`);
+      console.log(`[${completed}/${stockList.length}] ${elapsed}s | OK ${successCount} | Failed ${failed} | Klines ${totalKlines} | Pauses ${pauseCount}`);
     }
 
-    // 批次间隔
+    // batch interval
     if (i + CONCURRENCY < pending.length) {
       await sleep(BATCH_DELAY_MS);
     }
@@ -105,8 +105,8 @@ export async function runDbInit(scope = 'hs300', periods = ['monthly', 'weekly',
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
   const successCount = completed - failed;
   console.log('');
-  console.log(`=== 建库完成 ===`);
-  console.log(`耗时: ${elapsed}s | 成功入库: ${successCount} | 失败: ${failed} | K线: ${totalKlines} 根 | 暂停: ${pauseCount} 次`);
+  console.log(`=== DB init complete ===`);
+  console.log(`Elapsed: ${elapsed}s | Inserted: ${successCount} | Failed: ${failed} | Klines: ${totalKlines} bars | Pauses: ${pauseCount}`);
 
   closeDb();
 }
@@ -119,14 +119,14 @@ async function processStock(stock, periods, fetchFn, db, saveKlinesSync, tableFo
     try {
       const result = await fetchFn({
         market: stock.market, code: stock.code, period,
-        limit: 0, // 全量拉取（百度无硬上限，start_time 追溯到 1990）
+        limit: 0, // full fetch (Baidu has no hard limit, start_time traces back to 1990)
       });
       if (result && Array.isArray(result.klines) && result.klines.length > 0) {
         const table = tableForPeriod(period);
         saveKlinesSync(db, table, stock.code, stock.market, result.name || stock.name, result.klines, sourceName);
         totalKlines += result.klines.length;
       } else {
-        errors.push(`${period}:无数据`);
+        errors.push(`${period}:no data`);
       }
     } catch (err) {
       errors.push(`${period}:${err.message || err}`);
@@ -165,13 +165,13 @@ async function fetchStockList(scope) {
             all.push({ code: d.f12, market, name: d.f14 });
           }
         } catch (err) {
-          console.warn(`全市场列表获取失败 (${fs}): ${err.message}`);
+          console.warn(`failed to fetch full market list (${fs}): ${err.message}`);
         }
       }
       return all;
     }
     default:
-      console.error(`未知 scope: ${scope}`);
+      console.error(`unknown scope: ${scope}`);
       return [];
   }
 }

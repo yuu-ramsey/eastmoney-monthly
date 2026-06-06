@@ -17,7 +17,7 @@ const sampleCtx = {
   },
 };
 
-test('judge: decisionMode=true 时包含个人决策视角', () => {
+test('judge: decisionMode=true includes personal decision perspective', () => {
   const prompt = judgeAgent.buildPrompt({ ...sampleCtx, decisionMode: true });
   assert.match(prompt, /个人决策视角/);
   assert.match(prompt, /关键止损位/);
@@ -25,7 +25,7 @@ test('judge: decisionMode=true 时包含个人决策视角', () => {
   assert.match(prompt, /仅供持有者本人/);
 });
 
-test('judge: decisionMode=false 时不包含决策段', () => {
+test('judge: decisionMode=false excludes decision section', () => {
   const prompt = judgeAgent.buildPrompt(sampleCtx);
   assert.ok(!/个人决策视角/.test(prompt));
   assert.ok(!/关键止损位/.test(prompt));

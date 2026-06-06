@@ -41,7 +41,7 @@ class TestTopKTopPFiltering:
 
 
 class TestSampleFromLogits:
-    """采样函数测试"""
+    """Sampling function test"""
 
     def test_deterministic_with_low_temp(self):
         torch.manual_seed(42)
@@ -61,7 +61,7 @@ class TestSampleFromLogits:
 
 
 class TestCalcTimeStamps:
-    """时间戳构建测试"""
+    """Timestamp construction test"""
 
     def test_monthly_stamps(self):
         stamps = calc_time_stamps(
@@ -81,7 +81,7 @@ class TestCalcTimeStamps:
 
 
 class TestKronosPredictor:
-    """预测器端到端测试"""
+    """Predictor end-to-end test"""
 
     @pytest.fixture
     def tokenizer(self):
@@ -146,7 +146,7 @@ class TestKronosPredictor:
 
     def test_insufficient_data(self, tokenizer, model, df):
         predictor = KronosPredictor(tokenizer, model, device="cpu")
-        with pytest.raises(ValueError, match="historical数据不足"):
+        with pytest.raises(ValueError, match="historical data insufficient"):
             predictor.predict(
                 df, x_timestamp="2020-02-01", y_timestamp="2020-03-01",
                 pred_len=3, context_len=400,
@@ -166,7 +166,7 @@ class TestKronosPredictor:
         with pytest.raises(KeyError):
             KronosPredictor._extract_ohlcv(df)
 
-    @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA 不可用")
+    @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA unavailable")
     def test_predict_cuda(self, tokenizer, model, df):
         predictor = KronosPredictor(tokenizer, model, device="cuda")
         result = predictor.predict(
@@ -177,7 +177,7 @@ class TestKronosPredictor:
 
 
 class TestAutoRegressiveInference:
-    """自回归推理测试"""
+    """Auto-regressive inference test"""
 
     @pytest.fixture
     def model(self):

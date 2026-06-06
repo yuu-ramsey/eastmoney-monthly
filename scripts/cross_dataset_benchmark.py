@@ -1,7 +1,7 @@
-"""Multi-dataset × multi-model comparison (no Qlib needed, pure sklearn+LightGBM)
-数据集: A股月线(2247只) + SPY月线(Yahoo) + Fama-French 3/5因子(Ken French)
-模型: Ridge / Linear / LightGBM / MLP / RandomForest
-指标: IC / ICIR / Hit Rate
+"""Multi-dataset x multi-model comparison (no Qlib needed, pure sklearn+LightGBM)
+Datasets: A-share monthly (2247 stocks) + SPY monthly (Yahoo) + Fama-French 3/5 factors (Ken French)
+Models: Ridge / Linear / LightGBM / MLP / RandomForest
+Metrics: IC / ICIR / Hit Rate
 """
 import warnings; warnings.filterwarnings('ignore')
 import numpy as np, pandas as pd, sqlite3, time, json, zipfile, io
@@ -17,7 +17,7 @@ OUT = Path('.eastmoney-ai/benchmark')
 OUT.mkdir(parents=True, exist_ok=True)
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 1. A股月线
+# 1. A-share monthly
 # ═══════════════════════════════════════════════════════════════════════════
 
 def load_ashare():
@@ -66,10 +66,10 @@ def load_ashare():
     feat_cols = [c for c in data.columns if c not in ['date','fwd_ret']]
     train = data[(data['date']>='2015-01')&(data['date']<='2021-12')]
     test = data[data['date']>='2024-01']
-    return train, test, feat_cols, f'A股月线({len(codes)}只)'
+    return train, test, feat_cols, f'A-share monthly ({len(codes)} stocks)'
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 2. SPY 月线
+# 2. SPY monthly
 # ═══════════════════════════════════════════════════════════════════════════
 
 def load_spy():
@@ -107,18 +107,18 @@ def load_spy():
     data = pd.DataFrame(rows).dropna()
     feat_cols = [c for c in data.columns if c not in ['date','fwd_ret']]
     split = int(len(data)*0.7)
-    return data.iloc[:split], data.iloc[split:], feat_cols, f'SPY月线({len(data)}条)'
+    return data.iloc[:split], data.iloc[split:], feat_cols, f'SPY monthly ({len(data)} bars)'
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 3. Fama-French 因子预测
+# 3. Fama-French factor prediction
 # ═══════════════════════════════════════════════════════════════════════════
 
 def load_ff_factors():
-    """用 FF3 因子历史值预测未来市场超额收益"""
+    """Predict future market excess returns using historical FF3 factor values"""
     f = OUT/'ff3_factors.csv'
     if not f.exists(): return None
     lines = f.read_text().strip().split('\n')
-    # 找到数据起始行
+    # Find data start row
     data_start = 0
     header_idx = 0
     for i, line in enumerate(lines):
@@ -127,7 +127,7 @@ def load_ff_factors():
             data_start = i+1
             break
     header = lines[header_idx].strip().split(',')
-    # 找到年/月列
+    # Find year/month column
     rows = []
     for i in range(data_start, len(lines)):
         parts = lines[i].strip().split(',')
@@ -140,7 +140,7 @@ def load_ff_factors():
             rows.append({'mkt_rf':mkt_rf, 'smb':smb, 'hml':hml, 'rf':rf})
         except: continue
     if len(rows) < 36: return None
-    # 构建滚动特征（过去12个月的因子值+波动率）
+    # Build rolling features (past 12-month factor values + volatility)
     df = pd.DataFrame(rows)
     for lag in [1,3,6,12]:
         df[f'mkt_lag{lag}'] = df['mkt_rf'].shift(lag)
@@ -148,16 +148,16 @@ def load_ff_factors():
         df[f'hml_lag{lag}'] = df['hml'].shift(lag)
     df['mkt_vol12'] = df['mkt_rf'].rolling(12).std()
     df['smb_vol12'] = df['smb'].rolling(12).std()
-    # 前向收益
-    df['fwd_ret'] = df['mkt_rf'].shift(-3)  # 预测3个月后
+    # Forward return
+    df['fwd_ret'] = df['mkt_rf'].shift(-3)  # predict 3 months ahead
     df['date'] = range(len(df))
     df = df.dropna()
     feat_cols = [c for c in df.columns if c not in ['date','fwd_ret']]
     split = int(len(df)*0.7)
-    return df.iloc[:split], df.iloc[split:], feat_cols, f'Fama-French3因子({len(df)}月)'
+    return df.iloc[:split], df.iloc[split:], feat_cols, f'Fama-French 3-factor ({len(df)} months)'
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 评估
+# Evaluation
 # ═══════════════════════════════════════════════════════════════════════════
 
 def eval_model(train, test, feat_cols, ds_name):
@@ -179,8 +179,8 @@ def eval_model(train, test, feat_cols, ds_name):
             Xe = X_te_s if use_scaled else X_te
             model_cls.fit(Xt, y_tr)
             pred = model_cls.predict(Xe)
-            # 截面IC（仅多资产）
-            if ds_name.startswith('A股'):
+            # Cross-sectional IC (multi-asset only)
+            if ds_name.startswith('A-share'):
                 ics = [spearmanr(pred[test['date']==m], test.loc[test['date']==m,'fwd_ret'].values)[0] for m in test['date'].unique() if (test['date']==m).sum()>=20]
             else:
                 ic = spearmanr(pred, y_te)[0]
@@ -198,19 +198,19 @@ def eval_model(train, test, feat_cols, ds_name):
 
 def main():
     print('='*70)
-    print('多数据集 × 多模型 IC 对比')
+    print('Multi-Dataset x Multi-Model IC Comparison')
     print('='*70)
 
     datasets = {}
-    for loader, key in [(load_ashare,'A股月线'), (load_spy,'SPY月线'), (load_ff_factors,'FF3因子')]:
+    for loader, key in [(load_ashare,'A-share Monthly'), (load_spy,'SPY Monthly'), (load_ff_factors,'FF3 Factors')]:
         try:
-            print(f'\n加载 {key}...')
+            print(f'\nLoading {key}...')
             result = loader()
             if result is None:
-                print(f'  数据不可用，跳过')
+                print(f'  Data unavailable, skipping')
                 continue
             train, test, feats, label = result
-            print(f'  {label} | 训练{len(train):,} 测试{len(test):,} 特征{len(feats)}')
+            print(f'  {label} | Train={len(train):,} Test={len(test):,} Features={len(feats)}')
             datasets[key] = (train, test, feats, label)
         except Exception as e:
             print(f'  failed: {e}')
@@ -218,18 +218,18 @@ def main():
     all_results = {}
     for ds_key, (train, test, feats, ds_label) in datasets.items():
         print('\n' + '─'*70)
-        print(f'数据集: {ds_label}')
+        print(f'Dataset: {ds_label}')
         r = eval_model(train, test, feats, ds_key)
         all_results[ds_key] = r
         for name, m in r.items():
             if 'error' in m: print(f'  {name:<15s} ERROR: {m[\"error\"]}')
             else: print(f'  {name:<15s} IC={m[\"IC\"]:+.4f} ICIR={m[\"ICIR\"]:+.4f} hit={m[\"hit_rate\"]:.3f} ({m[\"time_s\"]}s)')
 
-    # 汇总
+    # Summary
     print(f'\n{\"=\"*70}')
-    print('IC 矩阵')
+    print('IC Matrix')
     model_names = ['Ridge','Linear','LightGBM','MLP(64,32)','RandomForest']
-    header = f'{\"模型\":<15s}'
+    header = f'{\"Model\":<15s}'
     for ds in datasets: header += f' {ds:<18s}'
     print(header)
     print('-'*len(header))
@@ -242,7 +242,7 @@ def main():
 
     with open(OUT/'cross_dataset_results.json','w') as f:
         json.dump(all_results, f, indent=2, default=str)
-    print(f'\n保存到 {OUT/\"cross_dataset_results.json\"}')
+    print(f'\nSaved to {OUT/\"cross_dataset_results.json\"}')
 
 if __name__ == '__main__':
     main()

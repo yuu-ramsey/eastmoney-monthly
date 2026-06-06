@@ -26,29 +26,29 @@ test('predictor.buildPrompt: 包含不做方向判断约束', () => {
   assert.match(prompt, /不预测涨跌/);
 });
 
-test('predictor.buildPrompt: 包含 K 线表格', () => {
+test('predictor.buildPrompt: contains K-line table', () => {
   const prompt = predictorAgent.buildPrompt(sampleCtx);
   assert.match(prompt, /2026-03-31/);
   assert.match(prompt, /MACD-DIF/);
 });
 
-test('predictor.buildPrompt: 不包含操作建议、看多看空', () => {
+test('predictor.buildPrompt: does not contain trading advice or bullish/bearish view', () => {
   const prompt = predictorAgent.buildPrompt(sampleCtx);
   // 扣除禁止声明后再检查
   const cleaned = prompt.replace(/不输出.*操作建议.*\n*/g, '').replace(/不输出.*看多.*看空.*\n*/g, '');
-  assert.ok(!/操作建议/.test(cleaned), 'predictor 不应有操作建议');
-  assert.ok(!/看多/.test(cleaned), 'predictor 不应说看多');
-  assert.ok(!/看空/.test(cleaned), 'predictor 不应说看空');
+  assert.ok(!/操作建议/.test(cleaned), 'predictor should not have trading advice');
+  assert.ok(!/看多/.test(cleaned), 'predictor should not say bullish');
+  assert.ok(!/看空/.test(cleaned), 'predictor should not say bearish');
 });
 
-test('predictor.buildPrompt: 月线周期提示季度级别', () => {
+test('predictor.buildPrompt: monthly period mentions quarterly level', () => {
   const prompt = predictorAgent.buildPrompt(sampleCtx);
   assert.match(prompt, /季度级别/);
 });
 
-test('predictor.buildPrompt: 日线周期不给季度限制', () => {
+test('predictor.buildPrompt: daily period does not have quarterly constraint', () => {
   const dailyCtx = { ...sampleCtx, period: 'daily', periodLabel: '日线' };
   const prompt = predictorAgent.buildPrompt(dailyCtx);
-  assert.ok(!/季度级别/.test(prompt), '日线不应有季度级别限制');
+  assert.ok(!/季度级别/.test(prompt), 'daily should not have quarterly level constraint');
   assert.match(prompt, /更精细/);
 });

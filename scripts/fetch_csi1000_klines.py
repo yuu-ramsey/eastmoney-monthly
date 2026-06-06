@@ -24,7 +24,7 @@ def fetch_monthly(code, market='0'):
         'secid': secid, 'fields1': 'f1,f2,f3,f4,f5,f6',
         'fields2': 'f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61',
         'klt': '103',  # monthly
-        'fqt': '1',    # 前复权
+        'fqt': '1',    # forward-adjusted
         'beg': '20100101', 'end': '20260519',
         'lmt': '300'
     }

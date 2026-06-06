@@ -4,7 +4,7 @@ Data adapter - reads monthly kline data from project SQLite, converts to Kronos 
 Input: Monthly kline records for a stock from SQLite
 Output: pandas DataFrame
   columns = ['open','high','low','close','volume','amount']
-  index 为 DatetimeIndex（月线date）
+  index is DatetimeIndex (monthly candle dates)
 """
 
 # Reproduced from Kronos (https://github.com/shiyu-coder/Kronos)
@@ -18,13 +18,13 @@ from typing import Optional
 
 import pandas as pd
 
-# 项目根目录（kronos/ 的父目录）
+# Project root directory (parent of kronos/)
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# 默认数据库路径
+# Default database path
 DEFAULT_DB_PATH = _PROJECT_ROOT / ".eastmoney-ai" / "db" / "klines-v2.sqlite"
 
-# 字段映射：SQLite 列名 → DataFrame 列名（均为同名，amount 单独处理）
+# Column mapping: SQLite column names -> DataFrame column names (all same-name, amount handled separately)
 _KLINE_COLUMNS = ["open", "high", "low", "close", "volume", "amount"]
 
 
@@ -34,26 +34,26 @@ def load_monthly_klines(
     min_records: int = 12,
 ) -> pd.DataFrame:
     """
-    从 SQLite 月线数据库Loaded单stocks的 OHLCV 数据。
+    Load OHLCV data for a single stock from the SQLite monthly kline database.
 
     Args:
-        code: 股票code，如 "600519"
-        db_path: SQLite 数据库路径，默认使用项目 klines-v2.sqlite
-        min_records: 最低记录数要求，不足则报错
+        code: stock code, e.g. "600519"
+        db_path: SQLite database path, defaults to project klines-v2.sqlite
+        min_records: minimum record count required, raises error if insufficient
 
     Returns:
-        DataFrame，columns 包含 OHLCV + timestamps，按时间升序排列
+        DataFrame with OHLCV columns + timestamps, sorted by time in ascending order
 
     Raises:
-        FileNotFoundError: 数据库File not found
-        ValueError: 股票code无数据或记录数不足
+        FileNotFoundError: database file not found
+        ValueError: stock code has no data or insufficient record count
     """
     if db_path is None:
         db_path = DEFAULT_DB_PATH
     db_path = Path(db_path)
 
     if not db_path.exists():
-        raise FileNotFoundError(f"数据库不存在: {db_path}")
+        raise FileNotFoundError(f"Database not found: {db_path}")
 
     conn = sqlite3.connect(str(db_path))
     try:
@@ -68,49 +68,49 @@ def load_monthly_klines(
         conn.close()
 
     if df.empty:
-        raise ValueError(f"股票 {code} 无月线数据")
+        raise ValueError(f"Stock {code} has no monthly kline data")
 
     if len(df) < min_records:
         raise ValueError(
-            f"股票 {code} 月线数据不足: 需要 ≥{min_records} 条，实际 {len(df)} 条"
+            f"Stock {code} has insufficient monthly kline data: need >= {min_records} records, got {len(df)}"
         )
 
-    # amount 缺失则填 0
+    # Fill missing amount with 0
     if "amount" not in df.columns or df["amount"].isna().all():
         df["amount"] = 0.0
     else:
         df["amount"] = df["amount"].fillna(0.0)
 
-    # 解析date → pandas datetime
-    # 月线格式 "YYYY-MM"，统一补 "-01" 转为月初date
+    # Parse date -> pandas datetime
+    # Monthly format "YYYY-MM", uniformly append "-01" to convert to month-start date
     date_str = df["date"].astype(str).str.strip()
     df["timestamps"] = pd.to_datetime(
         date_str.apply(_normalize_date), format="%Y-%m-%d"
     )
 
-    # 只保留 Kronos 需要的 7 列，按时间升序
+    # Keep only the 7 columns Kronos needs, sorted by time ascending
     result = df[["open", "high", "low", "close", "volume", "amount", "timestamps"]].copy()
 
-    # 确保数值列为 float
+    # Ensure numeric columns are float
     for col in _KLINE_COLUMNS:
         result[col] = result[col].astype(float)
 
-    # 按时间升序，设置 timestamps 为 DatetimeIndex（predictor 用 df.index 做时间过滤）
+    # Sort by time ascending, set timestamps as DatetimeIndex (predictor uses df.index for time filtering)
     result = result.sort_values("timestamps")
     result = result.set_index("timestamps")
 
-    # 摘要输出到 stderr（避免污染 stdout 的 JSON 输出）
+    # Summary output to stderr (avoid polluting stdout JSON output)
     import sys
-    print(f"股票: {code}", file=sys.stderr)
-    print(f"数据条数: {len(result)}", file=sys.stderr)
-    print(f"时间范围: {result.index.min().strftime('%Y-%m')} → "
+    print(f"Stock: {code}", file=sys.stderr)
+    print(f"Records: {len(result)}", file=sys.stderr)
+    print(f"Date range: {result.index.min().strftime('%Y-%m')} -> "
           f"{result.index.max().strftime('%Y-%m')}", file=sys.stderr)
 
     return result
 
 
 def _normalize_date(date_str: str) -> str:
-    """将 "YYYY-MM" 补全为 "YYYY-MM-DD"；已是完整date则原样返回"""
+    """Convert "YYYY-MM" to "YYYY-MM-DD"; return as-is if already a full date"""
     date_str = date_str.strip()
     if len(date_str) == 7:  # "YYYY-MM"
         return date_str + "-01"
@@ -118,30 +118,30 @@ def _normalize_date(date_str: str) -> str:
 
 
 # ============================================================
-# 验证入口
+# Verification entry point
 # ============================================================
 
 if __name__ == "__main__":
     TEST_CODE = "600519"
 
     print("=" * 60)
-    print("Kronos 数据适配层验证")
-    print(f"数据库: {DEFAULT_DB_PATH}")
+    print("Kronos Data Adapter Verification")
+    print(f"Database: {DEFAULT_DB_PATH}")
     print("=" * 60)
 
     try:
         df = load_monthly_klines(TEST_CODE)
-        print(f"\n字段列表: {list(df.columns)}")
-        print(f"数据类型:\n{df.dtypes}")
-        print(f"\n前 5 条:")
+        print(f"\nColumns: {list(df.columns)}")
+        print(f"Dtypes:\n{df.dtypes}")
+        print(f"\nFirst 5:")
         print(df.head())
-        print(f"\n后 5 条:")
+        print(f"\nLast 5:")
         print(df.tail())
-        print(f"\n空值检查:")
+        print(f"\nNull check:")
         print(df.isna().sum())
-        print(f"\n基本统计:")
+        print(f"\nBasic statistics:")
         print(df[["open", "high", "low", "close", "volume", "amount"]].describe())
-        print("\n验证通过.")
+        print("\nVerification passed.")
     except Exception as e:
-        print(f"\n验证失败: {e}")
+        print(f"\nVerification failed: {e}")
         raise

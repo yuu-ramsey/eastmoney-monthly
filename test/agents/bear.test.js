@@ -15,43 +15,43 @@ const sampleCtx = {
   extraContext: { events: [{ date: '04-30', type: '研报', title: '测试标题' }] },
 };
 
-test('bear.buildPrompt: 包含看空角色指令', () => {
+test('bear.buildPrompt: includes bearish role instructions', () => {
   const prompt = bearAgent.buildPrompt(sampleCtx);
   assert.match(prompt, /看空分析师/);
   assert.match(prompt, /看空论点/);
   assert.match(prompt, /空头视角/);
 });
 
-test('bear.buildPrompt: 包含 K 线表格', () => {
+test('bear.buildPrompt: includes K-line table', () => {
   const prompt = bearAgent.buildPrompt(sampleCtx);
   assert.match(prompt, /2026-03-31/);
   assert.match(prompt, /MACD-DIF/);
 });
 
-test('bear.buildPrompt: 包含附加上下文', () => {
+test('bear.buildPrompt: includes extra context', () => {
   const prompt = bearAgent.buildPrompt(sampleCtx);
   assert.match(prompt, /测试标题/);
   assert.match(prompt, /附加上下文/);
 });
 
-test('bear.buildPrompt: 不包含综合结论和操作建议', () => {
+test('bear.buildPrompt: does not include comprehensive conclusion or action advice', () => {
   const prompt = bearAgent.buildPrompt(sampleCtx);
   const afterProhibition = prompt.replace(/不要输出.*综合结论.*操作建议.*\n*/g, '');
   assert.ok(!/综合结论/.test(afterProhibition));
   assert.ok(!/操作建议/.test(afterProhibition));
 });
 
-test('bear.buildPrompt: 包含反向风险评估要求', () => {
+test('bear.buildPrompt: includes reverse risk assessment requirement', () => {
   const prompt = bearAgent.buildPrompt(sampleCtx);
   assert.match(prompt, /反向风险/);
 });
 
-test('bear.buildPrompt: 包含诚实面对反向证据', () => {
+test('bear.buildPrompt: includes "honestly confront opposing evidence" directive', () => {
   const prompt = bearAgent.buildPrompt(sampleCtx);
   assert.match(prompt, /诚实面对/);
 });
 
-test('bear.buildPrompt: 禁止脱离事实给跌幅预测', () => {
+test('bear.buildPrompt: prohibits giving downside predictions without factual basis', () => {
   const prompt = bearAgent.buildPrompt(sampleCtx);
   assert.match(prompt, /不能脱离事实/);
 });

@@ -15,17 +15,17 @@ SW_INDUSTRIES = [
     {'code': '801880.SI', 'name': 'Automobiles'},
     {'code': '801110.SI', 'name': 'Home Appliances'},
     {'code': '801120.SI', 'name': 'Food & Beverage'},
-    {'code': '801130.SI', 'name': '纺织服饰'},
+    {'code': '801130.SI', 'name': 'Textile & Apparel'},
     {'code': '801140.SI', 'name': 'Light Manufacturing'},
     {'code': '801150.SI', 'name': 'Pharmaceutical & Biotech'},
     {'code': '801160.SI', 'name': 'Public Utilities'},
     {'code': '801170.SI', 'name': 'Transportation'},
     {'code': '801180.SI', 'name': 'Real Estate'},
     {'code': '801200.SI', 'name': 'Commercial Retail'},
-    {'code': '801210.SI', 'name': '社会服务'},
+    {'code': '801210.SI', 'name': 'Social Services'},
     {'code': '801780.SI', 'name': 'Banking'},
     {'code': '801790.SI', 'name': 'Non-bank Financials'},
-    {'code': '801230.SI', 'name': '综合'},
+    {'code': '801230.SI', 'name': 'Conglomerates'},
     {'code': '801710.SI', 'name': 'Building Materials'},
     {'code': '801720.SI', 'name': 'Building Decoration'},
     {'code': '801730.SI', 'name': 'Electrical Equipment'},
@@ -34,10 +34,10 @@ SW_INDUSTRIES = [
     {'code': '801750.SI', 'name': 'Computers'},
     {'code': '801760.SI', 'name': 'Media'},
     {'code': '801770.SI', 'name': 'Communications'},
-    {'code': '801950.SI', 'name': '煤炭'},
-    {'code': '801960.SI', 'name': '石油石化'},
-    {'code': '801970.SI', 'name': '环保'},
-    {'code': '801980.SI', 'name': '美容护理'},
+    {'code': '801950.SI', 'name': 'Coal'},
+    {'code': '801960.SI', 'name': 'Petroleum & Petrochemicals'},
+    {'code': '801970.SI', 'name': 'Environmental Protection'},
+    {'code': '801980.SI', 'name': 'Beauty & Personal Care'},
 ]
 
 HEADERS = {
@@ -46,7 +46,7 @@ HEADERS = {
 }
 
 def fetch_industry_stocks(industry_code: str) -> list[str]:
-    """从legulegu获取某个申万行业的所有成分股代码"""
+    """Fetch all constituent stock codes for a Shenwan industry from legulegu"""
     code = industry_code.replace('.SI', '')
     url = f'https://legulegu.com/stockdata/index-composition?industryCode={code}'
     r = requests.get(url, headers=HEADERS, timeout=30, verify=False)

@@ -1,10 +1,10 @@
 """
 v32 + peer approximation features: add within-industry ranking/similarity features on top of 32d, check IC improvement
 New 4 dimensions:
-  - ind_rank_pct: 行业内月收益百分位 (0~1)
-  - ind_zscore: 行业内月收益z-score
-  - peer_dist_median: 32维特征向量到行业median的欧氏距离
-  - peer_dist_pct: 上述距离的横截面百分位
+  - ind_rank_pct: within-industry monthly return percentile (0~1)
+  - ind_zscore: within-industry monthly return z-score
+  - peer_dist_median: Euclidean distance from 32-dim feature vector to industry median
+  - peer_dist_pct: cross-sectional percentile of above distance
 """
 import warnings; warnings.filterwarnings('ignore')
 import numpy as np, pandas as pd, sqlite3, time, json
@@ -28,12 +28,12 @@ FEATURE_NAMES_PEER = [
     'vol_6m', 'atr14',                                     # G4 (6-7)
     'fft_amp_0','fft_amp_1','fft_amp_2','fft_amp_3','fft_amp_4', # FFT (8-17)
     'fft_amp_5','fft_amp_6','fft_amp_7','fft_amp_8','fft_amp_9',
-    'vol_ratio','turnover','turnover_dev',                 # G7全14d (18-31)
+    'vol_ratio','turnover','turnover_dev',                 # G7 full 14d (18-31)
     'vol_ma3_ratio','log_volume','log_turnover',
     'body_pct','price_pos','ma_spread',
     'vol_12m','ma5_ma20_ratio',
     'above_ma5','up_streak','dn_streak',
-    'ind_rank_pct','ind_zscore',                           # 同业特征 (32-35)
+    'ind_rank_pct','ind_zscore',                           # peer features (32-35)
     'peer_dist_median','peer_dist_pct',
 ]
 assert len(FEATURE_NAMES_PEER) == 36
@@ -86,8 +86,8 @@ def cross_sectional_neutralize(features, dates, neutralizer):
 
 
 def build_features():
-    """一次构建32d和36d(含同业特征)"""
-    print(f"[{ts()}] Loaded数据...", flush=True)
+    """Build 32d and 36d (with peer features) in one pass"""
+    print(f"[{ts()}] Loading data...", flush=True)
     conn = sqlite3.connect(str(DB))
     codes = [r[0] for r in conn.execute(
         'SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
@@ -105,7 +105,7 @@ def build_features():
     print(f"[{ts()}] {len(codes_used)} stocks, {len(df)} rows", flush=True)
 
     df['month'] = df['date'].str[:7]
-    print(f"[{ts()}] 构建特征 (32d + 36d peer)...", flush=True); t0 = time.time()
+    print(f"[{ts()}] Building features (32d + 36d peer)...", flush=True); t0 = time.time()
     X32_list, X36_base_list, y_list, meta_list = [], [], [], []
 
     for code in codes_used:
@@ -173,9 +173,9 @@ def build_features():
     v = ~np.isnan(X32).any(axis=1) & ~np.isnan(X36_base).any(axis=1) & ~np.isnan(y)
     X32 = X32[v]; X36_base = X36_base[v]; y = y[v]; meta = meta.iloc[v].reset_index(drop=True)
 
-    print(f"[{ts()}] {len(y):,} 样本, 计算同业特征...", flush=True); t0 = time.time()
+    print(f"[{ts()}] {len(y):,} samples, computing peer features...", flush=True); t0 = time.time()
 
-    # 逐月计算4维同业特征
+    # Compute 4-dim peer features month by month
     peer_features = np.zeros((len(y), 4), dtype=np.float32)
     months = sorted(meta['month'].unique())
 
@@ -280,7 +280,7 @@ def train_and_eval(X_tr, y_tr, X_te, y_te, dates_te, fwd_te, label, n_folds=5):
 if __name__ == '__main__':
     X32, X36, y, meta = build_features()
 
-    print(f"[{ts()}] 行业中性化...", flush=True); t0 = time.time()
+    print(f"[{ts()}] Industry neutralization...", flush=True); t0 = time.time()
     X32_ind = cross_sectional_neutralize(X32.copy(), meta['month'].values, meta['industry'].values)
     X36_ind = cross_sectional_neutralize(X36.copy(), meta['month'].values, meta['industry'].values)
     print(f"[{ts()}] done ({time.time()-t0:.0f}s)", flush=True)
@@ -292,14 +292,14 @@ if __name__ == '__main__':
     X36_tr = X36_ind[tr_m]; X36_te = X36_ind[te_m]
     y_tr = y[tr_m]; y_te = y[te_m]; dates_te = meta['month'][te_m].values
 
-    # T+1~T+6 forward returns (用y_te的shift近似)
+    # T+1~T+6 forward returns (approximated via y_te shift)
     fwd_te = {}
     for lag in range(1, 7):
         fwd_te[lag] = np.roll(y_te, -lag)
 
     print(f"\n{'='*75}")
-    print("32维 vs 36维(含同业特征) 对比")
-    print(f"Train: 2010-2014, Test: 2015-01~2025-11, {len(np.unique(dates_te))} 测试月")
+    print("32d vs 36d (with peer features) Comparison")
+    print(f"Train: 2010-2014, Test: 2015-01~2025-11, {len(np.unique(dates_te))} test months")
     print(f"{'='*75}")
 
     r32 = train_and_eval(X32_tr, y_tr, X32_te, y_te, dates_te, fwd_te, "32d")
@@ -314,9 +314,9 @@ if __name__ == '__main__':
     print(f"  CV: mean={r36['cv_mean']:+.4f}  range=[{r36['cv_min']:+.4f},{r36['cv_max']:+.4f}]  "
           f"all_pos={r36['cv_all_pos']}")
 
-    # ====== 汇总 ======
+    # ====== Summary ======
     print(f"\n{'='*80}")
-    print("32d vs 36d 对比")
+    print("32d vs 36d Comparison")
     print(f"{'='*80}")
     print(f"{'Version':<8s} {'Dim':>4s} {'IC':>8s} {'ICIR':>8s} {'IC_std':>8s} {'IC>0':>8s} "
           f"{'CV_mean':>8s} {'CV_min':>8s} {'CV_max':>8s} {'CV_all+':>8s}")
@@ -331,9 +331,9 @@ if __name__ == '__main__':
     delta_pct = delta_ic / abs(r32['IC']) * 100 if r32['IC'] != 0 else 0
     print(f"\nΔIC(36d-32d) = {delta_ic:+.4f} ({delta_pct:+.1f}%)")
 
-    # 同业Feature importance
+    # Peer feature importance
     print(f"\n{'='*60}")
-    print("同业Feature importance (LGB gain + XGB gain)")
+    print("Peer Feature Importance (LGB gain + XGB gain)")
     print(f"{'='*60}")
     lgb_gain = r36['lgb'].feature_importances_
     xgb_gain_dict = r36['xgb'].get_booster().get_score(importance_type='gain')
@@ -343,7 +343,7 @@ if __name__ == '__main__':
 
     # IC Decay
     print(f"\n{'='*70}")
-    print("IC Decay 对比")
+    print("IC Decay Comparison")
     print(f"{'='*70}")
     print(f"{'Horizon':<8s} {'32d_IC':>8s} {'32d_IR':>8s} {'36d_IC':>8s} {'36d_IR':>8s} {'ΔIC':>8s}")
     print('-'*44)
@@ -375,4 +375,4 @@ if __name__ == '__main__':
             'delta_IC': float(delta_ic), 'delta_IC_pct': float(delta_pct),
         }, f, indent=2, ensure_ascii=False)
 
-    print(f"\n[{ts()}] 同业特征对比done. ΔIC={delta_ic:+.4f}. 结果: {OUT}")
+    print(f"\n[{ts()}] Peer feature comparison complete. delta_IC={delta_ic:+.4f}. Results: {OUT}")

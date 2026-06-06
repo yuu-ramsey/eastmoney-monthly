@@ -1,7 +1,8 @@
+
 """
 Phase 5 Step 2: FFT feature deep diagnosis
-Step 2.1 — FFT内部消融: 低频峰(1-3) / 中频峰(4-6) / 高频峰(7-10)
-Step 2.2 — FFT稳定性检验: 滑动窗口58/60/62根K线的频峰变化
+Step 2.1 -- FFT internal ablation: low-freq peaks(1-3) / mid-freq peaks(4-6) / high-freq peaks(7-10)
+Step 2.2 -- FFT stability test: frequency peak changes with sliding window 58/60/62 bars
 """
 import warnings; warnings.filterwarnings('ignore')
 import numpy as np, pandas as pd, sqlite3, time, json
@@ -18,15 +19,15 @@ OUT.mkdir(parents=True, exist_ok=True)
 N_FFT = 10
 DATE_FMT = '%Y-%m-%d %H:%M:%S'
 
-# FFT特征在61维中的位置: 索引 17-46 (30维)
-# fft_f() Returns 10个峰 × 3值(频率/振幅/相位), 按振幅降序排列
-# Peak 1-3 (最强振幅峰): fft_0..fft_8  → 索引 17-25 (9维)
-# Peak 4-6:               fft_9..fft_17 → 索引 26-34 (9维)
-# Peak 7-10 (最弱振幅峰): fft_18..fft_29 → 索引 35-46 (12维)
+# FFT feature positions in 61d: indices 17-46 (30 dims)
+# fft_f() returns 10 peaks x 3 values (freq/amp/phase), sorted by amplitude descending
+# Peak 1-3 (strongest amp peaks): fft_0..fft_8  -> indices 17-25 (9 dims)
+# Peak 4-6:                       fft_9..fft_17 -> indices 26-34 (9 dims)
+# Peak 7-10 (weakest amp peaks):  fft_18..fft_29 -> indices 35-46 (12 dims)
 FFT_SUBGROUPS = [
-    ('FFT_低频峰1-3',  slice(17, 26)),   # 9 features
-    ('FFT_中频峰4-6',  slice(26, 35)),   # 9 features
-    ('FFT_高频峰7-10', slice(35, 47)),   # 12 features
+    ('FFT_LowFreqPeaks1-3',  slice(17, 26)),   # 9 features
+    ('FFT_MidFreqPeaks4-6',  slice(26, 35)),   # 9 features
+    ('FFT_HighFreqPeaks7-10', slice(35, 47)),   # 12 features
 ]
 
 
@@ -42,7 +43,7 @@ def cs_ic(pred, true, dates):
 
 
 def fft_f(p):
-    """与phase4_full.py/phase5_feature_diagnosis.py完全一致"""
+    """Identical to phase4_full.py/phase5_feature_diagnosis.py"""
     x = np.arange(len(p))
     t = np.polyfit(x, p, 1)
     d = p - np.polyval(t, x)
@@ -62,7 +63,7 @@ def fft_f(p):
 
 
 def fft_f_raw(p):
-    """Returns未截断的完整频峰列表 [(freq, amp, phase), ...] 按振幅降序"""
+    """Returns untruncated full peak list [(freq, amp, phase), ...] sorted by amp descending"""
     x = np.arange(len(p))
     t = np.polyfit(x, p, 1)
     d = p - np.polyval(t, x)
@@ -103,8 +104,8 @@ def cross_sectional_neutralize(features, dates, neutralizer, ntype='categorical'
 
 
 def build_features():
-    """构建特征矩阵, 与phase5_feature_diagnosis.py一致"""
-    print(f"[{ts()}] Loaded数据...", flush=True)
+    """Build feature matrix, identical to phase5_feature_diagnosis.py"""
+    print(f"[{ts()}] Loading data...", flush=True)
     conn = sqlite3.connect(str(DB))
     codes = [r[0] for r in conn.execute(
         'SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
@@ -122,7 +123,7 @@ def build_features():
     print(f"[{ts()}] {len(codes_used)} stocks, {len(df)} rows", flush=True)
 
     df['month'] = df['date'].str[:7]
-    print(f"[{ts()}] 构建特征...", flush=True)
+    print(f"[{ts()}] Building features...", flush=True)
     t0 = time.time()
     flat_list, y_list, dates_list, inds_list = [], [], [], []
 
@@ -193,7 +194,8 @@ def build_features():
             flat.extend(fft_f(cc[i - 60 + 1:i + 1]).tolist())
             flat.extend([v[i] / max(vol_ma12[i], 1) - 1 if i >= 12 and vol_ma12[i] > 0 else 0,
                          tr[i] if not np.isnan(tr[i]) else 0,
-                         tr[i] / max(np.mean(tr[max(0, i - 12):i + 1]), 0.001) - 1 if i >= 12 and not np.isnan(tr[i]) else 0,
+                         tr[i] / max(np.mean(tr[max(0, i - 12):i + 1]), 0.001) - 1 if i >= 12 and not np.isnan(
+                             tr[i]) else 0,
                          (vol_ma3[i] / max(vol_ma12[i], 1) - 1) if i >= 12 and vol_ma12[i] > 0 else 0,
                          np.log1p(max(v[i], 1)),
                          np.log1p(max(tr[i] * 100, 1)) if not np.isnan(tr[i]) else 0])
@@ -221,7 +223,7 @@ def build_features():
     dates_arr = dates_arr[v]
     inds_arr = inds_arr[v]
 
-    print(f"[{ts()}] {len(flat):,} 样本, {flat.shape[1]}d ({time.time() - t0:.0f}s)", flush=True)
+    print(f"[{ts()}] {len(flat):,} samples, {flat.shape[1]}d ({time.time() - t0:.0f}s)", flush=True)
     return flat, y, dates_arr, inds_arr
 
 
@@ -261,11 +263,11 @@ def train_and_eval(X_train, y_train, X_test, y_test, dates_test, label="baseline
             'w_xgb': ics_m['XGB'], 'w_ridge': ics_m['Ridge']}
 
 
-# ====== Step 2.2: FFT稳定性检验 ======
+# ====== Step 2.2: FFT stability test ======
 def fft_stability_analysis():
-    """对随机抽样股票, 用58/60/62窗口计算FFT, 看频峰稳定性"""
+    """For randomly sampled stocks, compute FFT with 58/60/62 windows to check peak stability"""
     print(f"\n{'=' * 60}")
-    print("Step 2.2: FFT稳定性检验 (58/60/62窗口)")
+    print("Step 2.2: FFT Stability Test (58/60/62 window)")
     print(f"{'=' * 60}")
 
     conn = sqlite3.connect(str(DB))
@@ -273,10 +275,10 @@ def fft_stability_analysis():
         'SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
     codes_used = sorted(codes)
 
-    # 随机抽200stocks
+    # Random sample 200 stocks
     rng = np.random.RandomState(789)
     sampled_codes = rng.choice(codes_used, min(200, len(codes_used)), replace=False)
-    print(f"[{ts()}] 抽样 {len(sampled_codes)} stocks for stability test", flush=True)
+    print(f"[{ts()}] Sampled {len(sampled_codes)} stocks for stability test", flush=True)
 
     params = ','.join('?' * len(sampled_codes))
     df = pd.read_sql_query(
@@ -285,11 +287,11 @@ def fft_stability_analysis():
         conn, params=list(sampled_codes))
     conn.close()
 
-    # 每个峰位的稳定性统计: [freq_cv, amp_cv] × 10 peaks
-    # CV = std/mean across 3 windows, 如果mean≈0则跳过
+    # Stability statistics per peak position: [freq_cv, amp_cv] x 10 peaks
+    # CV = std/mean across 3 windows, skip if mean~0
     peak_freq_cvs = [[] for _ in range(10)]
     peak_amp_cvs = [[] for _ in range(10)]
-    # 频峰匹配率: 同rank的峰在3个窗口中是否频率相近(<5%偏离)
+    # Peak match rate: whether same-rank peaks have nearby frequencies (<5% deviation) across 3 windows
     peak_match_rates = [[] for _ in range(10)]
 
     n_samples = 0
@@ -300,13 +302,13 @@ def fft_stability_analysis():
         if n < 63:
             continue
 
-        # 每stocks最多取30个时间点
+        # Max 30 time points per stock
         test_points = list(range(62, n))
         if len(test_points) > 30:
             test_points = sorted(rng.choice(test_points, 30, replace=False))
 
         for i in test_points:
-            # 3个窗口的FFT
+            # FFT with 3 windows
             peaks_58 = fft_f_raw(c[i - 57:i + 1])   # 58-bar
             peaks_60 = fft_f_raw(c[i - 59:i + 1])   # 60-bar (baseline)
             peaks_62 = fft_f_raw(c[i - 61:i + 1])   # 62-bar
@@ -315,22 +317,22 @@ def fft_stability_analysis():
                 continue
             n_samples += 1
 
-            # 对每个rank位置, 比较3个窗口的峰
+            # For each rank position, compare peaks across 3 windows
             for rank in range(min(10, len(peaks_58), len(peaks_62))):
                 freqs = [peaks_58[rank][0], peaks_60[rank][0], peaks_62[rank][0]]
                 amps = [peaks_58[rank][1], peaks_60[rank][1], peaks_62[rank][1]]
 
-                # 频率CV
+                # Frequency CV
                 fmean = np.mean(freqs)
                 if fmean > 1e-8:
                     peak_freq_cvs[rank].append(np.std(freqs) / fmean)
 
-                # 振幅CV
+                # Amplitude CV
                 amean = np.mean(amps)
                 if amean > 1e-8:
                     peak_amp_cvs[rank].append(np.std(amps) / amean)
 
-                # 匹配率: 3个窗口的频率两两偏差<5%即认为匹配
+                # Match rate: pairwise frequency deviation < 5% counts as match
                 f60 = peaks_60[rank][0]
                 matches = 0
                 for f_other in [peaks_58[rank][0], peaks_62[rank][0]]:
@@ -338,9 +340,9 @@ def fft_stability_analysis():
                         matches += 1
                 peak_match_rates[rank].append(matches / 2.0)  # 0, 0.5, or 1.0
 
-    print(f"[{ts()}] 有效样本: {n_samples} stock-months", flush=True)
+    print(f"[{ts()}] Valid samples: {n_samples} stock-months", flush=True)
 
-    # 汇总
+    # Summary
     print(f"\n{'Peak':<10s} {'Freq_CV':>10s} {'Amp_CV':>10s} {'MatchRate':>10s} {'Verdict':>15s}")
     print('-' * 60)
     stability_results = []
@@ -348,7 +350,7 @@ def fft_stability_analysis():
         fc = np.mean(peak_freq_cvs[rank]) * 100 if peak_freq_cvs[rank] else 0
         ac = np.mean(peak_amp_cvs[rank]) * 100 if peak_amp_cvs[rank] else 0
         mr = np.mean(peak_match_rates[rank]) * 100 if peak_match_rates[rank] else 0
-        # 判定: Freq_CV<10% 且 MatchRate>80% → 稳定
+        # Verdict: Freq_CV<10% AND MatchRate>80% -> STABLE
         if fc < 10 and mr > 80:
             verdict = "STABLE"
         elif fc < 20 and mr > 60:
@@ -364,8 +366,8 @@ def fft_stability_analysis():
         })
         print(f"Peak {rank + 1:<5d} {fc:>9.1f}% {ac:>9.1f}% {mr:>9.1f}% {verdict:>15s}")
 
-    # 按频段汇总
-    for group_name, ranks in [('低频峰1-3', [0, 1, 2]), ('中频峰4-6', [3, 4, 5]), ('高频峰7-10', [6, 7, 8, 9])]:
+    # Group summary
+    for group_name, ranks in [('LowFreqPeaks1-3', [0, 1, 2]), ('MidFreqPeaks4-6', [3, 4, 5]), ('HighFreqPeaks7-10', [6, 7, 8, 9])]:
         avg_fc = np.mean([stability_results[r]['freq_cv_pct'] for r in ranks])
         avg_ac = np.mean([stability_results[r]['amp_cv_pct'] for r in ranks])
         avg_mr = np.mean([stability_results[r]['match_rate_pct'] for r in ranks])
@@ -383,11 +385,11 @@ def fft_stability_analysis():
 
 # ====== Main ======
 if __name__ == '__main__':
-    # 1. 构建特征
+    # 1. Build features
     flat, y, dates_arr, inds_arr = build_features()
 
-    # 2. 行业中性化
-    print(f"[{ts()}] 行业中性化...", flush=True)
+    # 2. Industry neutralize
+    print(f"[{ts()}] Industry neutralizing...", flush=True)
     t0 = time.time()
     flat_ind = cross_sectional_neutralize(flat.copy(), dates_arr, inds_arr, 'categorical')
     print(f"[{ts()}] done ({time.time() - t0:.0f}s)", flush=True)
@@ -401,14 +403,14 @@ if __name__ == '__main__':
     y_test = y[te_m]
     dates_test = dates_arr[te_m]
 
-    # ====== Step 2.1: FFT子频段消融 ======
+    # ====== Step 2.1: FFT sub-band ablation ======
     print(f"\n{'=' * 60}")
-    print("Step 2.1: FFT子频段消融 (低频1-3 / 中频4-6 / 高频7-10)")
+    print("Step 2.1: FFT Sub-band Ablation (LowFreq1-3 / MidFreq4-6 / HighFreq7-10)")
     print(f"{'=' * 60}")
 
-    # baseline (全61维)
+    # baseline (full 61d)
     result_base = train_and_eval(X_train_full, y_train_full, X_test, y_test, dates_test, "baseline")
-    print(f"Baseline (全61维): IC={result_base['IC']:+.4f}, ICIR={result_base['ICIR']:+.3f}")
+    print(f"Baseline (full 61d): IC={result_base['IC']:+.4f}, ICIR={result_base['ICIR']:+.3f}")
 
     ablation_results = [result_base]
 
@@ -429,11 +431,11 @@ if __name__ == '__main__':
         delta_ic = r['IC'] - result_base['IC']
         delta_ir = r['ICIR'] - result_base['ICIR']
         n_removed = 61 - len(idxs)
-        print(f"  {gname:<20s} ({n_removed}d removed): IC={r['IC']:+.4f} (Δ{delta_ic:+.4f})  "
-              f"ICIR={r['ICIR']:+.3f} (Δ{delta_ir:+.3f})")
+        print(f"  {gname:<20s} ({n_removed}d removed): IC={r['IC']:+.4f} (D{delta_ic:+.4f})  "
+              f"ICIR={r['ICIR']:+.3f} (D{delta_ir:+.3f})")
 
-    # 汇总
-    print(f"\n{'Result':<25s} {'IC':>8s} {'ICIR':>8s} {'ΔIC':>8s} {'ΔICIR':>8s} {'ΔIC%':>8s}")
+    # Summary
+    print(f"\n{'Result':<25s} {'IC':>8s} {'ICIR':>8s} {'delta_IC':>8s} {'delta_ICIR':>8s} {'delta_IC%':>8s}")
     print('-' * 65)
     for r in ablation_results:
         delta_ic = r['IC'] - result_base['IC']
@@ -455,10 +457,10 @@ if __name__ == '__main__':
     ablation_df.to_csv(OUT / 'step2_1_fft_ablation.csv', index=False, encoding='utf-8-sig')
     print(f"\nSaved: {OUT / 'step2_1_fft_ablation.csv'}")
 
-    # ====== Step 2.2: FFT稳定性检验 ======
+    # ====== Step 2.2: FFT stability test ======
     stability_results = fft_stability_analysis()
 
-    # 综合保存
+    # Combined save
     summary = {
         'step2_1_fft_ablation': [{
             'experiment': r['label'],
@@ -472,4 +474,4 @@ if __name__ == '__main__':
     with open(OUT / 'step2_summary.json', 'w') as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
 
-    print(f"\n[{ts()}] Step 2 诊断done. 结果: {OUT}")
+    print(f"\n[{ts()}] Step 2 diagnosis done. Results: {OUT}")

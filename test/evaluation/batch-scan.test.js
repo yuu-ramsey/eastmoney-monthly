@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-test('batch-scan: generateDailyReport 格式验证', async () => {
+test('batch-scan: generateDailyReport format verification', async () => {
   const { generateDailyReport } = await import('../../lib/scanner/daily-report.js');
 
   const results = [
@@ -21,41 +21,41 @@ test('batch-scan: generateDailyReport 格式验证', async () => {
   const fs = await import('node:fs');
   const content = fs.readFileSync(reportPath, 'utf-8');
 
-  // 标题
+  // title
   assert.ok(content.includes('# 机会股日报 2026-05-17'));
-  // 概况
-  assert.ok(content.includes('300 只'));
+  // summary
+  assert.ok(content.includes('300 stocks'));
   assert.ok(content.includes('¥15.20'));
-  // 看多
-  assert.ok(content.includes('🟢 强看多信号'));
+  // bullish
+  assert.ok(content.includes('🟢 Strong Bullish Signals'));
   assert.ok(content.includes('贵州茅台'));
   assert.ok(content.includes('中天科技'));
-  // 看空
-  assert.ok(content.includes('🔴 强看空信号'));
-  // 失败
+  // bearish
+  assert.ok(content.includes('🔴 Strong Bearish Signals'));
+  // failures
   assert.ok(content.includes('失败股'));
   assert.ok(content.includes('timeout'));
 
-  // 清理
+  // cleanup
   fs.unlinkSync(reportPath);
 });
 
-test('batch-scan: 空结果不抛错', async () => {
+test('batch-scan: empty results does not throw', async () => {
   const { generateDailyReport } = await import('../../lib/scanner/daily-report.js');
   const reportPath = generateDailyReport([], { totalStocks: 0, totalCost: 0 });
 
   const fs = await import('node:fs');
   const content = fs.readFileSync(reportPath, 'utf-8');
-  assert.ok(content.includes('0 只'));
+  assert.ok(content.includes('0 stocks'));
   fs.unlinkSync(reportPath);
 });
 
-test('batch-scan: 预算耗尽场景', async () => {
+test('batch-scan: budget exhausted scenario', async () => {
   const { checkBudget, BudgetExceededError } = await import('../../lib/evaluation/cost-guard.js');
-  // 检查大量预估是否抛错
+  // check if large estimate throws
   try {
-    checkBudget(100); // 远超 ¥3/天
-    // 如果能通过（预算文件可能有累积），跳过
+    checkBudget(100); // far exceeds ¥3/day
+    // if it passes (budget file may have accumulation), skip
   } catch (err) {
     assert.ok(err instanceof BudgetExceededError);
   }

@@ -1,6 +1,6 @@
 """B1-XGB: XGBoost stacking ensemble vs Ridge baseline.
 Walk-forward monthly training, strictly prevents future information leakage.
-对比 Ridge IC=0.063 baseline vs XGBoost with same + extended features.
+Compare Ridge IC=0.063 baseline vs XGBoost with same + extended features.
 """
 import numpy as np, pandas as pd, sqlite3, warnings
 from pathlib import Path
@@ -27,7 +27,7 @@ if lstm_path.exists():
         lstm_dict[(r['code'], r['month'])] = r['lstm_signal']
 print(f"  {len(lstm_dict)} LSTM signals")
 
-# ======== 2. Loaded月线 ========
+# ======== 2. Load monthly klines ========
 conn = sqlite3.connect(str(DB))
 stocks = [r[0] for r in conn.execute(
     "SELECT DISTINCT stock_code FROM stock_industry_mapping").fetchall()]
@@ -38,7 +38,7 @@ m_df = pd.read_sql_query(
 conn.close()
 print(f"  {len(stocks)} stocks, {len(m_df)} monthly rows")
 
-# ======== 3. 构建特征矩阵 ========
+# ======== 3. Build feature matrix ========
 print("2/3 Building features...")
 
 def compute_quant_score(closes, highs, lows, volumes, idx):

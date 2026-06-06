@@ -1,13 +1,13 @@
 """
 Phase 4: Robustness check — monthly factor backtest + robustness test + OOS tracking template
 ================================================================
-Tasks 4.1-4.3: IC衰减 / 噪声敏感度 / Permutation Test
-Steps 1-4: 五分组回测 / 交易成本 / 时序CV / OOS跟踪
+Tasks 4.1-4.3: IC Decay / Noise Sensitivity / Permutation Test
+Steps 1-4: Quintile Backtest / Transaction Costs / Time-Series CV / OOS Tracking
 
-因子: 多因子复合 (MACD+RSI+MA+动量+价值), 行业中性化
-标的: 298 只 HS300 成分股 (stock_industry_mapping)
-周期: 月度, 2010-01 ~ 2026-04
-WALK_FORWARD: strict date-based (训练=2015-2021, 测试=2022-2026)
+Factor: Multi-factor composite (MACD+RSI+MA+Momentum+Value), industry-neutralized
+Universe: 298 HS300 constituent stocks (stock_industry_mapping)
+Frequency: Monthly, 2010-01 ~ 2026-04
+WALK_FORWARD: strict date-based (train=2015-2021, test=2022-2026)
 """
 import sqlite3, numpy as np, pandas as pd, json, time, warnings, os
 from pathlib import Path
@@ -23,21 +23,21 @@ OUT.mkdir(parents=True, exist_ok=True)
 PYTHON = PROJECT / '.venv' / 'Scripts' / 'python.exe'
 
 # ============================================================
-# 0. 数据Loaded
+# 0. Data Loading
 # ============================================================
 def load_data():
-    """Loaded月度K线 + 行业映射"""
+    """Load monthly klines + industry mapping"""
     conn = sqlite3.connect(str(DB))
 
-    # 行业映射
+    # Industry mapping
     ind_rows = conn.execute(
         "SELECT stock_code, industry_code FROM stock_industry_mapping"
     ).fetchall()
     stock_to_ind = {r[0]: r[1] for r in ind_rows}
     codes = sorted(stock_to_ind.keys())
-    print(f"行业映射: {len(codes)} stocks, {len(set(stock_to_ind.values()))} 个行业")
+    print(f"Industry mapping: {len(codes)} stocks, {len(set(stock_to_ind.values()))} industries")
 
-    # 月度K线 (只取有行业映射的股票)
+    # Monthly klines (only stocks with industry mapping)
     params = ','.join('?' * len(codes))
     df = pd.read_sql_query(
         f"SELECT code, date, open, high, low, close, volume "
@@ -47,30 +47,30 @@ def load_data():
     )
     conn.close()
 
-    # 过滤: 每stocks至少需要 60 个月数据
+    # Filter: each stock needs at least 60 months of data
     counts = df.groupby('code').size()
     valid = counts[counts >= 60].index.tolist()
     df = df[df['code'].isin(valid)]
     stock_to_ind = {k: v for k, v in stock_to_ind.items() if k in valid}
-    print(f"月度K线: {len(df)} 行, {len(valid)} stocks (>=60月)")
-    print(f"date范围: {df['date'].min()} ~ {df['date'].max()}")
+    print(f"Monthly klines: {len(df)} rows, {len(valid)} stocks (>=60 months)")
+    print(f"Date range: {df['date'].min()} ~ {df['date'].max()}")
 
     return df, stock_to_ind
 
 # ============================================================
-# 1. 因子计算 (每stocks, 每月一个因子值)
+# 1. Factor Calculation (per stock, one factor value per month)
 # ============================================================
 def compute_factors(df):
     """
-    计算月度多因子复合得分.
-    因子组件 (等权):
-      - MACD 信号 (DIF 方向 + 量级)
-      - RSI 反转信号
-      - MA 位置 (vs MA20, MA60)
-      - 短期动量 (3月收益)
-      - 长期反转 (12月收益)
-      - 波动率 (ATR归一化)
-    每个因子月度截面标准化后等权合成.
+    Compute monthly multi-factor composite score.
+    Factor components (equal weight):
+      - MACD signal (DIF direction + magnitude)
+      - RSI reversal signal
+      - MA position (vs MA20, MA60)
+      - Short-term momentum (3-month return)
+      - Long-term reversal (12-month return)
+      - Volatility (ATR normalized)
+    Each factor is monthly cross-section standardized then equal-weight combined.
     """
     results = []
 
@@ -87,7 +87,7 @@ def compute_factors(df):
         ema12 = pd.Series(c).ewm(span=12, min_periods=12).mean().values
         ema26 = pd.Series(c).ewm(span=26, min_periods=26).mean().values
         dif = ema12 - ema26
-        # 归一化 DIF: DIF/close
+        # Normalize DIF: DIF/close
         dif_norm = np.where(c > 0, dif / c, 0.0)
 
         # --- RSI ---
@@ -99,13 +99,13 @@ def compute_factors(df):
         rsi = np.where(avg_loss > 1e-8,
                        100 - 100 / (1 + avg_gain / avg_loss), 50.0)
 
-        # --- MA 位置 ---
+        # --- MA Position ---
         ma20 = pd.Series(c).rolling(20, min_periods=20).mean().values
         ma60 = pd.Series(c).rolling(60, min_periods=60).mean().values
         pos_ma20 = np.where((ma20 > 0) & (c > 0), (c - ma20) / c, 0.0)
         pos_ma60 = np.where((ma60 > 0) & (c > 0), (c - ma60) / c, 0.0)
 
-        # --- 动量 ---
+        # --- Momentum ---
         mom3 = np.full(n, np.nan)
         for i in range(3, n):
             mom3[i] = (c[i] - c[i-3]) / max(c[i-3], 0.01)
@@ -113,12 +113,12 @@ def compute_factors(df):
         for i in range(12, n):
             mom12[i] = (c[i] - c[i-12]) / max(c[i-12], 0.01)
 
-        # --- 波动率 (ATR/close) ---
+        # --- Volatility (ATR/close) ---
         tr = np.maximum(h - l, np.abs(h - np.roll(c, 1)))
         atr14 = pd.Series(tr).rolling(14, min_periods=14).mean().values
         vol_norm = np.where(c > 0, atr14 / c, 0.0)
 
-        # 组装 (从第60个月开始, 确保所有指标有足够历史)
+        # Assemble (start from month 60, ensure all indicators have enough history)
         for i in range(60, n):
             row = {
                 'code': code,
@@ -137,9 +137,9 @@ def compute_factors(df):
             results.append(row)
 
     df_factors = pd.DataFrame(results)
-    print(f"因子计算完成: {df_factors.shape}, {df_factors['code'].nunique()} stocks")
+    print(f"Factor calculation complete: {df_factors.shape}, {df_factors['code'].nunique()} stocks")
 
-    # 计算前瞻收益
+    # Compute forward returns
     df_factors = df_factors.sort_values(['code', 'date']).reset_index(drop=True)
     fwd1, fwd2 = [], []
     for code, g in df_factors.groupby('code'):
@@ -157,40 +157,40 @@ def compute_factors(df):
     df_factors['fwd_ret_1m'] = fwd1
     df_factors['fwd_ret_2m'] = fwd2
 
-    # 去掉 NaN 前瞻收益的行
+    # Remove rows with NaN forward returns
     df_factors = df_factors.dropna(subset=['fwd_ret_1m']).reset_index(drop=True)
-    print(f"去掉NaN前瞻收益后: {df_factors.shape}")
+    print(f"After removing NaN forward returns: {df_factors.shape}")
 
     return df_factors
 
 # ============================================================
-# 2. 因子标准化 + 行业中性化
+# 2. Factor Standardization + Industry Neutralization
 # ============================================================
 def neutralize_and_score(df_factors, stock_to_ind):
     """
-    每月截面:
-    1. 各子因子 rank → z-score
-    2. 等权合成 → raw_score
-    3. 行业中性化: raw_score ~ industry_dummies, 取 residual
+    Monthly cross-section:
+    1. Each sub-factor rank → z-score
+    2. Equal-weight combination → raw_score
+    3. Industry neutralization: raw_score ~ industry_dummies, take residual
     """
     factor_cols = ['macd', 'rsi', 'ma20_pos', 'ma60_pos', 'mom3', 'mom12', 'vol']
 
-    # Step 1: 每月截面 rank → z-score
+    # Step 1: Monthly cross-section rank → z-score
     df = df_factors.copy()
     for col in factor_cols:
         df[f'{col}_z'] = df.groupby('date')[col].transform(
             lambda x: (x.rank() - x.rank().mean()) / x.rank().std()
         )
 
-    # Step 2: 等权合成
+    # Step 2: Equal-weight combination
     z_cols = [f'{c}_z' for c in factor_cols]
     df['raw_score'] = df[z_cols].mean(axis=1)
-    # 符号修正: RSI高=超买=看空, vol高=风险高=看空, mom12高=可能反转=看空
-    # 将 rsi_z 和 mom12_z 和 vol_z 取反
+    # Sign correction: high RSI=overbought=bearish, high vol=high risk=bearish, high mom12=possible reversal=bearish
+    # Reverse sign of rsi_z, mom12_z, and vol_z
     df['raw_score'] = (df['macd_z'] + df['ma20_pos_z'] + df['ma60_pos_z'] + df['mom3_z']
                        - df['rsi_z'] - df['mom12_z'] - df['vol_z']) / 7.0
 
-    # Step 3: 行业中性化
+    # Step 3: Industry neutralization
     df['industry'] = df['code'].map(stock_to_ind)
     df['neutral_score'] = np.nan
 
@@ -207,27 +207,27 @@ def neutralize_and_score(df_factors, stock_to_ind):
             residual = y - predicted
         df.loc[g.index, 'neutral_score'] = residual
 
-    # 最终因子: 行业中性化后月度截面 rank z-score
+    # Final factor: industry-neutralized monthly cross-section rank z-score
     df['factor'] = df.groupby('date')['neutral_score'].transform(
         lambda x: (x.rank() - x.rank().mean()) / x.rank().std()
     )
 
-    print(f"因子标准化完成: factor mean={df['factor'].mean():.4f}, std={df['factor'].std():.4f}")
+    print(f"Factor standardization complete: factor mean={df['factor'].mean():.4f}, std={df['factor'].std():.4f}")
     return df
 
 # ============================================================
-# Task 4.1: 收益延迟一期 IC 衰减
+# Task 4.1: IC Decay — Forward Return Lag
 # ============================================================
 def task_4_1_ic_decay(df):
     """
-    信号使用 T 期因子, 收益分别取 T+1, T+2, T+3, T+4, T+5, T+6 期.
-    计算每期截面 IC (Spearman), 看衰减速度.
+    Use T-period factor as signal, compute returns at T+1 through T+6.
+    Calculate cross-sectional IC (Spearman) for each lag to observe decay speed.
     """
     print("\n" + "=" * 60)
-    print("Task 4.1: IC Decay — 信号延迟收益")
+    print("Task 4.1: IC Decay — Signal Lag Returns")
     print("=" * 60)
 
-    # 计算 T+1 到 T+6 的前瞻收益
+    # Compute T+1 to T+6 forward returns
     df_sorted = df.sort_values(['code', 'date']).reset_index(drop=True)
     for lag in range(1, 7):
         col_name = f'fwd_ret_{lag}m'
@@ -273,15 +273,15 @@ def task_4_1_ic_decay(df):
     return ic_table
 
 # ============================================================
-# Task 4.2: 因子噪声敏感度
+# Task 4.2: Factor Noise Sensitivity
 # ============================================================
 def task_4_2_noise_sensitivity(df):
     """
-    原始因子值上加 N(0, amplitude*std) 噪声.
-    amplitude ∈ {5%, 10%, 20%}, 每种跑 50 次, 取 IC 均值 + 标准差.
+    Add N(0, amplitude*std) noise to raw factor values.
+    amplitude ∈ {5%, 10%, 20%}, run 50 trials each, take IC mean + std.
     """
     print("\n" + "=" * 60)
-    print("Task 4.2: Noise Sensitivity — 因子加噪 IC 衰减")
+    print("Task 4.2: Noise Sensitivity — IC Decay with Noisy Factor")
     print("=" * 60)
 
     factor_std = df['factor'].std()
@@ -297,7 +297,7 @@ def task_4_2_noise_sensitivity(df):
             np.random.seed(seed)
             noisy = df.copy()
             noisy['factor_noisy'] = noisy['factor'] + np.random.normal(0, noise_std, len(noisy))
-            # 重新截面标准化
+            # Re-standardize cross-section
             noisy['factor_noisy'] = noisy.groupby('date')['factor_noisy'].transform(
                 lambda x: (x.rank() - x.rank().mean()) / x.rank().std()
             )
@@ -328,36 +328,36 @@ def task_4_2_noise_sensitivity(df):
 # ============================================================
 def task_4_3_permutation(df):
     """
-    H0: 因子 IC = 0 (信号时序随机)
-    随机打乱因子时间标签 (在每stocks内部 shuffle), 跑 1000 次.
-    输出: 原始 IC 在随机分布中的分位数, 经验 p-value.
+    H0: Factor IC = 0 (signal time series is random)
+    Randomly shuffle factor time labels (shuffle within each stock), run 1000 times.
+    Output: percentile of original IC in random distribution, empirical p-value.
     """
     print("\n" + "=" * 60)
-    print("Task 4.3: Permutation Test — 时序随机化 (1000 次)")
+    print("Task 4.3: Permutation Test — Time-Series Randomization (1000 trials)")
     print("=" * 60)
 
-    # 计算原始 IC
+    # Compute original IC
     base_ic = df.dropna(subset=['fwd_ret_1m']).groupby('date').apply(
         lambda g: spearmanr(g['factor'], g['fwd_ret_1m'])[0]
     ).mean()
-    print(f"原始 IC = {base_ic:.5f}")
+    print(f"Original IC = {base_ic:.5f}")
 
-    # 准备数据: 每stocks的 factor 数组
+    # Prepare data: per-stock factor arrays
     stock_factors = {}
     for code, g in df.groupby('code'):
         g_sorted = g.sort_values('date')
         stock_factors[code] = g_sorted['factor'].values.copy()
 
-    # 1000 次 permutation
+    # 1000 permutation trials
     perm_ics = []
     np.random.seed(42)
     for trial in range(1000):
-        # 每stocks内部 shuffle factor
+        # Shuffle factor within each stock
         trial_monthly_ics = []
         for date, g in df.dropna(subset=['fwd_ret_1m']).groupby('date'):
             if len(g) < 30:
                 continue
-            # 对当月的股票, 每个随机从自己历史中取一个因子值
+            # For this month's stocks, each randomly picks a factor value from its own history
             shuffled = []
             for _, row in g.iterrows():
                 code = row['code']
@@ -377,13 +377,13 @@ def task_4_3_permutation(df):
     p_value = (np.abs(perm_ics) >= np.abs(base_ic)).mean()
     percentile = (perm_ics < base_ic).mean() * 100
 
-    print(f"\nPermutation 结果:")
-    print(f"  原始 IC:     {base_ic:.5f}")
-    print(f"  随机 IC 均值: {perm_ics.mean():.5f}")
-    print(f"  随机 IC std:  {perm_ics.std():.5f}")
-    print(f"  分位数:      {percentile:.1f}%")
-    print(f"  p-value:     {p_value:.4f}")
-    print(f"  结论: {'显著' if p_value < 0.05 else '不显著'} (p {'<' if p_value < 0.05 else '>='} 0.05)")
+    print(f"\nPermutation results:")
+    print(f"  Original IC:     {base_ic:.5f}")
+    print(f"  Random IC mean:  {perm_ics.mean():.5f}")
+    print(f"  Random IC std:   {perm_ics.std():.5f}")
+    print(f"  Percentile:      {percentile:.1f}%")
+    print(f"  p-value:         {p_value:.4f}")
+    print(f"  Conclusion: {'Significant' if p_value < 0.05 else 'Not significant'} (p {'<' if p_value < 0.05 else '>='} 0.05)")
 
     # Save
     result = {
@@ -401,13 +401,13 @@ def task_4_3_permutation(df):
     return result
 
 # ============================================================
-# Step 1: 五分组多空回测 (行业中性化因子)
+# Step 1: Quintile Long-Short Backtest (Industry-Neutral Factor)
 # ============================================================
 def step1_quintile_backtest(df):
     """
-    每月按因子值分 5 组.
-    等权持有, 月度调仓.
-    输出: 分组单调性, 多头年化收益, 多空夏普, 最大回撤.
+    Sort into 5 groups by factor value each month.
+    Equal-weight holding, monthly rebalancing.
+    Output: group monotonicity, long annualized return, long-short Sharpe, max drawdown.
     """
     print("\n" + "=" * 60)
     print("Step 1: Quintile Portfolio Backtest (Industry-Neutral)")
@@ -416,22 +416,22 @@ def step1_quintile_backtest(df):
     df_valid = df.dropna(subset=['fwd_ret_1m']).copy()
     dates = sorted(df_valid['date'].unique())
 
-    # 分组标记: Q1=最小因子(空头), Q5=最大因子(多头)
+    # Group labels: Q1=lowest factor (short), Q5=highest factor (long)
     df_valid['quintile'] = df_valid.groupby('date')['factor'].transform(
         lambda x: pd.qcut(x.rank(method='first'), 5, labels=False, duplicates='drop')
     )
 
-    # 每月每组等权收益
+    # Monthly equal-weight return for each group
     quintile_rets = {}
     for q in range(5):
         q_data = df_valid[df_valid['quintile'] == q]
         monthly = q_data.groupby('date')['fwd_ret_1m'].mean()
         quintile_rets[q] = monthly
 
-    # 多空组合
+    # Long-short portfolio
     ls_rets = quintile_rets[4] - quintile_rets[0]  # Q5 - Q1
 
-    # 统计
+    # Statistics
     def stats(rets, name):
         ann_ret = rets.mean() * 12
         ann_vol = rets.std() * np.sqrt(12)
@@ -450,12 +450,12 @@ def step1_quintile_backtest(df):
         return {'name': name, 'ann_ret': ann_ret, 'ann_vol': ann_vol, 'sharpe': sharpe,
                 'max_dd': max_dd, 'calmar': calmar, 'win_rate': win_rate, 'n_months': len(rets)}
 
-    print("\n分组单调性:")
+    print("\nGroup monotonicity:")
     all_stats = []
     monotonicity_check = True
     prev_ret = None
     for q in range(5):
-        label = ['Q1(空头)', 'Q2', 'Q3', 'Q4', 'Q5(多头)'][q]
+        label = ['Q1(Short)', 'Q2', 'Q3', 'Q4', 'Q5(Long)'][q]
         s = stats(quintile_rets[q], label)
         s['quintile'] = q
         all_stats.append(s)
@@ -463,18 +463,18 @@ def step1_quintile_backtest(df):
             monotonicity_check = False
         prev_ret = s['ann_ret']
 
-    print(f"\n  单调性: {'✅ 通过' if monotonicity_check else '❌ 不单调'}")
+    print(f"\n  Monotonicity: {'PASS' if monotonicity_check else 'NOT MONOTONIC'}")
 
     ls_stats = stats(ls_rets, 'Q5-Q1')
     ls_stats['quintile'] = 'LS'
     all_stats.append(ls_stats)
 
-    # 累计收益曲线
+    # Cumulative return curve
     ls_cum = (1 + ls_rets).cumprod()
 
     # Save
     stats_df = pd.DataFrame(all_stats)
-    print(f"\n回测汇总:")
+    print(f"\nBacktest summary:")
     print(stats_df.to_string(index=False))
     stats_df.to_csv(OUT / 'step1_quintile_stats.csv', index=False)
     pd.DataFrame({'date': ls_rets.index, 'ls_ret': ls_rets.values,
@@ -483,14 +483,14 @@ def step1_quintile_backtest(df):
     return stats_df, ls_rets, ls_cum
 
 # ============================================================
-# Step 2: 交易成本叠加
+# Step 2: Transaction Cost Overlay
 # ============================================================
 def step2_transaction_costs(df):
     """
-    多空组合叠加 10bp/20bp/30bp/50bp 四档交易成本 (单边).
-    每月调仓: 换手率 ≈ 组合换手比例 × 2 (买卖双向).
-    成本 = turnover × cost_bps * 2 (每只买入卖出各一次).
-    输出: 各档净收益曲线 + 盈亏平衡点.
+    Overlay 10bp/20bp/30bp/50bp four-level transaction costs (one-way) on LS portfolio.
+    Monthly rebalancing: turnover ≈ portfolio turnover ratio × 2 (both buy and sell).
+    Cost = turnover × cost_bps * 2 (each stock bought and sold once).
+    Output: net return curves at each level + breakeven point.
     """
     print("\n" + "=" * 60)
     print("Step 2: Transaction Cost Overlay")
@@ -503,7 +503,7 @@ def step2_transaction_costs(df):
 
     dates = sorted(df_valid['date'].unique())
 
-    # 计算每月 Q5 和 Q1 的股票集合
+    # Compute stock sets for Q5 and Q1 each month
     monthly_holdings = {}
     for date in dates:
         g = df_valid[df_valid['date'] == date]
@@ -511,41 +511,41 @@ def step2_transaction_costs(df):
         q1 = set(g[g['quintile'] == 0]['code'])
         monthly_holdings[date] = {'Q5': q5, 'Q1': q1}
 
-    # 计算换手率
+    # Compute turnover rate
     months = sorted(monthly_holdings.keys())
     turnovers = []
     for i, m in enumerate(months):
         if i == 0:
-            turnovers.append(1.0)  # 首次建仓 100%
+            turnovers.append(1.0)  # Initial position 100%
         else:
             prev_q5 = monthly_holdings[months[i-1]]['Q5']
             prev_q1 = monthly_holdings[months[i-1]]['Q1']
             curr_q5 = monthly_holdings[m]['Q5']
             curr_q1 = monthly_holdings[m]['Q1']
-            # 换手比例
+            # Turnover ratio
             to_q5 = len(curr_q5 - prev_q5) / max(len(curr_q5), 1)
             to_q1 = len(curr_q1 - prev_q1) / max(len(curr_q1), 1)
-            # LS 组合换手 = 平均(Q5换手, Q1换手)
+            # LS portfolio turnover = avg(Q5 turnover, Q1 turnover)
             turnovers.append((to_q5 + to_q1) / 2)
 
-    # 无成本 LS 收益
+    # No-cost LS return
     ls_base = df_valid[df_valid['quintile'].isin([0, 4])].groupby(['date', 'quintile'])['fwd_ret_1m'].mean().unstack()
     ls_base_ret = ls_base[4] - ls_base[0]
     ls_base_ret = ls_base_ret.loc[months]
 
-    print(f"\n平均月度换手率: {np.mean(turnovers[1:]):.1%}")
+    print(f"\nAvg monthly turnover: {np.mean(turnovers[1:]):.1%}")
 
-    # 各档成本
+    # Cost levels
     cost_levels = [0.0010, 0.0020, 0.0030, 0.0050]  # 10bp, 20bp, 30bp, 50bp
     cost_labels = ['10bp', '20bp', '30bp', '50bp']
 
-    print("\n成本叠加结果:")
+    print("\nCost overlay results:")
     cost_results = []
     for cost, label in zip(cost_levels, cost_labels):
         net_rets = []
         for i, m in enumerate(months):
             gross = ls_base_ret[m]
-            # 成本 = 换手率 × 2(买卖) × cost_bps
+            # Cost = turnover × 2(buy+sell) × cost_bps
             tc = turnovers[i] * 2 * cost
             net_rets.append(gross - tc)
         net_rets = pd.Series(net_rets, index=months)
@@ -558,8 +558,8 @@ def step2_transaction_costs(df):
         dd = (cum - cum_max) / cum_max
         max_dd = dd.min()
 
-        # 盈亏平衡点: 找到 Sharpe 降到 0 时的成本
-        print(f"  {label}: 净AnnRet={ann_ret:.2%}  Sharpe={sharpe:.3f}  MaxDD={max_dd:.1%}  末值={cum.iloc[-1]:.3f}")
+        # Breakeven point: find cost where Sharpe drops to 0
+        print(f"  {label}: NetAnnRet={ann_ret:.2%}  Sharpe={sharpe:.3f}  MaxDD={max_dd:.1%}  Final={cum.iloc[-1]:.3f}")
 
         cost_results.append({
             'cost': label,
@@ -570,25 +570,25 @@ def step2_transaction_costs(df):
             'final_cum': cum.iloc[-1],
         })
 
-        # Save净收益曲线
+        # Save net return curve
         pd.DataFrame({'date': net_rets.index, 'net_ret': net_rets.values,
                       'net_cum': cum.values}).to_csv(OUT / f'step2_net_curve_{label}.csv', index=False)
 
-    # 计算盈亏平衡点 (通过线性插值)
+    # Compute breakeven point (via linear interpolation)
     sharpes = [r['net_sharpe'] for r in cost_results]
     costs_bps = [r['cost_bps'] for r in cost_results]
-    # 找到 Sharpe 穿零的成本
+    # Find cost where Sharpe crosses zero
     breakeven_bps = None
     for i in range(len(sharpes) - 1):
         if sharpes[i] * sharpes[i+1] <= 0:
-            # 线性插值
+            # Linear interpolation
             frac = abs(sharpes[i]) / (abs(sharpes[i]) + abs(sharpes[i+1]))
             breakeven_bps = costs_bps[i] + frac * (costs_bps[i+1] - costs_bps[i])
             break
     if breakeven_bps is None and sharpes[0] > 0 and sharpes[-1] < 0:
         breakeven_bps = costs_bps[-1] + (0 - sharpes[-1]) / (sharpes[-2] - sharpes[-1] + 1e-8) * (costs_bps[-1] - costs_bps[-2])
 
-    print(f"\n  盈亏平衡点: {breakeven_bps*10000:.0f}bp (Sharpe=0)" if breakeven_bps else "\n  盈亏平衡点: >50bp (Sharpe始终为正)")
+    print(f"\n  Breakeven: {breakeven_bps*10000:.0f}bp (Sharpe=0)" if breakeven_bps else "\n  Breakeven: >50bp (Sharpe always positive)")
 
     cost_df = pd.DataFrame(cost_results)
     cost_df.to_csv(OUT / 'step2_cost_overlay.csv', index=False)
@@ -596,15 +596,15 @@ def step2_transaction_costs(df):
     return cost_df, breakeven_bps
 
 # ============================================================
-# Step 3: 5-Fold 时间序列交叉验证
+# Step 3: 5-Fold Time Series Cross-Validation
 # ============================================================
 def step3_time_series_cv(df):
     """
-    5-fold 时间序列 CV:
-    将 2015-2024 按时间等分 5 折.
-    每折: 前序数据作"训练"(参数估计), 当前折作"测试"(IC计算).
-    参数: 子因子权重 (简单等权, 不做优化).
-    输出: 每折测试集 IC 和 IC_IR.
+    5-fold time series CV:
+    Split 2015-2024 into 5 equal time folds.
+    Each fold: preceding data as "train" (parameter estimation), current fold as "test" (IC calculation).
+    Parameters: sub-factor weights (simple equal-weight, no optimization).
+    Output: per-fold test set IC and IC_IR.
     """
     print("\n" + "=" * 60)
     print("Step 3: 5-Fold Time Series Cross-Validation")
@@ -614,9 +614,9 @@ def step3_time_series_cv(df):
     all_dates = sorted(df_valid['date'].unique())
     # Filter to 2015-2024
     test_dates = [d for d in all_dates if '2015-01' <= d <= '2024-12']
-    print(f"CVdate范围: {test_dates[0]} ~ {test_dates[-1]}, {len(test_dates)} 个月")
+    print(f"CV date range: {test_dates[0]} ~ {test_dates[-1]}, {len(test_dates)} months")
 
-    # 等分为 5 折
+    # Split into 5 equal folds
     n = len(test_dates)
     fold_size = n // 5
     folds = []
@@ -625,17 +625,17 @@ def step3_time_series_cv(df):
         end = start + fold_size if f < 4 else n
         folds.append(test_dates[start:end])
 
-    print(f"折大小: {[len(fold) for fold in folds]}")
+    print(f"Fold sizes: {[len(fold) for fold in folds]}")
 
     cv_results = []
     for f_idx, test_fold in enumerate(folds):
         train_fold = [d for d in test_dates if d < test_fold[0]]
         if not train_fold:
-            print(f"  Fold {f_idx+1}: 跳过 (无训练数据)")
+            print(f"  Fold {f_idx+1}: skipped (no training data)")
             continue
 
-        # 在训练期计算子因子权重 (简化: 用等权, 不做优化)
-        # 实际这里是 IC 评估, 不做参数优化
+        # Compute sub-factor weights on training period (simplified: equal-weight, no optimization)
+        # In practice this is IC evaluation, no parameter optimization
         test_data = df_valid[df_valid['date'].isin(test_fold)]
 
         monthly_ics = []
@@ -665,22 +665,22 @@ def step3_time_series_cv(df):
 
     cv_df = pd.DataFrame(cv_results)
     if len(cv_df) > 0:
-        print(f"\n  CV 汇总: IC均值={cv_df['mean_IC'].mean():+.4f}  "
-              f"IC范围=[{cv_df['mean_IC'].min():+.4f}, {cv_df['mean_IC'].max():+.4f}]  "
-              f"IR均值={cv_df['IC_IR'].mean():.3f}")
+        print(f"\n  CV Summary: IC mean={cv_df['mean_IC'].mean():+.4f}  "
+              f"IC range=[{cv_df['mean_IC'].min():+.4f}, {cv_df['mean_IC'].max():+.4f}]  "
+              f"IR mean={cv_df['IC_IR'].mean():.3f}")
     cv_df.to_csv(OUT / 'step3_cv_results.csv', index=False)
     return cv_df
 
 # ============================================================
-# Step 4: 样本外跟踪模板
+# Step 4: Out-of-Sample Tracking Template
 # ============================================================
 def step4_oos_tracking(df, stock_to_ind):
     """
-    建立样本外跟踪模板:
-    1. 保存最新一期的因子排名 (tracking/<YYYY-MM>.csv)
-    2. 创建 master tracking log (tracking/master_log.csv)
-       - 每月运行: 记录当月排名 → 下月回填实际收益 → 更新滚动OOS IC
-    3. 生成运行脚本 (tracking/run_monthly.py)
+    Establish OOS tracking template:
+    1. Save latest period factor rankings (tracking/<YYYY-MM>.csv)
+    2. Create master tracking log (tracking/master_log.csv)
+       - Monthly run: record current month rankings → backfill actual returns next month → update rolling OOS IC
+    3. Generate run script (tracking/run_monthly.py)
     """
     print("\n" + "=" * 60)
     print("Step 4: OOS Tracking Template")
@@ -689,7 +689,7 @@ def step4_oos_tracking(df, stock_to_ind):
     tracking_dir = OUT / 'tracking'
     tracking_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- 4a. 最新一期因子排名 ---
+    # --- 4a. Latest period factor rankings ---
     df_valid = df.dropna(subset=['fwd_ret_1m']).copy()
     latest_date = sorted(df_valid['date'].unique())[-1]
     latest = df_valid[df_valid['date'] == latest_date].copy()
@@ -701,12 +701,12 @@ def step4_oos_tracking(df, stock_to_ind):
                  'macd', 'rsi', 'mom3', 'mom12']
     rank_df = latest[rank_cols].copy()
     rank_df.to_csv(tracking_dir / f'{latest_date}.csv', index=False)
-    print(f"  最新因子排名: {tracking_dir / f'{latest_date}.csv'}  ({len(rank_df)} stocks)")
+    print(f"  Latest factor rankings: {tracking_dir / f'{latest_date}.csv'}  ({len(rank_df)} stocks)")
 
     # --- 4b. Master tracking log ---
-    # 从 backtest 期提取所有月份的排名+收益作为历史
+    # Extract all month rankings + returns from backtest period as history
     all_dates = sorted(df_valid['date'].unique())
-    # 取最近 36 个月作为 tracking 历史示例
+    # Take last 36 months as tracking history example
     recent_dates = all_dates[-36:]
 
     log_rows = []
@@ -734,24 +734,24 @@ def step4_oos_tracking(df, stock_to_ind):
     master_log['cum_ls'] = (1 + master_log['ls_fwd_ret']).cumprod()
     master_log['rolling_12m_ic'] = master_log['monthly_ic'].rolling(12).mean()
     master_log.to_csv(tracking_dir / 'master_log.csv', index=False)
-    print(f"  Master log: {tracking_dir / 'master_log.csv'}  ({len(master_log)} 个月)")
+    print(f"  Master log: {tracking_dir / 'master_log.csv'}  ({len(master_log)} months)")
 
-    # 最新滚动 IC
+    # Latest rolling IC
     latest_ic = master_log['rolling_12m_ic'].iloc[-1] if len(master_log) > 0 else np.nan
     latest_ls_ret = master_log['ls_fwd_ret'].iloc[-1] if len(master_log) > 0 else np.nan
-    print(f"  最近月 IC: {master_log['monthly_ic'].iloc[-1]:+.4f}")
-    print(f"  滚动12月 IC: {latest_ic:+.4f}")
-    print(f"  最近月 LS收益: {latest_ls_ret:+.4f}")
+    print(f"  Latest month IC: {master_log['monthly_ic'].iloc[-1]:+.4f}")
+    print(f"  Rolling 12m IC: {latest_ic:+.4f}")
+    print(f"  Latest month LS return: {latest_ls_ret:+.4f}")
 
-    # --- 4c. 每月运行脚本 ---
+    # --- 4c. Monthly run script ---
     run_script = f'''"""
-样本外跟踪 — 每月运行脚本
+Out-of-Sample Tracking — Monthly Run Script
 Usage: {PYTHON} {tracking_dir / 'run_monthly.py'}
-功能:
-  1. 计算最新月度因子排名 → tracking/<YYYY-MM>.csv
-  2. 回填上月预测的实际收益 → 更新 master_log.csv
-  3. 计算滚动 OOS IC
-自动识别新月份 — 只跑增量, 不重复已有月份.
+Features:
+  1. Compute latest monthly factor rankings → tracking/<YYYY-MM>.csv
+  2. Backfill previous month predicted actual returns → update master_log.csv
+  3. Compute rolling OOS IC
+Auto-detect new months — incremental only, skip existing months.
 """
 import sqlite3, numpy as np, pandas as pd, json
 from pathlib import Path
@@ -764,7 +764,7 @@ MASTER_LOG = TRACKING_DIR / 'master_log.csv'
 FACTOR_COLS = ['macd', 'rsi', 'ma20_pos', 'ma60_pos', 'mom3', 'mom12', 'vol']
 
 def load_and_compute():
-    """Loaded最新数据并计算因子 (复用主脚本逻辑)"""
+    """Load latest data and compute factors (reuses main script logic)"""
     conn = sqlite3.connect(str(DB))
     ind_rows = conn.execute("SELECT stock_code, industry_code FROM stock_industry_mapping").fetchall()
     stock_to_ind = {{r[0]: r[1] for r in ind_rows}}
@@ -776,49 +776,49 @@ def load_and_compute():
         conn, params=codes
     )
     conn.close()
-    # 过滤 >=60月
+    # Filter >=60 months
     counts = df.groupby('code').size()
     valid = counts[counts >= 60].index.tolist()
     df = df[df['code'].isin(valid)]
-    # ... (因子计算逻辑 —— 调用主脚本的 compute_factors + neutralize)
+    # ... (factor calculation logic — calls main script's compute_factors + neutralize)
     print(f"Loaded {{len(df)}} rows, {{len(valid)}} stocks")
     return df, stock_to_ind
 
 def update_tracking():
-    """增量更新: 添加新月份, 回填上月收益, 更新滚动IC"""
-    # 1. 检查现有 master_log 的最后date
+    """Incremental update: add new months, backfill previous month returns, update rolling IC"""
+    # 1. Check existing master_log last date
     if MASTER_LOG.exists():
         master = pd.read_csv(MASTER_LOG)
         last_date = master['signal_date'].max()
-        print(f"现有 master_log: {{len(master)}} 个月, 最后: {{last_date}}")
+        print(f"Existing master_log: {{len(master)}} months, last: {{last_date}}")
     else:
         master = pd.DataFrame()
         last_date = None
-        print("新建 master_log")
+        print("New master_log")
 
-    # 2. Loaded数据, 计算因子
+    # 2. Load data, compute factors
     df, stock_to_ind = load_and_compute()
-    # (此处省略因子计算, 实际运行会调用完整 pipeline)
+    # (factor calculation omitted here, full pipeline called in actual run)
 
-    # 3. 找到新月
+    # 3. Find new months
     new_months = sorted(df['date'].unique())
     if last_date:
         new_months = [m for m in new_months if m > last_date]
 
     if not new_months:
-        print("无新月份")
+        print("No new months")
         return
 
-    # 4. 对每个新月, 计算排名 + 前瞻收益 (如有)
+    # 4. For each new month, compute rankings + forward returns (if available)
     new_rows = []
     for month in new_months:
         g = df[df['date'] == month]
         if len(g) < 30:
             continue
-        # ... 因子排名 + 前瞻收益
+        # ... factor rankings + forward returns
         new_rows.append({{'signal_date': month, 'n_stocks': len(g)}})
 
-    # 5. 更新 master_log
+    # 5. Update master_log
     # ...
 
     print(f"Updated: {{len(new_rows)}} new months")
@@ -829,9 +829,9 @@ if __name__ == '__main__':
 
     run_script_path = tracking_dir / 'run_monthly.py'
     run_script_path.write_text(run_script, encoding='utf-8')
-    print(f"  运行脚本: {run_script_path}")
+    print(f"  Run script: {run_script_path}")
 
-    # 摘要
+    # Summary
     summary = {
         'last_signal_date': latest_date,
         'n_stocks': len(latest),
@@ -848,60 +848,60 @@ if __name__ == '__main__':
 # ============================================================
 def main():
     print("=" * 60)
-    print("Phase 4: Robustness check — 全流程")
+    print("Phase 4: Robustness check — Full Pipeline")
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    print(f"开始: {now}")
-    print(f"输出: {OUT}")
+    print(f"Start: {now}")
+    print(f"Output: {OUT}")
     print("=" * 60)
 
     t0 = time.time()
 
-    # 0. Loaded数据
-    print("\n[0/7] Loaded数据...")
+    # 0. Load data
+    print("\n[0/7] Loading data...")
     df_raw, stock_to_ind = load_data()
 
-    # 1. 计算因子
-    print("\n[1/7] 计算因子...")
+    # 1. Compute factors
+    print("\n[1/7] Computing factors...")
     df_factors = compute_factors(df_raw)
 
-    # 2. 行业中性化
-    print("\n[2/7] 行业中性化...")
+    # 2. Industry neutralization
+    print("\n[2/7] Industry neutralization...")
     df = neutralize_and_score(df_factors, stock_to_ind)
 
-    # Save完整因子数据
+    # Save complete factor data
     df.to_parquet(OUT / 'factor_data.parquet', index=False)
 
-    # Task 4.1: IC 衰减
+    # Task 4.1: IC Decay
     ic_decay = task_4_1_ic_decay(df)
 
-    # Task 4.2: 噪声敏感度
+    # Task 4.2: Noise Sensitivity
     noise_sens = task_4_2_noise_sensitivity(df)
 
     # Task 4.3: Permutation Test
     perm_result = task_4_3_permutation(df)
 
-    # Step 1: 五分组回测
+    # Step 1: Quintile Backtest
     quintile_stats, ls_rets, ls_cum = step1_quintile_backtest(df)
 
-    # Step 2: 交易成本
+    # Step 2: Transaction Costs
     cost_stats, breakeven = step2_transaction_costs(df)
 
     # Step 3: 5-Fold CV
     cv_results = step3_time_series_cv(df)
 
-    # Step 4: OOS 跟踪模板
+    # Step 4: OOS Tracking Template
     tracking_dir = step4_oos_tracking(df, stock_to_ind)
 
-    # ==== 最终摘要 ====
+    # ==== Final Summary ====
     elapsed = time.time() - t0
     print("\n" + "=" * 60)
-    print(f"Phase 4 Robustness check完成 ({elapsed:.0f}s)")
-    print(f"输出目录: {OUT}")
+    print(f"Phase 4 Robustness check complete ({elapsed:.0f}s)")
+    print(f"Output dir: {OUT}")
     print("=" * 60)
 
-    # 输出文件清单
+    # Output file list
     files = sorted(OUT.rglob('*'))
-    print(f"\n输出文件 ({len(files)} 个):")
+    print(f"\nOutput files ({len(files)}):")
     for f in files:
         size = f.stat().st_size if f.is_file() else 0
         print(f"  {f.relative_to(OUT)}  ({size:,} bytes)")

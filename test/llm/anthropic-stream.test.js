@@ -5,7 +5,7 @@ import { getProvider } from '../../lib/llm/index.js';
 
 const originalFetch = globalThis.fetch;
 
-// 构造 SSE 流
+// Build SSE stream
 function sseEvents(...events) {
   let content = '';
   for (const ev of events) {
@@ -41,9 +41,9 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
-// ---- 基本流式文本 ----
+// ---- basic streaming text ----
 
-test('stream: onProgress 收到 text_delta', async () => {
+test('stream: onProgress receives text_delta', async () => {
   const events = [
     { event: 'message_start', data: { type: 'message_start', message: { usage: { input_tokens: 50 } } } },
     { event: 'content_block_start', data: { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } } },
@@ -69,7 +69,7 @@ test('stream: onProgress 收到 text_delta', async () => {
 
 // ---- thinking_delta ----
 
-test('stream: onProgress 收到 thinking_delta', async () => {
+test('stream: onProgress receives thinking_delta', async () => {
   const events = [
     { event: 'message_start', data: { type: 'message_start', message: { usage: { input_tokens: 100 } } } },
     { event: 'content_block_start', data: { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '' } } },
@@ -100,10 +100,10 @@ test('stream: onProgress 收到 thinking_delta', async () => {
   assert.ok(thinkings.join('').includes('Let me analyze'));
 });
 
-// ---- tool_use 流式 ----
+// ---- tool_use streaming ----
 
-test('stream: tool_use 触发 tool_start + tool_result', async () => {
-  // 分两轮返回不同的事件
+test('stream: tool_use triggers tool_start + tool_result', async () => {
+  // two rounds returning different events
   let callCount = 0;
   globalThis.fetch = () => {
     callCount++;
@@ -147,9 +147,9 @@ test('stream: tool_use 触发 tool_start + tool_result', async () => {
   assert.equal(toolResults[0].name, 'get_financials');
 });
 
-// ---- 无 onProgress 时走非流式路径 ----
+// ---- no onProgress falls back to non-streaming path ----
 
-test('stream: 无 onProgress 时走非流式路径', async () => {
+test('stream: no onProgress uses non-streaming path', async () => {
   globalThis.fetch = () => Promise.resolve({
     status: 200,
     ok: true,
@@ -167,9 +167,9 @@ test('stream: 无 onProgress 时走非流式路径', async () => {
   assert.equal(result.text, '非流式输出');
 });
 
-// ---- extended thinking 预算 ----
+// ---- extended thinking budget ----
 
-test('stream: enableThinking + Opus 时请求体含 thinking 字段', async () => {
+test('stream: enableThinking + Opus request body contains thinking field', async () => {
   let capturedBody = null;
   globalThis.fetch = (url, init) => {
     capturedBody = JSON.parse(init.body);
@@ -196,9 +196,9 @@ test('stream: enableThinking + Opus 时请求体含 thinking 字段', async () =
   assert.equal(capturedBody.thinking.budget_tokens, 8000);
 });
 
-// ---- SSE 错误 ----
+// ---- SSE error ----
 
-test('stream: HTTP 401 抛 key 无效', async () => {
+test('stream: HTTP 401 throws invalid key', async () => {
   globalThis.fetch = () => Promise.resolve({ status: 401, ok: false });
   await assert.rejects(
     () => getProvider('anthropic').call('x', {
@@ -208,9 +208,9 @@ test('stream: HTTP 401 抛 key 无效', async () => {
   );
 });
 
-// ---- 消息边界（ping 忽略）----
+// ---- message boundary (ping ignored) ----
 
-test('stream: ping 事件被忽略', async () => {
+test('stream: ping event is ignored', async () => {
   const events = [
     { event: 'message_start', data: { type: 'message_start', message: { usage: { input_tokens: 10 } } } },
     { event: 'content_block_start', data: { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } } },
@@ -219,9 +219,9 @@ test('stream: ping 事件被忽略', async () => {
     { event: 'message_delta', data: { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 5 } } },
     { event: 'message_stop', data: { type: 'message_stop' } },
   ];
-  // 插入一个空行（模拟 ping）
+  // inserting empty line (simulates ping)
   mockStream(...events);
-  // ping 不产生事件，不抛错
+  // ping produces no events, does not throw
 
   const result = await getProvider('anthropic').call('prompt', {
     model: 'claude-sonnet-4-6',

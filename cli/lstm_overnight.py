@@ -207,7 +207,7 @@ def stage1():
 # Stage 2: Macro data + 26d retrain
 # ============================================================
 def fetch_macro():
-    """Fetch M2/CPI/SHIBOR/PMI/北向 from akshare"""
+    """Fetch M2/CPI/SHIBOR/PMI/Northbound from akshare"""
     log("Fetching macro data...")
     import pandas as pd
     try:
@@ -244,7 +244,7 @@ def fetch_macro():
         except:
             shi_df = pd.DataFrame(columns=['date', 'shibor'])
 
-        # 北向资金
+        # Northbound capital flow
         try:
             north = ak.stock_hsgt_north_net_flow_in_em()
             north_df = pd.DataFrame(north)

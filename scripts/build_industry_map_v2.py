@@ -12,15 +12,15 @@ from collections import Counter
 SW_INDUSTRIES = [
     ('801010', 'Agriculture, Forestry, Animal Husbandry & Fishery'), ('801030', 'Basic Chemicals'), ('801040', 'Steel'),
     ('801050', 'Non-ferrous Metals'), ('801080', 'Electronics'), ('801880', 'Automobiles'),
-    ('801110', 'Home Appliances'), ('801120', 'Food & Beverage'), ('801130', '纺织服饰'),
+    ('801110', 'Home Appliances'), ('801120', 'Food & Beverage'), ('801130', 'Textile & Apparel'),
     ('801140', 'Light Manufacturing'), ('801150', 'Pharmaceutical & Biotech'), ('801160', 'Public Utilities'),
     ('801170', 'Transportation'), ('801180', 'Real Estate'), ('801200', 'Commercial Retail'),
-    ('801210', '社会服务'), ('801780', 'Banking'), ('801790', 'Non-bank Financials'),
-    ('801230', '综合'), ('801710', 'Building Materials'), ('801720', 'Building Decoration'),
+    ('801210', 'Social Services'), ('801780', 'Banking'), ('801790', 'Non-bank Financials'),
+    ('801230', 'Conglomerates'), ('801710', 'Building Materials'), ('801720', 'Building Decoration'),
     ('801730', 'Electrical Equipment'), ('801890', 'Mechanical Equipment'), ('801740', 'Defense & Military'),
     ('801750', 'Computers'), ('801760', 'Media'), ('801770', 'Communications'),
-    ('801950', '煤炭'), ('801960', '石油石化'), ('801970', '环保'),
-    ('801980', '美容护理'),
+    ('801950', 'Coal'), ('801960', 'Petroleum & Petrochemicals'), ('801970', 'Environmental Protection'),
+    ('801980', 'Beauty & Personal Care'),
 ]
 
 # Load XLS
@@ -39,20 +39,20 @@ HEADERS = {
 }
 
 def fetch_index_stocks(index_code: str) -> list[str]:
-    """获取申万某指数的成分股列表"""
+    """Fetch constituent stock list for a Shenwan index"""
     url = f'https://www.swsresearch.com/institute_sw/allIndex/releasedIndex/releasedetail?code={index_code}'
     r = requests.get(url, headers=HEADERS, timeout=30, verify=False)
     if r.status_code != 200:
         print(f'    HTTP {r.status_code}')
         return []
     html = r.text
-    # 找成分股代码: 6位数字.SH或.SZ
+    # Find constituent stock codes: 6-digit.SH or .SZ
     stocks = []
     for m in re.finditer(r'(\d{6})\.(?:SH|SZ)', html):
         stocks.append(m.group(1))
-    return list(set(stocks))  # 去重
+    return list(set(stocks))  # deduplicate
 
-# 对每个行业获取成分股
+# Fetch constituents for each industry
 l3_to_industry: dict[str, Counter] = {}  # L3_code → Counter of industry names
 industry_stock_counts: dict[str, int] = {}
 
@@ -73,7 +73,7 @@ for ind_code, ind_name in SW_INDUSTRIES:
         print(f'  {ind_name} ({ind_code}): ERROR - {e}')
     time.sleep(2)
 
-# 解析映射
+# Resolve mapping
 l3_final: dict[str, str] = {}
 conflicts = 0
 for l3, counter in l3_to_industry.items():
@@ -82,9 +82,9 @@ for l3, counter in l3_to_industry.items():
     if len(counter) > 1:
         conflicts += 1
 
-print(f'\nL3→行业映射: {len(l3_final)} codes, {conflicts} conflicts')
+print(f'\nL3→Industry mapping: {len(l3_final)} codes, {conflicts} conflicts')
 
-# 未映射的L3代码尝试用L2推断
+# Try L2 inference for unmapped L3 codes
 l2_to_name: dict[str, Counter] = {}
 for l3, name in l3_final.items():
     l2 = l3[:4]
@@ -101,7 +101,7 @@ for l3, name in l3_final.items():
     l1_to_name[l1][name] += 1
 l1_final = {l1: counter.most_common(1)[0][0] for l1, counter in l1_to_name.items()}
 
-# 应用到全部股票
+# Apply to all stocks
 stock_to_industry: dict[str, str] = {}
 for stock, l3 in xls_map.items():
     if l3 in l3_final:
@@ -112,12 +112,12 @@ for stock, l3 in xls_map.items():
         stock_to_industry[stock] = l1_final[l3[:2]]
 
 final_counts = Counter(stock_to_industry.values())
-print(f'\n最终映射: {len(stock_to_industry)}/{len(xls_map)} stocks ({100*len(stock_to_industry)/len(xls_map):.1f}%)')
-print(f'行业数: {len(final_counts)}')
+print(f'\nFinal mapping: {len(stock_to_industry)}/{len(xls_map)} stocks ({100*len(stock_to_industry)/len(xls_map):.1f}%)')
+print(f'Industry count: {len(final_counts)}')
 for name, n in final_counts.most_common():
     print(f'  {name}: {n}')
 
-# 保存
+# Save
 output = {
     'description': 'Shenwan level-1 industry classification for A-shares',
     'source': 'swsresearch.com XLS + index_component_sw cross-reference',

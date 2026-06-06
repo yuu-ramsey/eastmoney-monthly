@@ -1,18 +1,18 @@
 """
 v32_final_eval.py — 32d final factor evaluation (all fixes merged)
 ======================================================
-Fix list（全部来自验证流程确认）：
-  1. 收益口径：单月 (c[i+1]-c[i])/c[i]，非accumulated
-  2. date分组：统一截断 YYYY-MM，同月股票归入同一截面
-  3. 特征版本：32维（FFT振幅10 + G7全14 + 均线偏离3 + MACD3 + G4精选2）
-  4. 回测窗口：2015-01 ~ 数据末尾
-  5. 行业中性化：CSRC L2
+Fix list (all confirmed from validation process):
+  1. Return definition: single month (c[i+1]-c[i])/c[i], not accumulated
+  2. Date grouping: unified truncation to YYYY-MM, same-month stocks grouped into same cross-section
+  3. Feature version: 32-dim (FFT amplitude 10 + G7 full 14 + MA deviation 3 + MACD 3 + G4 selected 2)
+  4. Backtest window: 2015-01 ~ end of data
+  5. Industry neutralization: CSRC L2
 
 Output:
-  - T+1~T+6 单月IC / ICIR / Hit Rate
-  - 5-Fold 时间序列CV
-  - 纯多头回测（Q5组，等权，月频调仓）
-  - 结果保存到 .eastmoney-ai/final_eval/
+  - T+1~T+6 single-month IC / ICIR / Hit Rate
+  - 5-Fold time-series CV
+  - Long-only backtest (Q5 group, equal-weight, monthly rebalance)
+  - Results saved to .eastmoney-ai/final_eval/
 """
 
 import numpy as np
@@ -23,7 +23,7 @@ from collections import defaultdict
 from datetime import datetime
 
 # ============================================================
-# 配置
+# Configuration
 # ============================================================
 DB_PATH = ".eastmoney-ai/db/klines-v2.sqlite"
 INDUSTRY_PATH = "data/industry-map.json"
@@ -39,10 +39,10 @@ np.random.seed(RANDOM_SEED)
 
 
 # ============================================================
-# 数据Loaded
+# Data Loading
 # ============================================================
 def load_data():
-    """从 SQLite Loaded月线数据，date统一截断为 YYYY-MM"""
+    """Load monthly data from SQLite, truncate date to YYYY-MM"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
@@ -54,10 +54,10 @@ def load_data():
     rows = cur.fetchall()
     conn.close()
 
-    # 按股票分组，date截断为 YYYY-MM（修复#2：去日粒度）
+    # Group by stock, truncate date to YYYY-MM (fix #2: remove day granularity)
     stock_data = defaultdict(list)
     for code, date_str, o, h, l, c, v, t in rows:
-        if c is None:  # 过滤 23 条 NULL close 记录
+        if c is None:  # Filter 23 NULL close records
             continue
         ym = str(date_str)[:7]  # "2024-01-31" → "2024-01"
         stock_data[code].append({
@@ -65,14 +65,14 @@ def load_data():
             'close': c, 'volume': v, 'turnover': t or 0.0
         })
 
-    # 同股同月多records取最后一条（去重）
+    # Same stock same month multiple records: keep last (deduplication)
     for code in stock_data:
         seen = {}
         for rec in stock_data[code]:
             seen[rec['ym']] = rec
         stock_data[code] = sorted(seen.values(), key=lambda x: x['ym'])
 
-    # Loaded CSRC L2 行业映射（stock→industry 在 stockToIndustry 子对象中）
+    # Load CSRC L2 industry mapping (stock->industry in stockToIndustry sub-object)
     industry_map = {}
     if os.path.exists(INDUSTRY_PATH):
         with open(INDUSTRY_PATH, 'r', encoding='utf-8') as f:
@@ -81,17 +81,17 @@ def load_data():
 
     covered = sum(1 for c in stock_data if c in industry_map)
     print(f"Loaded {len(stock_data)} stocks | "
-          f"行业Covering {covered}/{len(stock_data)} "
+          f"industry coverage {covered}/{len(stock_data)} "
           f"({covered/max(len(stock_data),1)*100:.0f}%)")
 
     return stock_data, industry_map
 
 
 # ============================================================
-# 技术指标计算
+# Technical indicator calculations
 # ============================================================
 def calc_ma(arr, n):
-    """简单移动平均"""
+    """Simple Moving Average"""
     ma = np.full_like(arr, np.nan)
     for i in range(n - 1, len(arr)):
         ma[i] = np.mean(arr[i - n + 1:i + 1])
@@ -99,7 +99,7 @@ def calc_ma(arr, n):
 
 
 def calc_ema(arr, n):
-    """指数移动平均"""
+    """Exponential Moving Average"""
     ema = np.full_like(arr, np.nan)
     k = 2.0 / (n + 1)
     ema[0] = arr[0]
@@ -133,7 +133,7 @@ def calc_macd(close, fast=12, slow=26, signal=9):
 
 
 def calc_fft_amplitudes(close_segment, n_peaks=10):
-    """FFT 振幅谱：取前 n_peaks 个最大振幅值（只保留振幅，32维方案）"""
+    """FFT amplitude spectrum: take top n_peaks largest amplitude values (amplitude only, 32-dim scheme)"""
     if len(close_segment) < 10:
         return [0.0] * n_peaks
 
@@ -142,7 +142,7 @@ def calc_fft_amplitudes(close_segment, n_peaks=10):
     detrended = close_segment - np.polyval(coef, x)
 
     fft_vals = np.fft.rfft(detrended)
-    amplitudes = np.abs(fft_vals)[1:]  # 去掉直流分量
+    amplitudes = np.abs(fft_vals)[1:]  # remove DC component
 
     if len(amplitudes) < n_peaks:
         amps = list(amplitudes) + [0.0] * (n_peaks - len(amplitudes))
@@ -155,19 +155,17 @@ def calc_fft_amplitudes(close_segment, n_peaks=10):
 
 
 # ============================================================
-# 32维特征提取
+# 32-dim feature extraction
 # ============================================================
 def extract_features_32d(records, idx):
     """
-    32维特征提取（最终确认版本）
-    ─────────────────────────────
-    FFT振幅:      10维  (振幅谱前10峰)
-    G7_量价K线:   14维  (含 above_ma5)
-    G2_均线偏离:   3维  (MA5/MA20/MA60偏离)
-    G3_MACD:       3维  (DIF/DEA/柱)
-    G4_精选:       2维  (ATR + vol_6m)
-    ─────────────────────────────
-    总计:         32维
+    32-dim feature extraction (final confirmed version)
+    FFT amplitude: 10-dim  (top 10 amplitude spectrum peaks)
+    G7 volume-price: 14-dim  (incl. above_ma5)
+    G2 MA deviation: 3-dim  (MA5/MA20/MA60 deviation)
+    G3 MACD: 3-dim  (DIF/DEA/histogram)
+    G4 selected: 2-dim  (ATR + vol_6m)
+    Total: 32-dim
     """
     if idx < 60:
         return None
@@ -193,11 +191,11 @@ def extract_features_32d(records, idx):
 
     features = []
 
-    # === FFT 振幅 (10维) ===
+    # === FFT amplitude (10-dim) ===
     fft_amps = calc_fft_amplitudes(c[max(0, i - 59):i + 1], n_peaks=10)
     features.extend(fft_amps)
 
-    # === G7_量价K线 (14维) ===
+    # === G7 volume-price (14-dim) ===
     vol_12m_mean = np.mean(v[max(0, i - 11):i + 1])
     vol_3m_mean = np.mean(v[max(0, i - 2):i + 1])
 
@@ -251,17 +249,17 @@ def extract_features_32d(records, idx):
             break
     features.append(streak / 12.0)
 
-    # === G2_均线偏离 (3维) ===
+    # === G2 MA deviation (3-dim) ===
     features.append((ci - ma5[i]) / eps)
     features.append((ci - ma20[i]) / eps)
     features.append((ci - ma60[i]) / eps)
 
-    # === G3_MACD (3维) ===
+    # === G3 MACD (3-dim) ===
     features.append(dif[i])
     features.append(dea[i])
     features.append(macd_hist[i])
 
-    # === G4_精选 (2维) ===
+    # === G4 selected (2-dim) ===
     features.append(atr[i] / eps)
     if i >= 6:
         rets_6 = np.diff(c[i - 6:i + 1]) / np.maximum(np.abs(c[i - 6:i]), 0.01)
@@ -269,18 +267,18 @@ def extract_features_32d(records, idx):
     else:
         features.append(0.0)
 
-    assert len(features) == 32, f"特征数={len(features)}, 期望32"
-    # 任何特征为 NaN 则丢弃该样本
+    assert len(features) == 32, f"feature count={len(features)}, expected 32"
+    # Discard sample if any feature is NaN
     if any(np.isnan(f) for f in features):
         return None
     return features
 
 
 # ============================================================
-# 行业中性化
+# Industry neutralization
 # ============================================================
 def neutralize_industry(features_dict, industry_map):
-    """对每个截面月份，按行业分组减组内均值"""
+    """For each cross-section month, subtract group mean by industry"""
     neutralized = {}
     for ym, records in features_dict.items():
         industry_groups = defaultdict(list)
@@ -303,18 +301,18 @@ def neutralize_industry(features_dict, industry_map):
 
 
 # ============================================================
-# 构建截面
+# Build cross-sections
 # ============================================================
 def build_cross_sections(stock_data, industry_map):
-    """按 YYYY-MM 分组构建截面：32维特征 + T+1~T+6 单月收益"""
+    """Build cross-sections grouped by YYYY-MM: 32-dim features + T+1~T+6 single-month returns"""
     all_yms = set()
     for recs in stock_data.values():
         for r in recs:
             all_yms.add(r['ym'])
     all_yms = sorted(ym for ym in all_yms if ym >= '2015-01')
-    print(f"回测窗口: {all_yms[0]} ~ {all_yms[-1]} ({len(all_yms)} 个自然月)")
+    print(f"Backtest window: {all_yms[0]} ~ {all_yms[-1]} ({len(all_yms)} calendar months)")
 
-    # ym → record index 映射
+    # ym -> record index mapping
     stock_ym_idx = {}
     for code, records in stock_data.items():
         ym_map = {}
@@ -333,7 +331,7 @@ def build_cross_sections(stock_data, industry_map):
             if feat is None:
                 continue
 
-            # 单月收益（修复#1：跨期减前值，非accumulated）
+            # Single-month returns (fix #1: period-over-period differencing, not accumulated)
             rets = {}
             for lag in range(1, MAX_HORIZONS + 1):
                 future_idx = idx + lag
@@ -351,12 +349,12 @@ def build_cross_sections(stock_data, industry_map):
             cross_sections[ym] = section
 
     avg_n = np.mean([len(v) for v in cross_sections.values()])
-    print(f"有效截面: {len(cross_sections)} 个月 | 月均 {avg_n:.0f} stocks")
+    print(f"Valid cross-sections: {len(cross_sections)} months | avg {avg_n:.0f} stocks/month")
     return cross_sections, all_yms
 
 
 # ============================================================
-# IC 计算
+# IC calculation
 # ============================================================
 def spearman_ic(predictions, returns):
     if len(predictions) < 10:
@@ -367,13 +365,13 @@ def spearman_ic(predictions, returns):
 
 
 # ============================================================
-# 模型训练
+# Model training
 # ============================================================
 def train_predict(train_X, train_y, test_X):
-    """三模型 IC 加权集成（Ridge + LightGBM + XGBoost）"""
+    """Train three-model IC-weighted ensemble (Ridge + LightGBM + XGBoost)"""
     from sklearn.linear_model import Ridge
 
-    # 过滤 NaN 样本
+    # Filter NaN samples
     valid_mask = ~np.isnan(train_X).any(axis=1) & ~np.isnan(train_y)
     train_X = train_X[valid_mask]
     train_y = train_y[valid_mask]
@@ -420,7 +418,7 @@ def train_predict(train_X, train_y, test_X):
     if len(predictions) == 1:
         return list(predictions.values())[0], models
 
-    # IC 加权集成
+    # IC-weighted ensemble
     ics = {}
     for name, m in models.items():
         ic = spearman_ic(m.predict(train_X), train_y)
@@ -435,10 +433,10 @@ def train_predict(train_X, train_y, test_X):
 
 
 # ============================================================
-# 滚动训练 + 截面 IC 评估
+# Rolling training + cross-sectional IC evaluation
 # ============================================================
 def rolling_evaluation(cross_sections, industry_map, train_months=60):
-    """扩展窗口，逐月训练预测"""
+    """Expanding window, train and predict month by month"""
     sorted_yms = sorted(cross_sections.keys())
     results = {lag: [] for lag in range(1, MAX_HORIZONS + 1)}
     monthly_predictions = {}
@@ -483,13 +481,13 @@ def rolling_evaluation(cross_sections, industry_map, train_months=60):
                     results[lag].append({'ym': test_ym, 'ic': ic})
 
         if (t_idx - train_months) % 12 == 0:
-            print(f"  滚动: {test_ym} ({t_idx - train_months + 1}/{total})", flush=True)
+            print(f"  Rolling: {test_ym} ({t_idx - train_months + 1}/{total})", flush=True)
 
     return results, monthly_predictions
 
 
 # ============================================================
-# 5-Fold 时间序列 CV
+# 5-Fold time-series CV
 # ============================================================
 def time_series_cv(cross_sections, n_folds=5):
     sorted_yms = sorted(cross_sections.keys())
@@ -550,7 +548,7 @@ def time_series_cv(cross_sections, n_folds=5):
 
 
 # ============================================================
-# 纯多头回测
+# Long-only backtest
 # ============================================================
 def long_only_backtest(monthly_predictions, n_groups=5):
     sorted_yms = sorted(monthly_predictions.keys())
@@ -603,7 +601,7 @@ def long_only_backtest(monthly_predictions, n_groups=5):
             'months': n_periods
         }
 
-    # 单调性
+    # Monotonicity
     monotonic = True
     for q in range(1, n_groups):
         if q in stats and q + 1 in stats:
@@ -614,7 +612,7 @@ def long_only_backtest(monthly_predictions, n_groups=5):
 
 
 # ============================================================
-# 交易成本
+# Transaction costs
 # ============================================================
 def cost_analysis(q_returns, n_groups=5, cost_bps_list=None):
     if cost_bps_list is None:
@@ -645,14 +643,14 @@ def cost_analysis(q_returns, n_groups=5, cost_bps_list=None):
 
 
 # ============================================================
-# 输出
+# Output
 # ============================================================
 def print_results(ic_results, cv_results, backtest_stats, cost_results):
     print("\n" + "=" * 70)
-    print("32维最终版因子评估（4修复全合并）")
+    print("32-dim Final Factor Evaluation (4 fixes merged)")
     print("=" * 70)
 
-    print("\n── T+1 ~ T+6 单月 IC 衰减 ──")
+    print("\n  T+1 ~ T+6 Single-Month IC Decay  ")  # note: box drawing chars are ASCII-safe
     print(f"{'Lag':>6} {'IC':>8} {'ICstd':>8} {'ICIR':>8} {'IC>0':>8} {'N':>5}")
     print("-" * 48)
     for lag in range(1, MAX_HORIZONS + 1):
@@ -663,7 +661,7 @@ def print_results(ic_results, cv_results, backtest_stats, cost_results):
                   f"{m/max(s,1e-8):>+8.2f} "
                   f"{np.mean([i>0 for i in ics]):>7.1%} {len(ics):>5}")
 
-    print("\n── 5-Fold 时间序列 CV ──")
+    print("\n  5-Fold Time-Series CV  ")
     print(f"{'Fold':>5} {'Period':>20} {'IC':>8} {'ICIR':>8} {'Months':>6}")
     print("-" * 48)
     for r in cv_results:
@@ -672,9 +670,9 @@ def print_results(ic_results, cv_results, backtest_stats, cost_results):
               f"{r.get('n_months',0):>6}")
     valid = [r['ic'] for r in cv_results if not np.isnan(r.get('ic', np.nan))]
     if valid:
-        print(f"{'均值':>5} {'':>20} {np.mean(valid):>+8.4f}")
+        print(f"{'Mean':>5} {'':>20} {np.mean(valid):>+8.4f}")
 
-    print("\n── 纯多头回测（五分组等权） ──")
+    print("\n  Long-Only Backtest (5-group, equal-weight)  ")
     print(f"{'Group':>6} {'AnnRet':>8} {'Sharpe':>8} {'MaxDD':>8} {'WinRate':>8} {'#Stocks':>7}")
     print("-" * 50)
     for q in [1, 3, 5, 'LS']:
@@ -685,15 +683,15 @@ def print_results(ic_results, cv_results, backtest_stats, cost_results):
             print(f"{'Q'+str(q) if isinstance(q,int) else q:>6} "
                   f"{s['ann_ret']:>+7.1%} {s['sharpe']:>+8.2f} "
                   f"{s['max_dd']:>+7.1%} {wr:>7.1%} {hold:>7.0f}")
-    print(f"单调性: {'PASS' if backtest_stats.get('monotonic') else 'FAIL'}")
+    print(f"Monotonicity: {'PASS' if backtest_stats.get('monotonic') else 'FAIL'}")
 
-    print("\n── 交易成本敏感性 ──")
+    print("\n  Transaction Cost Sensitivity  ")
     for r in cost_results:
         if 'cost_bps' in r:
             print(f"  {r['cost_bps']:>3}bp → Net Sharpe {r['net_sharpe']:>+.2f} "
                   f"(Net AnnRet {r['net_ann_ret']:>+.1%})")
         if 'breakeven_bps' in r:
-            print(f"  盈亏平衡: {r['breakeven_bps']}bp")
+            print(f"  Breakeven: {r['breakeven_bps']}bp")
 
 
 # ============================================================
@@ -702,23 +700,23 @@ def print_results(ic_results, cv_results, backtest_stats, cost_results):
 def main():
     print("=" * 70)
     print(f"v32_final_eval.py | {datetime.now():%Y-%m-%d %H:%M:%S}")
-    print("32维 | 单月收益 | YYYY-MM截面 | CSRC L2 | 滚动60月")
+    print("32-dim | single-month returns | YYYY-MM cross-section | CSRC L2 | rolling 60 months")
     print("=" * 70)
 
-    print("\n[1/5] Loaded数据...")
+    print("\n[1/5] Loading data...")
     stock_data, industry_map = load_data()
 
-    print("\n[2/5] 构建截面...")
+    print("\n[2/5] Building cross-sections...")
     cross_sections, all_yms = build_cross_sections(stock_data, industry_map)
 
-    print("\n[3/5] 滚动训练 + 截面IC...")
+    print("\n[3/5] Rolling training + cross-sectional IC...")
     ic_results, monthly_predictions = rolling_evaluation(
         cross_sections, industry_map, train_months=60)
 
     print("\n[4/5] 5-Fold CV...")
     cv_results = time_series_cv(cross_sections)
 
-    print("\n[5/5] 回测 + 成本分析...")
+    print("\n[5/5] Backtest + cost analysis...")
     backtest_stats, q_returns = long_only_backtest(monthly_predictions)
     cost_results = cost_analysis(q_returns)
 
@@ -743,7 +741,7 @@ def main():
     out = os.path.join(OUTPUT_DIR, 'v32_final_results.json')
     with open(out, 'w', encoding='utf-8') as f:
         json.dump(output, f, indent=2, ensure_ascii=False, default=str)
-    print(f"\n结果已保存: {out}")
+    print(f"\nResults saved: {out}")
 
 
 if __name__ == '__main__':

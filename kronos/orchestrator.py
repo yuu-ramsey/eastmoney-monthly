@@ -35,16 +35,16 @@ def run_analysis(
     Complete analysis pipeline for a single stock.
 
     Args:
-        code: 股票code
-        predictor: 已Loaded模型的 KronosPredictor 实例
-        x_timestamp: historical数据截止时间
-        y_timestamp: 预测起始时间
-        pred_len: 预测 K 线数量
-        context_len: 使用的historical K 线数量（上下文窗口）
-        n_samples: 独立采样次数
+        code: stock code
+        predictor: KronosPredictor instance with loaded model
+        x_timestamp: historical data cutoff time
+        y_timestamp: prediction start time
+        pred_len: number of predicted K-lines
+        context_len: number of historical K-lines to use (context window)
+        n_samples: number of independent sampling runs
 
     Returns:
-        signal dict + 股票元信息
+        signal dict + stock metadata
     """
     df = load_monthly_klines(code, db_path=db_path, min_records=context_len)
 
@@ -65,7 +65,7 @@ def run_analysis(
 
     signal = generate_signal(predictions)
 
-    # 附加元信息
+    # Attach metadata
     signal["code"] = code
     signal["data_range"] = (
         f"{df.index.min().strftime('%Y-%m')} → "

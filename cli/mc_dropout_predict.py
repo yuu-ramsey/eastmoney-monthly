@@ -1,4 +1,4 @@
-"""MC Dropout batch inference — Loaded日线模型，N 次前向传播，输出不确定性量化结果
+"""MC Dropout batch inference — Loads daily model, N forward passes, outputs uncertainty quantification results
 Usage:
   python cli/mc_dropout_predict.py --codes 000001,000002  # specific stocks
   python cli/mc_dropout_predict.py --limit 100             # first N stocks
@@ -64,8 +64,8 @@ def build_features(df_group):
 
 # ======== MC Dropout Inference ========
 def mc_predict_batch(model, X_batch, n_samples=MC_SAMPLES):
-    """Batch MC Dropout: N forward passes，dropout 保持开启"""
-    model.train()  # dropout 活跃
+    """Batch MC Dropout: N forward passes, dropout kept active"""
+    model.train()  # dropout active
     all_samples = []
     with torch.no_grad():
         for _ in range(n_samples):
@@ -175,7 +175,7 @@ def main():
         # Confidence penalty
         y3_adj, y3_penalty, y3_conf, y3_cv = confidence_penalty_vec(means[:, 0], stds[:, 0])
         y6_adj, y6_penalty, y6_conf, y6_cv = confidence_penalty_vec(means[:, 1], stds[:, 1])
-        # Only use y3 for overall_confidence，y6 是训练时的 dummy target（恒为 0），不参与
+        # Only use y3 for overall_confidence; y6 is the dummy target during training (always 0), not used
         overall_conf = y3_conf
         avg_cv = y3_cv
         ulevel = uncertainty_level_vec(avg_cv)

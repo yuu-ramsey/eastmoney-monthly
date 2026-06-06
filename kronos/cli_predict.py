@@ -3,11 +3,11 @@ Kronos local offline prediction CLI
 
 Usage:
     python cli_predict.py 600519                    # text output
-    python cli_predict.py 600519 --json             # JSON 输出（供 Node.js 消费）
-    python cli_predict.py 600519 --n-samples 20     # 自定义采样次数
-    python cli_predict.py 600519 --pred-len 6       # 预测 6 根月线
+    python cli_predict.py 600519 --json             # JSON output (for Node.js consumption)
+    python cli_predict.py 600519 --n-samples 20     # custom sample count
+    python cli_predict.py 600519 --pred-len 6       # predict 6 monthly candles
 
-前置条件: 先运行 download_weights.py download预训练权重到 kronos/weights/
+Prerequisite: run download_weights.py first to download pretrained weights to kronos/weights/
 """
 
 # Reproduced from Kronos (https://github.com/shiyu-coder/Kronos)
@@ -24,7 +24,7 @@ from pathlib import Path
 
 import torch
 
-# 项目根目录
+# Project root directory
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_PROJECT_ROOT))
 
@@ -40,15 +40,15 @@ _MODEL_DIR = _KRONOS_DIR / "weights" / "model"
 
 
 def load_predictor(device: str = "cuda") -> KronosPredictor:
-    """Loaded tokenizer + model 权重"""
+    """Load tokenizer + model weights"""
     if not _TOKENIZER_DIR.exists():
         raise FileNotFoundError(
-            f"Tokenizer 权重未找到: {_TOKENIZER_DIR}\n"
+            f"Tokenizer weights not found: {_TOKENIZER_DIR}\n"
             f"Please run first: python -m kronos.download_weights"
         )
     if not _MODEL_DIR.exists():
         raise FileNotFoundError(
-            f"Model 权重未找到: {_MODEL_DIR}\n"
+            f"Model weights not found: {_MODEL_DIR}\n"
             f"Please run first: python -m kronos.download_weights"
         )
 
@@ -58,66 +58,67 @@ def load_predictor(device: str = "cuda") -> KronosPredictor:
     model = Kronos.from_pretrained(str(_MODEL_DIR))
 
     predictor = KronosPredictor(tokenizer, model, device=device)
-    print(f"设备: {predictor.device}", file=sys.stderr)
+    print(f"Device: {predictor.device}", file=sys.stderr)
     return predictor
 
 
 def format_text(signal: dict) -> str:
-    """signal dict → 人类可读文本"""
-    direction_label = {"up": "看多", "down": "看空", "flat": "震荡"}
+    """signal dict -> human-readable text"""
+    direction_label = {"up": "Bullish", "down": "Bearish", "flat": "Sideways"}
 
     lines = [
         f"code: {signal['code']}",
-        f"数据: {signal['data_count']} 条 ({signal['data_range']})",
-        f"预测: 未来 {signal['pred_len']} 个月",
+        f"Data: {signal['data_count']} records ({signal['data_range']})",
+        f"Prediction: next {signal['pred_len']} months",
         "",
-        f"方向: {direction_label.get(signal['direction'], signal['direction'])}",
-        f"涨跌幅: {signal['predicted_change_pct']:+.2f}%",
-        f"最高价: {signal['predicted_high']:.2f}",
-        f"最低价: {signal['predicted_low']:.2f}",
-        f"置信度: {signal['confidence']:.2%}",
-        f"波动率: {signal['volatility']:.2f}%",
-        f"采样: {signal['sample_count']} 次 "
-        f"(涨{signal['up_count']}/跌{signal['down_count']}/平{signal['flat_count']})",
+        f"Direction: {direction_label.get(signal['direction'], signal['direction'])}",
+        f"Change: {signal['predicted_change_pct']:+.2f}%",
+        f"High: {signal['predicted_high']:.2f}",
+        f"Low: {signal['predicted_low']:.2f}",
+        f"Confidence: {signal['confidence']:.2%}",
+        f"Volatility: {signal['volatility']:.2f}%",
+        f"Samples: {signal['sample_count']} "
+        f"(up{signal['up_count']}/down{signal['down_count']}/flat{signal['flat_count']})",
     ]
     return "\n".join(lines)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Kronos 本地离线预测")
-    parser.add_argument("code", help="股票code，如 600519")
-    parser.add_argument("--json", action="store_true", help="JSON 输出（供 Node.js 解析）")
-    parser.add_argument("--n-samples", type=int, default=30, help="采样次数 (default: 30)")
-    parser.add_argument("--pred-len", type=int, default=3, help="预测月数 (default: 3)")
-    parser.add_argument("--context-len", type=int, default=256, help="上下文窗口长度 (default: 256)")
-    parser.add_argument("--temperature", type=float, default=0.6, help="采样温度 (default: 0.6)")
-    parser.add_argument("--top-k", type=int, default=30, help="top-k 过滤 (default: 30)")
+    parser = argparse.ArgumentParser(description="Kronos local offline prediction")
+    parser.add_argument("code", help="stock code, e.g. 600519")
+    parser.add_argument("--json", action="store_true", help="JSON output (for Node.js parsing)")
+    parser.add_argument("--n-samples", type=int, default=30, help="sample count (default: 30)")
+    parser.add_argument("--pred-len", type=int, default=3, help="prediction months (default: 3)")
+    parser.add_argument("--context-len", type=int, default=256, help="context window length (default: 256)")
+    parser.add_argument("--temperature", type=float, default=0.6, help="sampling temperature (default: 0.6)")
+    parser.add_argument("--top-k", type=int, default=30, help="top-k filtering (default: 30)")
     parser.add_argument("--device", default="cuda", choices=["cuda", "cpu"])
-    parser.add_argument("--x-timestamp", default=None, help="historical截止时间 (default: 自动取最新月)")
-    parser.add_argument("--y-timestamp", default=None, help="预测起始时间 (default: x_timestamp + 1月)")
-    parser.add_argument("--db", default=None, help="SQLite 数据库路径")
+    parser.add_argument("--x-timestamp", default=None, help="historical cutoff time (default: auto-use latest month)")
+    parser.add_argument("--y-timestamp", default=None, help="prediction start time (default: x_timestamp + 1 month)")
+    parser.add_argument("--db", default=None, help="SQLite database path")
     args = parser.parse_args()
 
-    # JSON 模式下抑制所有非 JSON 输出到 stdout
+    # In JSON mode, suppress all non-JSON output to stdout
     _real_stdout = sys.stdout
     if args.json:
         sys.stdout = open(os.devnull, 'w')
 
     try:
-        # Loaded模型
+        # Load model
         try:
             predictor = load_predictor(args.device)
         except FileNotFoundError as e:
             print(str(e), file=sys.stderr)
             sys.exit(2)
 
-        # 自动推断时间戳
+        # Automatically infer timestamp
         df_meta = load_monthly_klines(args.code, db_path=args.db, min_records=12)
         latest_date = df_meta.index.max()
 
         if args.x_timestamp is None:
-            # 默认取最后完整月作为 x_ts。
-            # 若当月未结束（<28 日），最后一条月线是 partial month，排除之。
+            # Default: use the last completed month as x_ts.
+            # If the current month is not yet finished (day < 28), the last monthly candle
+            # is a partial month, so exclude it.
             now = datetime.now()
             latest_month = latest_date.month
             latest_year = latest_date.year
@@ -139,7 +140,7 @@ def main():
         else:
             y_ts = args.y_timestamp
 
-        # 预测
+        # Predict
         signal = run_analysis(
             code=args.code,
             predictor=predictor,

@@ -14,45 +14,45 @@ const sampleCtx = {
   extraContext: { events: [{ date: '04-30', type: '研报', title: '测试标题' }] },
 };
 
-test('bull.buildPrompt: 包含看多角色指令', () => {
+test('bull.buildPrompt: includes bullish role instructions', () => {
   const prompt = bullAgent.buildPrompt(sampleCtx);
   assert.match(prompt, /看多分析师/);
   assert.match(prompt, /看多论点/);
   assert.match(prompt, /多头视角/);
 });
 
-test('bull.buildPrompt: 包含 K 线表格', () => {
+test('bull.buildPrompt: includes K-line table', () => {
   const prompt = bullAgent.buildPrompt(sampleCtx);
   assert.match(prompt, /2026-03-31/);
   assert.match(prompt, /1500\.00/);
   assert.match(prompt, /MACD-DIF/);
 });
 
-test('bull.buildPrompt: 包含附加上下文', () => {
+test('bull.buildPrompt: includes extra context', () => {
   const prompt = bullAgent.buildPrompt(sampleCtx);
   assert.match(prompt, /测试标题/);
   assert.match(prompt, /附加上下文/);
 });
 
-test('bull.buildPrompt: 不包含综合结论和操作建议', () => {
+test('bull.buildPrompt: does not include comprehensive conclusion or action advice', () => {
   const prompt = bullAgent.buildPrompt(sampleCtx);
-  // 扣除禁止声明段落后再检查
+  // Strip the prohibition paragraph before checking
   const afterProhibition = prompt.replace(/不要输出.*综合结论.*操作建议.*\n*/g, '');
-  assert.ok(!/综合结论/.test(afterProhibition), 'bull 分析任务中不应要求综合结论');
-  assert.ok(!/操作建议/.test(afterProhibition), 'bull 分析任务中不应要求操作建议');
+  assert.ok(!/综合结论/.test(afterProhibition), 'bull analysis task should not require comprehensive conclusion');
+  assert.ok(!/操作建议/.test(afterProhibition), 'bull analysis task should not require action advice');
 });
 
-test('bull.buildPrompt: 包含反向风险评估要求', () => {
+test('bull.buildPrompt: includes reverse risk assessment requirement', () => {
   const prompt = bullAgent.buildPrompt(sampleCtx);
   assert.match(prompt, /反向风险/);
 });
 
-test('bull.buildPrompt: 包含诚实面对反向证据', () => {
+test('bull.buildPrompt: includes "honestly confront opposing evidence" directive', () => {
   const prompt = bullAgent.buildPrompt(sampleCtx);
   assert.match(prompt, /诚实面对/);
 });
 
-test('bull.buildPrompt: 禁止脱离事实给目标价', () => {
+test('bull.buildPrompt: prohibits giving price targets without factual basis', () => {
   const prompt = bullAgent.buildPrompt(sampleCtx);
   assert.match(prompt, /不能脱离事实/);
 });

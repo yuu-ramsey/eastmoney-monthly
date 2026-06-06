@@ -6,7 +6,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 // ---- KlinesCache ----
-test('KlinesCache: 基本存取', async () => {
+test('KlinesCache: basic get/set', async () => {
   const { KlinesCache } = await import('../../lib/eval/klines-cache.js');
   const c = new KlinesCache();
   assert.equal(c.get('600519', '1'), null);
@@ -17,7 +17,7 @@ test('KlinesCache: 基本存取', async () => {
   assert.equal(c.size(), 1);
 });
 
-test('KlinesCache: 命中率统计', async () => {
+test('KlinesCache: hit rate stats', async () => {
   const { KlinesCache } = await import('../../lib/eval/klines-cache.js');
   const c = new KlinesCache();
   c.get('a', '1'); // miss
@@ -30,42 +30,42 @@ test('KlinesCache: 命中率统计', async () => {
 
 // ---- scorePrediction ----
 
-test('scorePrediction: 完全匹配=1.0', async () => {
+test('scorePrediction: exact match = 1.0', async () => {
   const { scorePrediction } = await import('../../lib/eval/runner.js');
   assert.equal(scorePrediction('strong_bull', 'strong_bull'), 1.0);
   assert.equal(scorePrediction('bear', 'bear'), 1.0);
   assert.equal(scorePrediction('neutral', 'neutral'), 1.0);
 });
 
-test('scorePrediction: 方向对强度错=0.5', async () => {
+test('scorePrediction: correct direction wrong strength = 0.5', async () => {
   const { scorePrediction } = await import('../../lib/eval/runner.js');
   assert.equal(scorePrediction('strong_bull', 'bull'), 0.5);
   assert.equal(scorePrediction('bull', 'strong_bull'), 0.5);
   assert.equal(scorePrediction('bear', 'strong_bear'), 0.5);
 });
 
-test('scorePrediction: neutral任意=0.3', async () => {
+test('scorePrediction: neutral any = 0.3', async () => {
   const { scorePrediction } = await import('../../lib/eval/runner.js');
   assert.equal(scorePrediction('neutral', 'strong_bull'), 0.3);
   assert.equal(scorePrediction('strong_bull', 'neutral'), 0.3);
 });
 
-test('scorePrediction: 方向反=-0.5', async () => {
+test('scorePrediction: wrong direction = -0.5', async () => {
   const { scorePrediction } = await import('../../lib/eval/runner.js');
   assert.equal(scorePrediction('bull', 'bear'), -0.5);
   assert.equal(scorePrediction('strong_bull', 'bear'), -0.5);
 });
 
-test('scorePrediction: 强方向反=-1.0', async () => {
+test('scorePrediction: strong wrong direction = -1.0', async () => {
   const { scorePrediction } = await import('../../lib/eval/runner.js');
   assert.equal(scorePrediction('strong_bull', 'strong_bear'), -1.0);
 });
 
-// ---- groundTruth判定 ----
+// ---- groundTruth determination ----
 
-test('groundTruth: alpha阈值', async () => {
+test('groundTruth: alpha threshold', async () => {
   const { buildDataset } = await import('../../lib/eval/dataset-builder.js');
-  // 间接测试：通过mock buildDataset
+  // indirect test: via mock buildDataset
   const mockFetch = async () => {
     const klines = [];
     for (let i = 0; i < 100; i++) {
@@ -88,14 +88,14 @@ test('groundTruth: alpha阈值', async () => {
   assert.ok(result.testPointCount > 0);
   const dataset = JSON.parse(fs.readFileSync(result.path, 'utf-8'));
   assert.ok(dataset.testPoints.length > 0);
-  // 上涨行情中应该主要是bull/strong_bull
+  // in uptrend, mainly bull/strong_bull
   const gtSet = new Set(dataset.testPoints.map((t) => t.groundTruth));
   assert.ok(gtSet.has('strong_bull') || gtSet.has('bull'));
 });
 
-// ---- report 生成 ----
+// ---- report generation ----
 
-test('generateEvalReport: 基本格式+预测分布', async () => {
+test('generateEvalReport: basic format + prediction distribution', async () => {
   const { generateEvalReport } = await import('../../lib/eval/report.js');
 
   const runDir = path.join(os.tmpdir(), 'eastmoney-eval-test');
@@ -116,23 +116,23 @@ test('generateEvalReport: 基本格式+预测分布', async () => {
 
   const reportPath = generateEvalReport(runId);
   const report = fs.readFileSync(reportPath, 'utf-8');
-  assert.ok(report.includes('# Eval 报告'));
-  assert.ok(report.includes('总体准确率'));
+  assert.ok(report.includes('# Eval Report'));
+  assert.ok(report.includes('Overall Accuracy'));
   assert.ok(report.includes('Prediction Distribution'));
-  assert.ok(report.includes('预测占比'));
-  assert.ok(report.includes('groundTruth占比'));
-  assert.ok(report.includes('分模板表现'));
-  assert.ok(report.includes('分股票类别表现'));
+  assert.ok(report.includes('Prediction Share'));
+  assert.ok(report.includes('Ground Truth Share'));
+  assert.ok(report.includes('By Template'));
+  assert.ok(report.includes('By Stock Category'));
 });
 
 // ---- compareRuns ----
 
-test('compareRuns: 对比两个版本', async () => {
+test('compareRuns: compare two versions', async () => {
   const { compareRuns } = await import('../../lib/eval/report.js');
   const runDir = path.join(os.tmpdir(), 'eastmoney-eval-compare');
   fs.mkdirSync(runDir, { recursive: true });
 
-  // 写 v1
+  // write v1
   const lines1 = [];
   for (let i = 0; i < 20; i++) {
     lines1.push(JSON.stringify({
@@ -144,7 +144,7 @@ test('compareRuns: 对比两个版本', async () => {
   }
   fs.writeFileSync(`${runDir}/v1.jsonl`, lines1.join(''));
 
-  // 写 v2（改善）
+  // write v2 (improved)
   const lines2 = [];
   for (let i = 0; i < 20; i++) {
     lines2.push(JSON.stringify({
@@ -159,12 +159,12 @@ test('compareRuns: 对比两个版本', async () => {
   const reportPath = compareRuns('v1', 'v2');
   const report = fs.readFileSync(reportPath, 'utf-8');
   assert.ok(report.includes('v1 vs v2'));
-  assert.ok(report.includes('↑')); // 应该有改善
+  assert.ok(report.includes('↑')); // should have improvement
 });
 
 // ---- seed-stocks ----
 
-test('seed-stocks: 6类齐全≥40只', () => {
+test('seed-stocks: 6 categories >= 40 total', () => {
   const seedPath = path.join(__dirname, '..', '..', 'lib', 'eval', 'seed-stocks.json');
   const seeds = JSON.parse(fs.readFileSync(seedPath, 'utf-8'));
   const categories = Object.keys(seeds.stocks);
@@ -174,12 +174,12 @@ test('seed-stocks: 6类齐全≥40只', () => {
     assert.ok(seeds.stocks[cat].length >= 5, `${cat}: ${seeds.stocks[cat].length} < 5`);
     total += seeds.stocks[cat].length;
   }
-  assert.ok(total >= 40, `总股票数 ${total} < 40`);
-  // 检查无重复code
+  assert.ok(total >= 40, `total stocks ${total} < 40`);
+  // check no duplicate codes
   const codes = new Set();
   for (const cat of categories) {
     for (const s of seeds.stocks[cat]) {
-      assert.ok(!codes.has(s.code), `重复code: ${s.code}`);
+      assert.ok(!codes.has(s.code), `duplicate code: ${s.code}`);
       codes.add(s.code);
     }
   }

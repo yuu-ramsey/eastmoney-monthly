@@ -1,5 +1,5 @@
 #!/bin/sh
-# 安装 git pre-commit hook —— 防 API key 意外提交
+# Install git pre-commit hook — prevent accidental API key commit
 HOOK_DIR=".git/hooks"
 HOOK_FILE="$HOOK_DIR/pre-commit"
 
@@ -7,14 +7,14 @@ mkdir -p "$HOOK_DIR"
 
 cat > "$HOOK_FILE" << 'HOOK_EOF'
 #!/bin/sh
-# 防 API key 意外提交
+# Prevent accidental API key commit
 if git diff --cached | grep -E "sk-[a-zA-Z0-9]{32,}|DEEPSEEK_API_KEY\s*=\s*['\"]sk-|ANTHROPIC_API_KEY\s*=\s*['\"]sk-"; then
   echo "❌ API key detected in staged files. Commit blocked."
   echo "   Remove real API keys before committing."
   exit 1
 fi
 
-# 防 .env 误提交（.env.example 除外）
+# Prevent accidental .env commit (.env.example excluded)
 ENV_FILES=$(git diff --cached --name-only | grep -E "^\.env$|^\.env\." | grep -v ".env.example")
 if [ -n "$ENV_FILES" ]; then
   echo "❌ .env file staged for commit. Commit blocked."

@@ -18,7 +18,7 @@ N_FFT, MC_SAMPLES = 10, 30
 EMA_DECAY = 0.999
 DB = '.eastmoney-ai/db/klines-v2.sqlite'
 THRESH_UP = 0.02    # up: monthly return > +2%
-THRESH_DN = -0.02   # 跌：月收益率 < -2%
+THRESH_DN = -0.02   # down: monthly return < -2%
 
 print(f'LSTM v4 Roadmap | GPU: {torch.cuda.get_device_name(0)}', flush=True)
 print(f'3-class: UP>{THRESH_UP:+.0%} FLAT=[{THRESH_DN:+.0%},{THRESH_UP:+.0%}] DOWN<{THRESH_DN:+.0%}', flush=True)

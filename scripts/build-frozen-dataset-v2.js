@@ -1,7 +1,7 @@
-// Build v2 frozen eval dataset —— 从 v1 精确匹配 cutoff dates，添加折扣多月回报标签
-// 用法：
-//   node scripts/build-frozen-dataset-v2.js                  (全量 298 股，自动生成 cutoff)
-//   node scripts/build-frozen-dataset-v2.js --match-v1       (精确使用 v1 的 stockCode+cutoffDate)
+// Build v2 frozen eval dataset — exact cutoff date matching from v1, adding discounted multi-month return labels
+// Usage:
+//   node scripts/build-frozen-dataset-v2.js                  (full 298 stocks, auto-generate cutoff)
+//   node scripts/build-frozen-dataset-v2.js --match-v1       (use v1 stockCode+cutoffDate exactly)
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,10 +29,10 @@ const matchV1 = process.argv.includes('--match-v1');
 const db = getDb();
 
 if (matchV1) {
-  // ====== 精确匹配 v1 模式：复用 v1 的 stockCode + cutoffDate ======
+  // ====== Exact match v1 mode: reuse v1 stockCode + cutoffDate ======
   const v1Path = path.join(DATA_DIR, 'frozen-eval-dataset-v1.json');
   if (!fs.existsSync(v1Path)) {
-    console.error('v1 dataset 不存在');
+    console.error('v1 dataset does not exist');
     process.exit(1);
   }
   const v1 = JSON.parse(fs.readFileSync(v1Path, 'utf-8'));
@@ -50,7 +50,7 @@ if (matchV1) {
     klinesByCode.get(row.code).push(row);
   }
 
-  // 构建 date → index 查找
+  // Build date → index lookup
   const dateIndexCache = new Map();
   for (const [code, klines] of klinesByCode) {
     const dateMap = new Map();
@@ -86,20 +86,20 @@ if (matchV1) {
     });
   }
 
-  console.log(`v1 testPoints: ${v1.testPoints.length}, 匹配成功: ${testPoints.length}, 跳过: ${skipped}`);
+  console.log(`v1 testPoints: ${v1.testPoints.length}, matched: ${testPoints.length}, skipped: ${skipped}`);
 
-  // 标签分布对比
+  // Label distribution comparison
   function labelDist(points, key) {
     const dist = {};
     for (const tp of points) dist[tp[key]] = (dist[tp[key]] || 0) + 1;
     return dist;
   }
 
-  console.log('\n=== 标签分布对比 ===');
-  console.log('旧(单月alpha):', JSON.stringify(labelDist(testPoints, 'groundTruth')));
-  console.log('新(折扣回报): ', JSON.stringify(labelDist(testPoints, 'groundTruthDiscounted')));
+  console.log('\n=== Label Distribution Comparison ===');
+  console.log('Old (single-month alpha):', JSON.stringify(labelDist(testPoints, 'groundTruth')));
+  console.log('New (discounted return): ', JSON.stringify(labelDist(testPoints, 'groundTruthDiscounted')));
   const agreeCount = testPoints.filter(tp => tp.labelAgreement).length;
-  console.log(`标签一致率: ${agreeCount}/${testPoints.length} (${(agreeCount / testPoints.length * 100).toFixed(1)}%)`);
+  console.log(`Label agreement rate: ${agreeCount}/${testPoints.length} (${(agreeCount / testPoints.length * 100).toFixed(1)}%)`);
 
   const alphas = testPoints.map(tp => tp.alpha ?? 0);
   const discounted = testPoints.map(tp => tp.discountedReturn);
@@ -108,7 +108,7 @@ if (matchV1) {
   const rankDiffs = alphaRanks.map(r => (r - discRanks.indexOf(r)) ** 2);
   const n = testPoints.length;
   const spearman = 1 - (6 * rankDiffs.reduce((a, b) => a + b, 0)) / (n * (n * n - 1));
-  console.log(`单月alpha vs 折扣回报 Spearman rank: ${spearman.toFixed(4)}`);
+  console.log(`Single-month alpha vs discounted return Spearman rank: ${spearman.toFixed(4)}`);
 
   const dataset = {
     version: 'frozen-v2',
@@ -121,10 +121,10 @@ if (matchV1) {
 
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(path.join(DATA_DIR, 'frozen-eval-dataset-v2.json'), JSON.stringify(dataset, null, 2), 'utf-8');
-  console.log(`\n保存: data/frozen-eval-dataset-v2.json (${dataset.stocks.length} stocks, ${testPoints.length} testPoints)`);
+  console.log(`\nSaved: data/frozen-eval-dataset-v2.json (${dataset.stocks.length} stocks, ${testPoints.length} testPoints)`);
 
 } else {
-  // ====== 全量模式：自动生成 cutoff dates ======
+  // ====== Full mode: auto-generate cutoff dates ======
   const stocks = db.prepare(`
     SELECT DISTINCT m.code, COALESCE(s.stock_name, m.code) AS name
     FROM monthly_klines m
@@ -132,7 +132,7 @@ if (matchV1) {
     WHERE m.code IN (SELECT stock_code FROM stock_industry_mapping)
     ORDER BY m.code
   `).all();
-  console.log(`股票数: ${stocks.length}`);
+  console.log(`Stock count: ${stocks.length}`);
 
   const allKlines = db.prepare(`
     SELECT code, date, close FROM monthly_klines
@@ -176,7 +176,7 @@ if (matchV1) {
     }
   }
 
-  console.log(`跳过低数据股票: ${skippedShort}`);
+  console.log(`Skipped low-data stocks: ${skippedShort}`);
   console.log(`Test points: ${testPoints.length}`);
 
   const activeCodes = new Set(testPoints.map(tp => tp.stockCode));
@@ -200,5 +200,5 @@ if (matchV1) {
 
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(path.join(DATA_DIR, 'frozen-eval-dataset-v2.json'), JSON.stringify(dataset, null, 2), 'utf-8');
-  console.log(`保存: data/frozen-eval-dataset-v2.json (${stockMeta.length} stocks, ${testPoints.length} testPoints)`);
+  console.log(`Saved: data/frozen-eval-dataset-v2.json (${stockMeta.length} stocks, ${testPoints.length} testPoints)`);
 }

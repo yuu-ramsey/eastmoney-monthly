@@ -10,19 +10,19 @@ import torch
 
 from kronos.tokenizer import KronosTokenizer
 
-# 跳过标记：需要已download的权重
+# Skip marker: need downloaded weights
 _tokenizer_weights_dir = (
     __import__("pathlib").Path(__file__).resolve().parent.parent
     / "weights" / "tokenizer"
 )
 requires_weights = pytest.mark.skipif(
     not _tokenizer_weights_dir.exists(),
-    reason="未download权重，Please run first download_weights.py"
+    reason="Weights not downloaded. Please run download_weights.py first"
 )
 
 
 class TestKronosTokenizerInit:
-    """测试初始化参数"""
+    """Test initialization parameters"""
 
     def test_default_init(self):
         tokenizer = KronosTokenizer(
@@ -38,7 +38,7 @@ class TestKronosTokenizerInit:
         assert tokenizer.codebook_dim == 20
 
     def test_small_vocab(self):
-        """小码本：s1=4, s2=4 → codebook_dim=8"""
+        """Small codebook: s1=4, s2=4 -> codebook_dim=8"""
         tokenizer = KronosTokenizer(
             d_in=6, d_model=128, n_heads=4, ff_dim=256,
             n_enc_layers=2, n_dec_layers=2,
@@ -51,7 +51,7 @@ class TestKronosTokenizerInit:
 
 
 class TestKronosTokenizerForward:
-    """测试前向传播（随机权重）"""
+    """Test forward pass (random weights)"""
 
     @pytest.fixture
     def tokenizer(self):
@@ -104,7 +104,7 @@ class TestKronosTokenizerForward:
 
 
 class TestKronosTokenizerPretrained:
-    """预训练权重Loaded测试（需先运行 download_weights.py）"""
+    """Pretrained weights loaded test (must run download_weights.py first)"""
 
     @requires_weights
     def test_from_pretrained_tokenizer(self):

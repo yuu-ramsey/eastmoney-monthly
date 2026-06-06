@@ -9,7 +9,7 @@ const sigDist = {};
 for (const r of records) { const s = r.predictedSignal || '?'; sigDist[s] = (sigDist[s] || 0) + 1; }
 console.log('Signal distribution:', JSON.stringify(sigDist));
 
-// 抽样 3 条
+// Sample 3 entries
 for (let i = 0; i < Math.min(3, records.length); i++) {
   const r = records[i];
   console.log(`\n=== ${r.stockCode} ${r.template} signal=${r.predictedSignal} gt=${r.groundTruth} score=${r.score} ===`);
@@ -17,5 +17,5 @@ for (let i = 0; i < Math.min(3, records.length); i++) {
   const m = jt.match(/```json\s*([\s\S]*?)```/);
   if (m) console.log('Judge JSON:', m[1].trim().substring(0, 150));
   const dirIdx = jt.indexOf('综合方向判断');
-  if (dirIdx >= 0) console.log('方向判断:', jt.substring(dirIdx, dirIdx + 200).replace(/\n/g, ' '));
+  if (dirIdx >= 0) console.log('Direction judgment:', jt.substring(dirIdx, dirIdx + 200).replace(/\n/g, ' '));
 }

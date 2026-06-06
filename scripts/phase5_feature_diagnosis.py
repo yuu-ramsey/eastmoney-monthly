@@ -1,7 +1,7 @@
 """
 Phase 5: Feature diagnosis
-Step 1.1 — Feature importance (LightGBM gain/split, XGBoost gain/weight)
-Step 1.2 — 逐组消融实验 (7组, 每次去掉一组重训, 对比IC/ICIR)
+Step 1.1 -- Feature importance (LightGBM gain/split, XGBoost gain/weight)
+Step 1.2 -- Group-wise ablation experiments (7 groups, remove one group at a time, retrain, compare IC/ICIR)
 """
 import warnings; warnings.filterwarnings('ignore')
 import numpy as np, pandas as pd, sqlite3, time, json
@@ -55,18 +55,18 @@ def cross_sectional_neutralize(features, dates, neutralizer, ntype='categorical'
                 if gm.sum() >= 3: neutralized[gm] -= features[gm].mean(axis=0)
     return neutralized
 
-# ====== 特征组定义 ======
+# ====== Feature group definitions ======
 FEATURE_GROUPS = [
-    ('G1_价格动量',  slice(0, 4)),
-    ('G2_均线偏离',  slice(4, 7)),
-    ('G3_MACD',     slice(7, 10)),
-    ('G4_技术指标',  slice(10, 15)),
-    ('G5_趋势二值',  slice(15, 17)),
-    ('G6_FFT频率',  slice(17, 47)),
-    ('G7_量价K线',  slice(47, 61)),
+    ('G1_price_momentum',  slice(0, 4)),
+    ('G2_ma_deviation',    slice(4, 7)),
+    ('G3_MACD',            slice(7, 10)),
+    ('G4_tech_indicators', slice(10, 15)),
+    ('G5_trend_binary',    slice(15, 17)),
+    ('G6_FFT_frequency',   slice(17, 47)),
+    ('G7_volume_price',    slice(47, 61)),
 ]
 
-# 特征名称
+# Feature names
 FEATURE_NAMES = [
     'mom_1m', 'mom_3m', 'mom_6m', 'mom_12m',           # G1: 0-3
     'ma5_dev', 'ma20_dev', 'ma60_dev',                    # G2: 4-6
@@ -85,8 +85,8 @@ assert len(FEATURE_NAMES) == 61, f"Expected 61, got {len(FEATURE_NAMES)}"
 
 
 def build_features():
-    """构建特征矩阵，与phase4_full.py一致"""
-    print(f"[{ts()}] Loaded数据...", flush=True)
+    """Build feature matrix, consistent with phase4_full.py"""
+    print(f"[{ts()}] Loading data...", flush=True)
     conn = sqlite3.connect(str(DB))
     codes = [r[0] for r in conn.execute(
         'SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
@@ -104,7 +104,7 @@ def build_features():
     print(f"[{ts()}] {len(codes_used)} stocks, {len(df)} rows", flush=True)
 
     df['month'] = df['date'].str[:7]
-    print(f"[{ts()}] 构建特征...", flush=True); t0 = time.time()
+    print(f"[{ts()}] Building features...", flush=True); t0 = time.time()
     flat_list, y_list, dates_list, inds_list = [], [], [], []
 
     for code in codes_used:
@@ -134,7 +134,7 @@ def build_features():
         for i in range(1,n): up_streak[i]=up_streak[i-1]+1 if c[i]>c[i-1] else 0; dn_streak[i]=dn_streak[i-1]+1 if c[i]<c[i-1] else 0
         for i in range(60, n-6):
             if c[i]<=0.01: continue
-            # T+3 单月收益作为标签
+            # T+3 single-month return as label
             if i+3 >= n: continue
             fwd_ret = (c[i+3]-c[i+2])/max(abs(c[i+2]), 0.01)
             if abs(fwd_ret) > 2: continue
@@ -177,12 +177,12 @@ def build_features():
     v = ~np.isnan(flat).any(axis=1) & ~np.isnan(y)
     flat = flat[v]; y = y[v]; dates_arr = dates_arr[v]; inds_arr = inds_arr[v]
 
-    print(f"[{ts()}] {len(flat):,} 样本, {flat.shape[1]}d ({time.time()-t0:.0f}s)", flush=True)
+    print(f"[{ts()}] {len(flat):,} samples, {flat.shape[1]}d ({time.time()-t0:.0f}s)", flush=True)
     return flat, y, dates_arr, inds_arr
 
 
 def train_and_eval(X_train, y_train, X_test, y_test, dates_test, label="baseline"):
-    """训练LGB+XGB+Ridge集成, ReturnsIC和模型"""
+    """Train LGB+XGB+Ridge ensemble, returns IC and models"""
     sc = StandardScaler()
     Xt = sc.fit_transform(X_train)
     Xte = sc.transform(X_test)
@@ -199,7 +199,7 @@ def train_and_eval(X_train, y_train, X_test, y_test, dates_test, label="baseline
 
     ridge_m = Ridge(alpha=1.0); ridge_m.fit(Xt, y_train); p_ridge = ridge_m.predict(Xte)
 
-    # IC加权
+    # IC-weighted ensemble
     ics_m = {}
     for n, p in [('LGB', p_lgb), ('XGB', p_xgb), ('Ridge', p_ridge)]:
         ic_tmp = np.mean([spearmanr(p[dates_test==m], y_test[dates_test==m])[0]
@@ -217,11 +217,11 @@ def train_and_eval(X_train, y_train, X_test, y_test, dates_test, label="baseline
 
 # ====== Main ======
 if __name__ == '__main__':
-    # 1. 构建特征
+    # 1. Build features
     flat, y, dates_arr, inds_arr = build_features()
 
-    # 2. 行业中性化
-    print(f"[{ts()}] 行业中性化...", flush=True); t0 = time.time()
+    # 2. Industry neutralization
+    print(f"[{ts()}] Industry neutralization...", flush=True); t0 = time.time()
     flat_ind = cross_sectional_neutralize(flat.copy(), dates_arr, inds_arr, 'categorical')
     print(f"[{ts()}] done ({time.time()-t0:.0f}s)", flush=True)
 
@@ -234,7 +234,7 @@ if __name__ == '__main__':
 
     # ====== Step 1.1: Feature importance ======
     print(f"\n{'='*60}")
-    print("Step 1.1: Feature importance分析")
+    print("Step 1.1: Feature Importance Analysis")
     print(f"{'='*60}")
 
     result = train_and_eval(X_train_full, y_train_full, X_test, y_test, dates_test, "baseline")
@@ -264,12 +264,12 @@ if __name__ == '__main__':
         })
     imp_df = pd.DataFrame(imp_rows)
 
-    # 按组汇总
-    print(f"\n{'Group':<16s} {'LGB_gain':>10s} {'LGB_split':>10s} {'XGB_gain':>10s} {'XGB_weight':>12s}")
+    # Group summary
+    print(f"\n{'Group':<20s} {'LGB_gain':>10s} {'LGB_split':>10s} {'XGB_gain':>10s} {'XGB_weight':>12s}")
     print('-' * 60)
     for gname, gslice in FEATURE_GROUPS:
         gdf = imp_df.iloc[gslice]
-        print(f"{gname:<16s} {gdf['lgb_gain'].sum():>10.4f} {gdf['lgb_split'].sum():>10d} "
+        print(f"{gname:<20s} {gdf['lgb_gain'].sum():>10.4f} {gdf['lgb_split'].sum():>10d} "
               f"{gdf['xgb_gain'].sum():>10.4f} {gdf['xgb_weight'].sum():>12d}")
 
     # Top 20 individual features
@@ -279,9 +279,9 @@ if __name__ == '__main__':
     imp_df.to_csv(OUT / 'step1_1_feature_importance.csv', index=False, encoding='utf-8-sig')
     print(f"\nSaved: {OUT / 'step1_1_feature_importance.csv'}")
 
-    # ====== Step 1.2: 逐组消融 ======
+    # ====== Step 1.2: Group-wise ablation ======
     print(f"\n{'='*60}")
-    print("Step 1.2: 逐组消融实验")
+    print("Step 1.2: Group-wise Ablation Experiments")
     print(f"{'='*60}")
 
     ablation_results = [result]  # baseline first
@@ -303,11 +303,11 @@ if __name__ == '__main__':
 
         delta_ic = r['IC'] - result['IC']
         delta_ir = r['ICIR'] - result['ICIR']
-        print(f"  {gname:<16s}: IC={r['IC']:+.4f} (Δ{delta_ic:+.4f})  "
-              f"ICIR={r['ICIR']:+.3f} (Δ{delta_ir:+.3f})  n_feat={len(idxs)}")
+        print(f"  {gname:<20s}: IC={r['IC']:+.4f} (delta{delta_ic:+.4f})  "
+              f"ICIR={r['ICIR']:+.3f} (delta{delta_ir:+.3f})  n_feat={len(idxs)}")
 
     # Summary
-    print(f"\n{'Result':<20s} {'IC':>8s} {'ICIR':>8s} {'ΔIC':>8s} {'ΔICIR':>8s}")
+    print(f"\n{'Result':<20s} {'IC':>8s} {'ICIR':>8s} {'delta_IC':>8s} {'delta_ICIR':>8s}")
     print('-' * 56)
     for r in ablation_results:
         delta_ic = r['IC'] - result['IC']
@@ -326,7 +326,7 @@ if __name__ == '__main__':
     ablation_df.to_csv(OUT / 'step1_2_ablation.csv', index=False, encoding='utf-8-sig')
     print(f"\nSaved: {OUT / 'step1_2_ablation.csv'}")
 
-    # Save完整结果JSON
+    # Save full results JSON
     summary = {
         'baseline_IC': float(result['IC']),
         'baseline_ICIR': float(result['ICIR']),
@@ -346,4 +346,4 @@ if __name__ == '__main__':
     with open(OUT / 'diagnosis_summary.json', 'w') as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
 
-    print(f"\n[{ts()}] 诊断done. 结果: {OUT}")
+    print(f"\n[{ts()}] Diagnosis complete. Results: {OUT}")

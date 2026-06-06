@@ -109,10 +109,10 @@ function getForwardReturn(klines, asOfDate, holdingMonths) {
   return null; // placeholder — computed below
 }
 
-// 计算每月 HS300 等权基准 forward return
+// Compute monthly HS300 equal-weight benchmark forward return
 const benchmarkReturns = new Map(); // asOfDate → {1m, 3m, 6m, 12m}
 for (const asOf of evalMonths) {
-  // 收集所有股票在 asOf 的收盘价，然后在 horizon 后的收盘价
+  // Collect all stocks' close at asOf, then close after horizon
   const bm = {};
   for (const h of [1, 3, 6, 12]) {
     let sumStart = 0, cntStart = 0, sumEnd = 0, cntEnd = 0;
@@ -147,7 +147,7 @@ console.log('\nComputing directions...');
 const SIGNALS = ['strong_bull', 'mild_bull', 'strong_bear', 'mild_bear'];
 const HOLDINGS = [1, 3, 6, 12];
 
-// 按信号分组收集 forward returns
+// Group forward returns by signal
 const signalObs = {}; // signal_holding → { fwdRets:[], stockFwdRets:[], benchmarkRets:[], dates:[] }
 for (const sig of SIGNALS) for (const h of HOLDINGS) signalObs[`${sig}_${h}`] = [];
 
@@ -206,13 +206,13 @@ for (const code of stockList) {
 console.log(`Done.`);
 
 // ============================================================
-// a. 样本量矩阵 + avg return + alpha
+// a. Sample count matrix + avg return + alpha
 // ============================================================
 function mean(arr) { return arr.reduce((a,b)=>a+b,0)/(arr.length||1); }
 function std(arr) { const m = mean(arr); return Math.sqrt(arr.reduce((s,v)=>s+(v-m)**2,0)/((arr.length-1)||1)); }
 
 console.log('\n' + '='.repeat(100));
-console.log('=== a. 样本量 + avg stock return + avg alpha (扣除HS300等权基准) ===');
+console.log('=== a. Sample count + avg stock return + avg alpha (deducting HS300 equal-weight benchmark) ===');
 console.log('='.repeat(100));
 console.log('| signal \\ holding | n | stock ret | alpha | hit rate(raw) | hit rate(alpha) |');
 console.log('|---|---|---:|---:|---:|---:|');
@@ -243,7 +243,7 @@ for (const sig of SIGNALS) {
 }
 
 // ============================================================
-// b. Long-Short 扣除基准
+// b. Long-Short deducting benchmark
 // ============================================================
 console.log('\n' + '='.repeat(100));
 console.log('=== b. Long-Short (strong_bull - strong_bear) alpha ===');
@@ -264,10 +264,10 @@ for (const h of HOLDINGS) {
 }
 
 // ============================================================
-// c. mild_bear 时间分布
+// c. mild_bear time distribution
 // ============================================================
 console.log('\n' + '='.repeat(100));
-console.log('=== c. mild_bear 6m 时间分布 (by year) ===');
+console.log('=== c. mild_bear 6m time distribution (by year) ===');
 console.log('='.repeat(100));
 const mildBear6 = signalObs['mild_bear_6'];
 const byYear = {};
@@ -284,9 +284,9 @@ for (const y of Object.keys(byYear).sort()) {
   console.log(`| ${y} | ${rets.length} | ${(mean(rets)*100).toFixed(2)}% | ${(mean(alphas)*100).toFixed(2)}% |`);
 }
 
-// 检查 strong_bull / strong_bear 的方向性是否受 mild_bear 异常影响
+// Check whether strong_bull / strong_bear directionality is affected by mild_bear anomaly
 console.log('\n' + '='.repeat(100));
-console.log('=== d. strong_bull vs strong_bear 核心验证 ===');
+console.log('=== d. strong_bull vs strong_bear core verification ===');
 console.log('='.repeat(100));
 for (const h of HOLDINGS) {
   const sbBull = signalObs[`strong_bull_${h}`];

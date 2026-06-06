@@ -20,8 +20,8 @@ function cleanupTempDir() {
   if (fs.existsSync(TMP_DIR)) fs.rmSync(TMP_DIR, { recursive: true, force: true });
 }
 
-test('进度文件初始加载（不存在时返回默认）', () => {
-  // 模拟 loadProgress 逻辑
+test('progress file initial load (returns default when file does not exist)', () => {
+  // simulate loadProgress logic
   const progressPath = path.join(TMP_DIR, 'nonexistent.json');
   let progress;
   try {
@@ -33,7 +33,7 @@ test('进度文件初始加载（不存在时返回默认）', () => {
   assert.equal(progress.failed, 0);
 });
 
-test('进度文件存盘后再读', () => {
+test('progress file write then read back', () => {
   setupTempDir();
   const progressPath = path.join(TMP_DIR, 'test-progress.json');
   const data = { done: ['600519', '000001'], failed: 2, updatedAt: new Date().toISOString() };
@@ -47,7 +47,7 @@ test('进度文件存盘后再读', () => {
   cleanupTempDir();
 });
 
-test('断点续传：done 中的股票被过滤', () => {
+test('resume from checkpoint: stocks in done list are filtered out', () => {
   const stockList = [
     { code: '600519', market: '1', name: '茅台' },
     { code: '000001', market: '0', name: '平安' },
@@ -59,7 +59,7 @@ test('断点续传：done 中的股票被过滤', () => {
   assert.equal(pending[0].code, '600036');
 });
 
-test('并发批次正确分组', () => {
+test('concurrent batch grouping', () => {
   const stockList = Array.from({ length: 12 }, (_, i) => ({ code: String(i) }));
   const concurrency = 5;
   const batches = [];
@@ -72,14 +72,14 @@ test('并发批次正确分组', () => {
   assert.equal(batches[2].length, 2);
 });
 
-test('空股票清单不报错', () => {
+test('empty stock list does not throw', () => {
   const stockList = [];
   const done = new Set();
   const pending = stockList.filter((s) => !done.has(s.code));
   assert.equal(pending.length, 0);
 });
 
-test('实际写入 SQLite 验证', () => {
+test('actual SQLite write verification', () => {
   const db = new Database(':memory:');
   initSchema(db);
 
@@ -91,18 +91,18 @@ test('实际写入 SQLite 验证', () => {
   saveKlinesSync(db, 'monthly_klines', '600519', '1', '贵州茅台', mockKlines);
   saveKlinesSync(db, 'weekly_klines', '600519', '1', '贵州茅台', mockKlines);
 
-  // 验证 stocks
+  // verify stocks
   const stock = db.prepare('SELECT * FROM stocks WHERE code = ?').get('600519');
   assert.equal(stock.name, '贵州茅台');
   assert.equal(stock.market, '1');
 
-  // 验证 klines 分开存储
+  // verify klines stored separately
   const monthlyCount = db.prepare('SELECT count(*) as c FROM monthly_klines').get();
   const weeklyCount = db.prepare('SELECT count(*) as c FROM weekly_klines').get();
   assert.equal(monthlyCount.c, 2);
   assert.equal(weeklyCount.c, 2);
 
-  // 验证字段映射（kline 对象 → SQLite 列）
+  // verify field mapping (kline object -> SQLite columns)
   const row = db.prepare('SELECT * FROM monthly_klines WHERE date = ?').get('2026-03');
   assert.equal(row.open, 100);
   assert.equal(row.close, 110);

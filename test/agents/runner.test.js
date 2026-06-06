@@ -3,7 +3,7 @@ import { test, afterEach, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { runDebate } from '../../lib/agents/runner.js';
 
-// ---- Mock chrome.storage (checkpoint 测试需要) ----
+// ---- Mock chrome.storage (needed for checkpoint tests) ----
 const storageMap = new Map();
 globalThis.chrome = globalThis.chrome || {
   storage: {
@@ -62,9 +62,9 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
-// ---- 完整流程（Bull/Bear/Predictor 并发 + Judge）----
+// ---- Full flow (Bull/Bear/Predictor concurrent + Judge) ----
 
-test('runDebate: 四个 Agent 完整流程', async () => {
+test('runDebate: full 4-Agent flow', async () => {
   let callCount = 0;
   globalThis.fetch = () => {
     callCount++;
@@ -79,20 +79,20 @@ test('runDebate: 四个 Agent 完整流程', async () => {
   };
 
   const result = await runDebate(sampleCtx, sampleOpts);
-  assert.equal(callCount, 4, '应调用 4 次：Bull/Bear/Predictor 并发 + Judge');
+  assert.equal(callCount, 4, 'should call 4 times: Bull/Bear/Predictor concurrent + Judge');
   assert.ok(result.partials.bull);
   assert.ok(result.partials.bear);
   assert.ok(result.partials.predictor);
-  assert.ok(result.judge, 'Judge 应有值');
+  assert.ok(result.judge, 'Judge should have a value');
   assert.equal(result.judge.role, 'judge');
   assert.ok(result.totalCost > 0);
   assert.ok(result.totalDurationMs >= 0);
   assert.equal(result.errors.judge, null);
 });
 
-// ---- 某 Agent 失败时其他仍完成 ----
+// ---- One Agent failure does not affect others ----
 
-test('runDebate: 某个 Agent 失败不影响其他', async () => {
+test('runDebate: single Agent failure does not affect others', async () => {
   const failModel = 'fail-model';
   globalThis.fetch = (url, init) => {
     const body = JSON.parse(init.body);
@@ -109,7 +109,7 @@ test('runDebate: 某个 Agent 失败不影响其他', async () => {
     });
   };
 
-  // Bear 故意用坏 key 模拟失败——这里改用让所有 agent 正常，手动验证 error 为空
+  // Use normal opts for all agents, manually verify errors are null
   const result = await runDebate(sampleCtx, sampleOpts);
   assert.ok(result.partials.bull);
   assert.ok(result.partials.bear);
@@ -119,9 +119,9 @@ test('runDebate: 某个 Agent 失败不影响其他', async () => {
   assert.equal(result.errors.predictor, null);
 });
 
-// ---- 全部失败时 Judge 跳过 ----
+// ---- All failed -> Judge skipped ----
 
-test('runDebate: 全部失败时 Judge 跳过 + judgeError 填充', async () => {
+test('runDebate: all failed -> Judge skipped + judgeError populated', async () => {
   globalThis.fetch = () => Promise.resolve({ status: 500, ok: false, json: () => Promise.resolve({}), text: () => Promise.resolve('Server error') });
 
   const result = await runDebate(sampleCtx, sampleOpts);
@@ -129,14 +129,14 @@ test('runDebate: 全部失败时 Judge 跳过 + judgeError 填充', async () => 
   assert.equal(result.partials.bear, null);
   assert.equal(result.partials.predictor, null);
   assert.equal(result.judge, null);
-  assert.ok(result.errors.judge, 'successCount=0 < 2，应跳过 Judge');
+  assert.ok(result.errors.judge, 'successCount=0 < 2, should skip Judge');
   assert.match(result.errors.judge, /不足 2 个/);
   assert.equal(result.totalCost, 0);
 });
 
-// ---- totalCost 累加 ----
+// ---- totalCost accumulation ----
 
-test('runDebate: totalCost 累加包含 Judge', async () => {
+test('runDebate: totalCost accumulation includes Judge', async () => {
   globalThis.fetch = () => Promise.resolve({
     status: 200, ok: true,
     json: () => Promise.resolve({
@@ -148,24 +148,24 @@ test('runDebate: totalCost 累加包含 Judge', async () => {
 
   const result = await runDebate(sampleCtx, sampleOpts);
   const singleCost = result.partials.bull.cost;
-  assert.ok(result.totalCost >= singleCost * 3.9, `totalCost 应接近 4 倍单 agent 成本,实际 ${result.totalCost} vs ${singleCost * 4}`);
-  assert.ok(result.judge, 'Judge 应有值');
+  assert.ok(result.totalCost >= singleCost * 3.9, `totalCost should be roughly 4x single agent cost, actual ${result.totalCost} vs ${singleCost * 4}`);
+  assert.ok(result.judge, 'Judge should have a value');
 });
 
-// ======== Checkpoint 续跑测试 ========
+// ======== Checkpoint resume tests ========
 
 const CK_KEY = 'debate-wip:1.600519:monthly:2026-04:technical:off';
 
-// 构造一个合法的 checkpoint partial
+// Build a valid checkpoint partial
 function makePartial(role) {
-  return { role, text: `${role} checkpoint 缓存`, usage: { input_tokens: 500, output_tokens: 200 }, cost: 0.01, durationMs: 1000 };
+  return { role, text: `${role} checkpoint cached`, usage: { input_tokens: 500, output_tokens: 200 }, cost: 0.01, durationMs: 1000 };
 }
 
-// 指纹必须匹配 sampleCtx（code=600519, period=monthly, klines[0].date=2026-04-30 close=1600）
-// buildFingerprint: 600519|monthly|2026-04-30:1600 → djb2 hash
-const VALID_FP = '386909631'; // 预计算: djb2('600519|monthly|1|2026-04-30|2026-04-30|1600')
+// Fingerprint must match sampleCtx (code=600519, period=monthly, klines[0].date=2026-04-30 close=1600)
+// buildFingerprint: 600519|monthly|2026-04-30:1600 -> djb2 hash
+const VALID_FP = '386909631'; // precomputed: djb2('600519|monthly|1|2026-04-30|2026-04-30|1600')
 
-test('checkpoint: 无 checkpoint → 三个 Agent 全被调用', async () => {
+test('checkpoint: no checkpoint -> all 3 Agents are called', async () => {
   storageMap.clear();
   let callCount = 0;
   globalThis.fetch = () => {
@@ -183,25 +183,25 @@ test('checkpoint: 无 checkpoint → 三个 Agent 全被调用', async () => {
   const opts = { ...sampleOpts, checkpointKey: CK_KEY };
   const result = await runDebate(sampleCtx, opts);
 
-  // 无 checkpoint：Bull+Bear+Predictor+Judge 都跑 → 4 次 fetch
-  assert.equal(callCount, 4, '无 checkpoint 时应调用 4 次');
+  // No checkpoint: Bull+Bear+Predictor+Judge all run -> 4 fetch calls
+  assert.equal(callCount, 4, 'no checkpoint should call 4 times');
   assert.ok(result.partials.bull);
   assert.ok(result.partials.bear);
   assert.ok(result.partials.predictor);
   assert.ok(result.judge);
 
-  // 验证 checkpoint 已落盘（三个 partial 都写入了）
+  // Verify checkpoint was persisted (all three partials written)
   const stored = storageMap.get(CK_KEY);
-  assert.ok(stored, 'checkpoint 应已落盘');
+  assert.ok(stored, 'checkpoint should be persisted');
   assert.ok(stored.partials.bull);
   assert.ok(stored.partials.bear);
   assert.ok(stored.partials.predictor);
   assert.equal(stored.v, 1);
 });
 
-test('checkpoint: 已有 bull+bear → 只 predictor 与 Judge 被调用', async () => {
+test('checkpoint: existing bull+bear -> only predictor and Judge called', async () => {
   storageMap.clear();
-  // 预设 checkpoint：bull+bear 已完成
+  // Preset checkpoint: bull+bear completed
   const ck = {
     v: 1,
     ts: Date.now(),
@@ -227,26 +227,26 @@ test('checkpoint: 已有 bull+bear → 只 predictor 与 Judge 被调用', async
   const opts = { ...sampleOpts, checkpointKey: CK_KEY };
   const result = await runDebate(sampleCtx, opts);
 
-  // 仅 predictor + judge 调 LLM → 2 次 fetch
-  assert.equal(callCount, 2, 'bull+bear 复用 checkpoint → 只 predictor+judge 调 LLM = 2 次');
+  // Only predictor + judge call LLM -> 2 fetch calls
+  assert.equal(callCount, 2, 'bull+bear reuse checkpoint -> only predictor+judge call LLM = 2 times');
 
-  // 验证 bull 来自 checkpoint
-  assert.equal(result.partials.bull.text, 'bull checkpoint 缓存');
-  assert.equal(result.partials.bear.text, 'bear checkpoint 缓存');
+  // Verify bull from checkpoint
+  assert.equal(result.partials.bull.text, 'bull checkpoint cached');
+  assert.equal(result.partials.bear.text, 'bear checkpoint cached');
 
-  // predictor 和 judge 是新跑的
+  // predictor and judge are fresh runs
   assert.ok(result.partials.predictor);
   assert.ok(result.judge);
-  assert.notEqual(result.partials.predictor.text, 'predictor checkpoint 缓存', 'predictor 应是新跑的');
+  assert.notEqual(result.partials.predictor.text, 'predictor checkpoint cached', 'predictor should be newly run');
 
-  // 验证 checkpoint 已更新（predictor 也落盘了）
+  // Verify checkpoint updated (predictor also persisted)
   const stored = storageMap.get(CK_KEY);
-  assert.ok(stored.partials.predictor, 'predictor 完成后应落盘到 checkpoint');
+  assert.ok(stored.partials.predictor, 'predictor should be persisted to checkpoint after completion');
 });
 
-test('checkpoint: 指纹不匹配 → checkpoint 被丢弃，三个全跑', async () => {
+test('checkpoint: fingerprint mismatch -> checkpoint discarded, all three re-run', async () => {
   storageMap.clear();
-  // 预设 checkpoint，但 fp 错误
+  // Preset checkpoint with wrong fp
   const ck = {
     v: 1,
     ts: Date.now(),
@@ -272,23 +272,23 @@ test('checkpoint: 指纹不匹配 → checkpoint 被丢弃，三个全跑', asyn
   const opts = { ...sampleOpts, checkpointKey: CK_KEY };
   const result = await runDebate(sampleCtx, opts);
 
-  // 指纹不匹配 → 丢弃 checkpoint → 4 次 fetch
-  assert.equal(callCount, 4, '指纹不匹配应丢弃 checkpoint，全部重跑 = 4 次');
+  // Fingerprint mismatch -> discard checkpoint -> 4 fetch calls
+  assert.equal(callCount, 4, 'fingerprint mismatch should discard checkpoint, full re-run = 4 times');
   assert.ok(result.partials.bull);
   assert.ok(result.partials.bear);
   assert.ok(result.partials.predictor);
   assert.ok(result.judge);
 
-  // 旧 checkpoint 已被删除（remove 后 loadCheckpoint 返回 null）
-  // 然后新的已写入
+  // Old checkpoint deleted (remove -> loadCheckpoint returns null)
+  // New checkpoint written
   const stored = storageMap.get(CK_KEY);
-  assert.ok(stored, '新 checkpoint 应已落盘');
-  assert.notEqual(stored.partials.bull.text, 'bull checkpoint 缓存', 'bull 不应是旧值');
+  assert.ok(stored, 'new checkpoint should be persisted');
+  assert.notEqual(stored.partials.bull.text, 'bull checkpoint cached', 'bull should not be old value');
 });
 
-test('checkpoint: ≥2 Agent 成功才调 Judge 规则未被破坏', async () => {
+test('checkpoint: >=2 Agent success required for Judge rule is not broken', async () => {
   storageMap.clear();
-  // checkpoint 只有 bull，bear 和 predictor 都失败 → successCount=1 < 2
+  // Checkpoint only has bull, bear and predictor both fail -> successCount=1 < 2
   const ck = {
     v: 1,
     ts: Date.now(),
@@ -298,7 +298,7 @@ test('checkpoint: ≥2 Agent 成功才调 Judge 规则未被破坏', async () =>
   };
   storageMap.set(CK_KEY, ck);
 
-  // bear 和 predictor 都返回 500
+  // bear and predictor both return 500
   globalThis.fetch = () => Promise.resolve({
     status: 500, ok: false,
     json: () => Promise.resolve({}),
@@ -308,20 +308,20 @@ test('checkpoint: ≥2 Agent 成功才调 Judge 规则未被破坏', async () =>
   const opts = { ...sampleOpts, checkpointKey: CK_KEY };
   const result = await runDebate(sampleCtx, opts);
 
-  // bull 来自 checkpoint，bear+predictor 失败 → successCount=1
-  assert.ok(result.partials.bull, 'bull 复用 checkpoint');
+  // bull from checkpoint, bear+predictor failed -> successCount=1
+  assert.ok(result.partials.bull, 'bull reused from checkpoint');
   assert.equal(result.partials.bear, null);
   assert.equal(result.partials.predictor, null);
-  assert.equal(result.judge, null, 'successCount=1 < 2，不应调 Judge');
+  assert.equal(result.judge, null, 'successCount=1 < 2, should not call Judge');
   assert.ok(result.errors.judge);
   assert.match(result.errors.judge, /不足 2 个/);
 });
 
-// ---- 指纹仅用已收盘 bar 的专项测试 ----
+// ---- Fingerprint uses only closed bars ----
 
-test('checkpoint: 同一 closed bars，当期 bar close 变动 → 指纹不变 → 复用 checkpoint', async () => {
+test('checkpoint: same closed bars, current bar close changes -> fingerprint unchanged -> reuse checkpoint', async () => {
   storageMap.clear();
-  // 预设 checkpoint：bull+bear 已完成
+  // Preset checkpoint: bull+bear completed
   const ck = {
     v: 1,
     ts: Date.now(),
@@ -331,7 +331,7 @@ test('checkpoint: 同一 closed bars，当期 bar close 变动 → 指纹不变 
   };
   storageMap.set(CK_KEY, ck);
 
-  // 构造 ctx：closed bar 不变，但多加一个当期 bar（模拟盘中 close 跳动）
+  // Build ctx: closed bar unchanged, but add a current bar (simulates intra-bar close fluctuation)
   const ctxWithCurrentBar = {
     ...sampleCtx,
     klines: [
@@ -356,16 +356,16 @@ test('checkpoint: 同一 closed bars，当期 bar close 变动 → 指纹不变 
   const opts = { ...sampleOpts, checkpointKey: CK_KEY };
   const result = await runDebate(ctxWithCurrentBar, opts);
 
-  // 当期 bar(2026-05-29)被 isBarClosed 过滤，指纹不变 → bull+bear 复用
-  assert.equal(callCount, 2, '当期 bar close 变动不应影响指纹 → 仅 predictor+judge 调 LLM = 2 次');
-  assert.equal(result.partials.bull.text, 'bull checkpoint 缓存', 'bull 应来自 checkpoint');
-  assert.equal(result.partials.bear.text, 'bear checkpoint 缓存', 'bear 应来自 checkpoint');
+  // Current bar (2026-05-29) filtered by isBarClosed, fingerprint unchanged -> bull+bear reused
+  assert.equal(callCount, 2, 'current bar close change should not affect fingerprint -> only predictor+judge call LLM = 2 times');
+  assert.equal(result.partials.bull.text, 'bull checkpoint cached', 'bull should come from checkpoint');
+  assert.equal(result.partials.bear.text, 'bear checkpoint cached', 'bear should come from checkpoint');
   assert.ok(result.judge);
 });
 
-test('checkpoint: closed bar close 变了 → 指纹不匹配 → 丢弃 checkpoint，全跑', async () => {
+test('checkpoint: closed bar close changed -> fingerprint mismatch -> discard checkpoint, full re-run', async () => {
   storageMap.clear();
-  // 预设 checkpoint：bull+bear 已完成
+  // Preset checkpoint: bull+bear completed
   const ck = {
     v: 1,
     ts: Date.now(),
@@ -375,7 +375,7 @@ test('checkpoint: closed bar close 变了 → 指纹不匹配 → 丢弃 checkpo
   };
   storageMap.set(CK_KEY, ck);
 
-  // 构造 ctx：closed bar close 变了（模拟复权基准切换）
+  // Build ctx: closed bar close changed (simulates adjustment factor switch)
   const ctxChangedClose = {
     ...sampleCtx,
     klines: [
@@ -399,18 +399,18 @@ test('checkpoint: closed bar close 变了 → 指纹不匹配 → 丢弃 checkpo
   const opts = { ...sampleOpts, checkpointKey: CK_KEY };
   const result = await runDebate(ctxChangedClose, opts);
 
-  // closed bar close 从 1600 → 1620，指纹改变 → 丢弃 checkpoint → 全部重跑
-  assert.equal(callCount, 4, 'closed bar close 变了应丢弃 checkpoint，全部重跑 = 4 次');
+  // Closed bar close changed 1600 -> 1620, fingerprint changed -> discard checkpoint -> all re-run
+  assert.equal(callCount, 4, 'closed bar close changed should discard checkpoint, full re-run = 4 times');
   assert.ok(result.partials.bull);
-  assert.notEqual(result.partials.bull.text, 'bull checkpoint 缓存', 'bull 不应复用旧 checkpoint');
+  assert.notEqual(result.partials.bull.text, 'bull checkpoint cached', 'bull should not reuse old checkpoint');
   assert.ok(result.judge);
 });
 
-// ---- #3: failed Agent 不被复用 ----
+// ---- #3: failed Agent is not reused ----
 
-test('checkpoint: 预置 bull 成功 + bear 持久化错误 → bull 复用，bear 重新调用', async () => {
+test('checkpoint: preset bull success + bear persistent error -> bull reused, bear re-called', async () => {
   storageMap.clear();
-  // 预设 checkpoint：bull 成功（partials），bear 失败（errors，不在 partials 中）
+  // Preset checkpoint: bull success (partials), bear failed (errors, not in partials)
   const ck = {
     v: 1,
     ts: Date.now(),
@@ -436,11 +436,11 @@ test('checkpoint: 预置 bull 成功 + bear 持久化错误 → bull 复用，be
   const opts = { ...sampleOpts, checkpointKey: CK_KEY };
   const result = await runDebate(sampleCtx, opts);
 
-  // bull 复用 checkpoint，bear + predictor + judge 调 LLM → 3 次 fetch
-  assert.equal(callCount, 3, 'bull 复用 checkpoint → bear+predictor+judge = 3 次 fetch');
-  assert.equal(result.partials.bull.text, 'bull checkpoint 缓存', 'bull 应来自 checkpoint');
-  assert.ok(result.partials.bear, 'bear 应被重新调用（非跳过）');
-  assert.notEqual(result.partials.bear.text, 'bear checkpoint 缓存', 'bear 不应复用 error 缓存');
+  // bull reused from checkpoint, bear + predictor + judge call LLM -> 3 fetch calls
+  assert.equal(callCount, 3, 'bull reused from checkpoint -> bear+predictor+judge = 3 fetch calls');
+  assert.equal(result.partials.bull.text, 'bull checkpoint cached', 'bull should come from checkpoint');
+  assert.ok(result.partials.bear, 'bear should be re-called (not skipped)');
+  assert.notEqual(result.partials.bear.text, 'bear checkpoint cached', 'bear should not reuse error cache');
   assert.ok(result.partials.predictor);
   assert.ok(result.judge);
 });

@@ -18,7 +18,7 @@ afterEach(() => {
   try { fs.unlinkSync(testFile); } catch (_) {}
 });
 
-test('parseUserReview: 提取勾选通过的建议', async () => {
+test('parseUserReview: extract checked approved suggestions', async () => {
   const { parseUserReview } = await import('../../lib/evaluation/refine.js');
 
   writeTestDraft(`# 草稿复盘 2026-05-14
@@ -35,7 +35,7 @@ test('parseUserReview: 提取勾选通过的建议', async () => {
   assert.ok(approved[1].includes('资金流'));
 });
 
-test('parseUserReview: 无勾选返回空', async () => {
+test('parseUserReview: no checks returns empty', async () => {
   const { parseUserReview } = await import('../../lib/evaluation/refine.js');
 
   writeTestDraft(`# 草稿
@@ -49,7 +49,7 @@ test('parseUserReview: 无勾选返回空', async () => {
   assert.equal(approved.length, 0);
 });
 
-test('parseUserReview: 修改建议', async () => {
+test('parseUserReview: modified suggestion', async () => {
   const { parseUserReview } = await import('../../lib/evaluation/refine.js');
 
   writeTestDraft(`# 草稿
@@ -62,7 +62,7 @@ test('parseUserReview: 修改建议', async () => {
   assert.equal(modified.length, 1);
 });
 
-test('refineWithClaude: 无建议抛错', async () => {
+test('refineWithClaude: no suggestions throws', async () => {
   const { refineWithClaude } = await import('../../lib/evaluation/refine.js');
 
   await assert.rejects(

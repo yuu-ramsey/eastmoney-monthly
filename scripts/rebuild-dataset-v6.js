@@ -1,6 +1,6 @@
 // Step 2: rebuild from v4 jsonl dataset-v6.json
-// 直接复用 v4 的 groundTruth/stockReturn/alpha，
-// 从本地 SQLite 补 cutoffIndex
+// Directly reuse v4 groundTruth/stockReturn/alpha,
+// fill cutoffIndex from local SQLite
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,7 +14,7 @@ const v4Path = path.join(RUNS_DIR, 'v4-signals-2026-05-17-00-41.jsonl');
 const v4Lines = fs.readFileSync(v4Path, 'utf-8').trim().split('\n').filter(Boolean);
 const v4Records = v4Lines.map(l => JSON.parse(l));
 
-// 提取 unique stocks (code → name)
+// Extract unique stocks (code → name)
 const stockMap = new Map();
 for (const r of v4Records) {
   const code = r.code || r.stockCode;
@@ -25,7 +25,7 @@ for (const r of v4Records) {
 }
 console.log(`Unique stocks: ${stockMap.size}`);
 
-// 提取 unique testPoints (去重: code + cutoffDate 唯一)
+// Extract unique testPoints (dedup: code + cutoffDate unique)
 const tpMap = new Map();
 for (const r of v4Records) {
   const code = r.code || r.stockCode;
@@ -41,7 +41,7 @@ for (const r of v4Records) {
 }
 console.log(`Unique testPoints: ${tpMap.size}`);
 
-// 连接 SQLite 补 cutoffIndex
+// Connect SQLite to fill cutoffIndex
 const { getDb } = await import('../lib/db/connection.js');
 const db = getDb();
 
@@ -77,8 +77,8 @@ for (const [key, tp] of tpMap) {
     cutoffIndex: idx,
     evaluationHorizonMonths: 6,
     groundTruth: tp.groundTruth,
-    // actualReturn/alpha 在 v4 eval 中由 runner 实时计算，从 jsonl 可提取
-    actualReturn: 0,  // 占位，runner 会重算
+    // actualReturn/alpha computed live by runner in v4 eval, extractable from jsonl
+    actualReturn: 0,  // placeholder, runner will recalculate
     indexReturn: 0,
     alpha: 0,
   });
@@ -86,7 +86,7 @@ for (const [key, tp] of tpMap) {
 
 console.log(`TestPoints built: ${testPoints.length} (skipped ${skipped})`);
 
-// 从 v4 jsonl 补 actualReturn/alpha（取该 code+cutoffDate 第一条记录的值）
+// Fill actualReturn/alpha from v4 jsonl (take first record value for this code+cutoffDate)
 for (const tp of testPoints) {
   const rec = v4Records.find(r =>
     (r.code || r.stockCode) === tp.stockCode && r.cutoffDate === tp.cutoffDate
@@ -98,13 +98,13 @@ for (const tp of testPoints) {
   }
 }
 
-// GT 分布
+// GT distribution
 const gtDist = {};
 testPoints.forEach(tp => { gtDist[tp.groundTruth] = (gtDist[tp.groundTruth] || 0) + 1; });
-console.log(`GT 分布: ${JSON.stringify(gtDist)}`);
-console.log(`LLM 调用: ${testPoints.length * 4}`);
+console.log(`GT distribution: ${JSON.stringify(gtDist)}`);
+console.log(`LLM calls: ${testPoints.length * 4}`);
 
-// 写入
+// Write output
 const stocks = [...stockMap.entries()].map(([code, name]) => ({
   code,
   market: code.startsWith('6') ? '1' : '0',
@@ -116,12 +116,12 @@ const stocks = [...stockMap.entries()].map(([code, name]) => ({
 const datasetOut = {
   version: 'v6',
   createdAt: new Date().toISOString(),
-  rebuildNote: '从 v4-signals-2026-05-17-00-41.jsonl 提取 40 股票+groundTruth, 本地 SQLite 补 cutoffIndex',
+  rebuildNote: 'Extracted 40 stocks+groundTruth from v4-signals-2026-05-17-00-41.jsonl, filled cutoffIndex from local SQLite',
   stocks,
   testPoints,
 };
 
 const outPath = path.join(EVAL_DIR, 'dataset-v6.json');
 fs.writeFileSync(outPath, JSON.stringify(datasetOut, null, 2), 'utf-8');
-console.log(`\n写入: ${outPath}`);
+console.log(`\nWritten to: ${outPath}`);
 console.log(`stocks=${stocks.length}, testPoints=${testPoints.length}, calls=${testPoints.length * 4}`);

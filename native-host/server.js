@@ -1,6 +1,6 @@
 // Native Messaging Host - receives data from Chrome extension, writes to .eastmoney-ai/storage/
-// 协议：stdin 读 4 字节长度前缀 + JSON，stdout 写相同格式响应
-// Chrome 按需启动此进程，不常驻
+// Protocol: read 4-byte length prefix + JSON from stdin, write same-format response to stdout
+// Chrome launches this process on demand, not resident
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -14,7 +14,7 @@ function ensureStorageDir() {
   if (!fs.existsSync(STORAGE_DIR)) fs.mkdirSync(STORAGE_DIR, { recursive: true });
 }
 
-// 读取长度前缀的消息
+// Read length-prefixed message
 function readMessage() {
   return new Promise((resolve) => {
     const header = Buffer.alloc(4);
@@ -30,15 +30,15 @@ function readMessage() {
       headerOffset += copyLen;
 
       if (headerOffset >= 4) {
-        // 读取小端 uint32
+        // Read little-endian uint32
         bodyLength = header.readUInt32LE(0);
         if (bodyLength > 1024 * 1024) {
-          // 单条消息不超过 1MB
-          sendError('消息过大: ' + bodyLength);
+          // Single message max 1MB
+          sendError('Message too large: ' + bodyLength);
           process.exit(1);
         }
         body = Buffer.alloc(bodyLength);
-        // 继续处理剩余数据
+        // Continue processing remaining data
         const rest = chunk.subarray(copyLen);
         if (rest.length > 0) readBody(rest);
       }
@@ -54,7 +54,7 @@ function readMessage() {
         try {
           resolve(JSON.parse(body.toString('utf-8')));
         } catch (err) {
-          sendError('JSON 解析失败: ' + err.message);
+          sendError('JSON parse failed: ' + err.message);
           resolve(null);
         }
       }
@@ -74,7 +74,7 @@ function readMessage() {
   });
 }
 
-// 写长度前缀的响应
+// Write length-prefixed response
 function sendMessage(obj) {
   const json = JSON.stringify(obj);
   const body = Buffer.from(json, 'utf-8');
@@ -91,11 +91,11 @@ function sendAck(msg) {
   sendMessage({ type: 'ack', message: msg });
 }
 
-// ---- 消息处理 ----
+// ---- Message handling ----
 
 function handleMessage(msg) {
   if (!msg || !msg.type) {
-    sendError('缺少 type 字段');
+    sendError('Missing type field');
     return;
   }
 
@@ -104,7 +104,7 @@ function handleMessage(msg) {
       ensureStorageDir();
       const { payload } = msg;
       if (!payload || !payload.key) {
-        sendError('sync 缺少 payload.key');
+        sendError('sync missing payload.key');
         return;
       }
 
@@ -113,9 +113,9 @@ function handleMessage(msg) {
 
       try {
         fs.writeFileSync(filePath, JSON.stringify(payload.value, null, 2), 'utf-8');
-        sendAck(`同步成功: ${payload.key}`);
+        sendAck(`Sync success: ${payload.key}`);
       } catch (err) {
-        sendError(`写入失败: ${err.message}`);
+        sendError(`Write failed: ${err.message}`);
       }
       break;
     }
@@ -124,7 +124,7 @@ function handleMessage(msg) {
       ensureStorageDir();
       const { items } = msg;
       if (!items || typeof items !== 'object') {
-        sendError('sync_batch 缺少 items');
+        sendError('sync_batch missing items');
         return;
       }
 
@@ -140,13 +140,13 @@ function handleMessage(msg) {
           fail++;
         }
       }
-      sendAck(`批量同步: ${ok} 成功${fail > 0 ? ', ' + fail + ' 失败' : ''}`);
+      sendAck(`Batch sync: ${ok} success${fail > 0 ? ', ' + fail + ' failed' : ''}`);
       break;
     }
 
     case 'query_sector_alpha': {
       handleQuerySectorAlpha(msg).then(sendMessage).catch(err => sendError(err.message));
-      return; // 异步响应，不立即 break
+      return; // Async response, don't break immediately
     }
 
     case 'ping': {
@@ -157,7 +157,7 @@ function handleMessage(msg) {
     case 'read': {
       ensureStorageDir();
       const key = String(msg.key || '').replace(/[:*?"<>|]/g, '_');
-      if (!key) { sendError('read 缺少 key'); break; }
+      if (!key) { sendError('read missing key'); break; }
       const filePath = path.join(STORAGE_DIR, `${key}.json`);
       try {
         if (!fs.existsSync(filePath)) {
@@ -167,7 +167,7 @@ function handleMessage(msg) {
           sendMessage({ type: 'read_result', key: msg.key, data, exists: true });
         }
       } catch (err) {
-        sendError(`读取失败: ${err.message}`);
+        sendError(`Read failed: ${err.message}`);
       }
       break;
     }
@@ -180,18 +180,18 @@ function handleMessage(msg) {
         const filePath = path.join(STORAGE_DIR, `${safeKey}.json`);
         try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch (_) { /* ignore */ }
       }
-      sendAck('删除完成');
+      sendAck('Removal complete');
       break;
     }
 
     default:
-      sendError(`未知消息类型: ${msg.type}`);
+      sendError(`Unknown message type: ${msg.type}`);
   }
 }
 
 async function handleQuerySectorAlpha(msg) {
   const { code, period = 'monthly', lookback = 12 } = msg;
-  if (!code) return { type: 'error', message: '缺少 code' };
+  if (!code) return { type: 'error', message: 'Missing code' };
 
   try {
     const { getDb } = await import('../lib/db/connection.js');
@@ -204,17 +204,17 @@ async function handleQuerySectorAlpha(msg) {
   }
 }
 
-// ---- 主循环 ----
+// ---- Main loop ----
 
 async function main() {
   while (true) {
     const msg = await readMessage();
-    if (msg === null) break; // stdin 关闭
+    if (msg === null) break; // stdin closed
     handleMessage(msg);
   }
 }
 
 main().catch((err) => {
-  try { sendError('进程异常: ' + err.message); } catch (_) { /* ignore */ }
+  try { sendError('Process error: ' + err.message); } catch (_) { /* ignore */ }
   process.exit(1);
 });

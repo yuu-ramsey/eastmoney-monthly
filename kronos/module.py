@@ -21,12 +21,12 @@ from torch.autograd import Function
 
 
 # ============================================================
-# 可微分熵估计 — 用于 BSQ 码本使用率正则化
-# 论文: Binary Spherical Quantization (arxiv 2406.07548)
+# Differentiable entropy estimation — for BSQ codebook utilization regularization
+# Paper: Binary Spherical Quantization (arxiv 2406.07548)
 # ============================================================
 
 class DifferentiableEntropyFunction(Function):
-    """可微分码本熵损失：用直方图近似码本使用分布的熵"""
+    """Differentiable codebook entropy loss: approximate codebook usage distribution entropy via histogram"""
 
     @staticmethod
     def forward(ctx, zq, basis, K, eps):
@@ -54,29 +54,29 @@ class DifferentiableEntropyFunction(Function):
 
 
 def codebook_entropy(zq, basis, K, eps=1e-4):
-    """码本熵包装函数"""
+    """Codebook entropy wrapper function"""
     return DifferentiableEntropyFunction.apply(zq, basis, K, eps)
 
 
 # ============================================================
 # Binary Spherical Quantizer (BSQ)
-# 将连续向量量化为 {-1, +1}^D 的二元球面码字
+# Quantizes continuous vectors into {-1, +1}^D binary spherical codewords
 # ============================================================
 
 class BinarySphericalQuantizer(nn.Module):
     """
-    二元球面量化器。
+    Binary Spherical Quantizer.
 
-    将归一化后的连续向量 z 通过 sign(z) 量化为二元向量 z_hat ∈ {-1, +1}^D，
-    训练时通过 straight-through estimator 传递梯度。
+    Quantizes a normalized continuous vector z into a binary vector z_hat in {-1, +1}^D
+    via sign(z), using straight-through estimator for gradient propagation during training.
 
     Args:
-        embed_dim: 码字维度（比特数）
-        beta: commit loss 权重
-        gamma0: 逐样本熵惩罚权重
-        gamma: 码本熵奖励权重（鼓励码本利用率）
-        zeta: 总熵惩罚缩放
-        group_size: 分组大小（用于熵近似计算）
+        embed_dim: codeword dimension (bit count)
+        beta: commit loss weight
+        gamma0: per-sample entropy penalty weight
+        gamma: codebook entropy reward weight (encourages codebook utilization)
+        zeta: total entropy penalty scaling
+        group_size: group size (for entropy approximation computation)
     """
 
     def __init__(
@@ -102,7 +102,7 @@ class BinarySphericalQuantizer(nn.Module):
         self.zeta = zeta
         self.input_format = input_format
 
-        assert self.embed_dim % group_size == 0, "embed_dim 必须能被 group_size 整除"
+        assert self.embed_dim % group_size == 0, "embed_dim must be divisible by group_size"
         self.num_groups = self.embed_dim // group_size
         self.group_size = group_size
         self.persample_entropy_compute = persample_entropy_compute
@@ -110,14 +110,14 @@ class BinarySphericalQuantizer(nn.Module):
         self.l2_norm = l2_norm
         self.inv_temperature = inv_temperature
 
-        # 位权基向量（用于将二元码转换为整数索引）
+        # Bit-weight basis vectors (for converting binary codes to integer indices)
         self.register_buffer('basis', 2 ** torch.arange(embed_dim - 1, -1, -1))
         self.register_buffer('group_basis', 2 ** torch.arange(group_size - 1, -1, -1))
 
         self.num_dimensions = 2 ** embed_dim
         self.bits_per_index = embed_dim
 
-        # 分组码本（用于近似熵计算）
+        # Grouped codebook (for approximate entropy computation)
         group_codes = torch.arange(2 ** self.group_size)
         group_codebook = self.indexes_to_codes(group_codes).float()[:, -group_size:]
         self.register_buffer('group_codebook', group_codebook, persistent=False)
@@ -134,7 +134,7 @@ class BinarySphericalQuantizer(nn.Module):
         return z + (zhat - z).detach()
 
     def forward(self, z: torch.Tensor, collect_metrics: bool = True):
-        """前向传播：量化 + 计算损失"""
+        """Forward pass: quantization + loss computation"""
         zq = self.quantize(z)
         q_scale = 1.0 / (self.embed_dim ** 0.5) if self.l2_norm else 1.0
         zq = zq * q_scale
@@ -170,7 +170,7 @@ class BinarySphericalQuantizer(nn.Module):
         )
 
     def soft_entropy_loss(self, z: torch.Tensor):
-        """软分配熵估计：用分组码本近似逐样本熵和码本熵"""
+        """Soft-assignment entropy estimation: approximate per-sample and codebook entropy using grouped codebook"""
         group_code_book = self.group_codebook / (self.embed_dim ** 0.5 if self.l2_norm else 1)
         divided_z = rearrange(z, '... (g c) -> ... g c', c=self.group_size)
 
@@ -193,7 +193,7 @@ class BinarySphericalQuantizer(nn.Module):
         return per_sample_entropy, codebook_entropy_val.sum(), avg_prob
 
     def get_hard_per_sample_entropy(self, zb_by_sample: torch.Tensor) -> torch.Tensor:
-        """硬分配逐样本熵（基于统计频率）"""
+        """Hard-assignment per-sample entropy (based on statistical frequency)"""
         probs_per_dim = zb_by_sample.sum(1) / zb_by_sample.shape[1]
         persample_entropy = (
             -probs_per_dim * torch.log(probs_per_dim + 1e-8)
@@ -202,22 +202,22 @@ class BinarySphericalQuantizer(nn.Module):
         return persample_entropy.sum(-1).mean()
 
     def codes_to_indexes(self, zhat: torch.Tensor) -> torch.Tensor:
-        """二元码 {-1,+1} → 整数索引（大端序）"""
+        """Binary codes {-1,+1} -> integer indices (big-endian)"""
         return ((zhat + 1) / 2 * self.basis).sum(axis=-1).to(torch.int64)
 
     def codes_to_group_indexes(self, zhat: torch.Tensor) -> torch.Tensor:
-        """二元码 → 分组整数索引"""
+        """Binary codes -> grouped integer indices"""
         zhat_in_group = rearrange(zhat, 'b ... (g c) -> b ... g c', c=self.group_size)
         return ((zhat_in_group + 1) / 2 * self.group_basis).sum(axis=-1).to(torch.int64)
 
     def indexes_to_codes(self, indices: torch.Tensor) -> torch.Tensor:
-        """整数索引 → 二元码 {-1,+1}"""
+        """Integer indices -> binary codes {-1,+1}"""
         indices = indices.unsqueeze(-1)
         codes_non_centered = torch.remainder(torch.floor_divide(indices, self.basis), 2)
         return codes_non_centered * 2 - 1
 
     def group_indexes_to_codes(self, group_indices: torch.Tensor) -> torch.Tensor:
-        """分组索引 → 二元码"""
+        """Grouped indices -> binary codes"""
         group_indices = group_indices.unsqueeze(-1)
         codes_non_centered = torch.remainder(torch.floor_divide(group_indices, self.group_basis), 2)
         codes_non_centered = rearrange(codes_non_centered, 'b ... g c -> b ... (g c)')
@@ -231,14 +231,14 @@ class BinarySphericalQuantizer(nn.Module):
         return -(probs * torch.log(probs + 1e-8)).sum(dim=dim)
 
     def get_codebook_entry(self, indices: torch.Tensor) -> torch.Tensor:
-        """索引 → 量化向量（含缩放）"""
+        """Indices -> quantized vector (with scaling)"""
         z_q = self.indexes_to_codes(indices)
         q_scale = 1.0 / (self.embed_dim ** 0.5) if self.l2_norm else 1.0
         z_q = z_q * q_scale
         return z_q
 
     def get_group_codebook_entry(self, group_indices: torch.Tensor) -> torch.Tensor:
-        """分组索引 → 量化向量"""
+        """Grouped indices -> quantized vector"""
         z_q = self.group_indexes_to_codes(group_indices)
         q_scale = 1.0 / (self.embed_dim ** 0.5) if self.l2_norm else 1.0
         z_q = z_q * q_scale
@@ -246,12 +246,12 @@ class BinarySphericalQuantizer(nn.Module):
 
 
 # ============================================================
-# BSQuantizer — BSQ 包装器
-# 将输入向量 L2 归一化后量化，输出 s1/s2 双级 token 索引
+# BSQuantizer — BSQ wrapper
+# L2-normalizes input vectors then quantizes, outputting s1/s2 dual-level token indices
 # ============================================================
 
 class BSQuantizer(nn.Module):
-    """BSQ 包装器：归一化 + BSQ 量化 → s1(粗粒度) + s2(细粒度) token"""
+    """BSQ wrapper: normalization + BSQ quantization -> s1 (coarse) + s2 (fine) tokens"""
 
     def __init__(self, s1_bits: int, s2_bits: int, beta: float, gamma0: float, gamma: float,
                  zeta: float, group_size: int):
@@ -264,7 +264,7 @@ class BSQuantizer(nn.Module):
         )
 
     def bits_to_indices(self, bits: torch.Tensor) -> torch.Tensor:
-        """二元码 → 整数索引"""
+        """Binary codes -> integer indices"""
         bits = (bits >= 0).to(torch.long)
         indices = 2 ** torch.arange(0, bits.shape[-1], 1, dtype=torch.long, device=bits.device)
         return (bits * indices).sum(-1)
@@ -273,7 +273,7 @@ class BSQuantizer(nn.Module):
         z = F.normalize(z, dim=-1)
         quantized, bsq_loss, metrics = self.bsq(z, collect_metrics=collect_metrics)
         if half:
-            # 分离 s1（前 s1_bits）和 s2（后 s2_bits）
+            # Split s1 (first s1_bits) and s2 (last s2_bits)
             q_pre = quantized[:, :, :self.s1_bits]
             q_post = quantized[:, :, self.s1_bits:]
             z_indices = [self.bits_to_indices(q_pre), self.bits_to_indices(q_post)]
@@ -283,11 +283,11 @@ class BSQuantizer(nn.Module):
 
 
 # ============================================================
-# RMS 归一化
+# RMS Normalization
 # ============================================================
 
 class RMSNorm(torch.nn.Module):
-    """RMS 归一化（比 LayerNorm 更快，去掉了均值中心化）"""
+    """RMS Normalization (faster than LayerNorm, removes mean centering)"""
 
     def __init__(self, dim: int, eps: float = 1e-5):
         super().__init__()
@@ -303,11 +303,11 @@ class RMSNorm(torch.nn.Module):
 
 
 # ============================================================
-# SwiGLU 前馈网络
+# SwiGLU Feed-Forward Network
 # ============================================================
 
 class FeedForward(nn.Module):
-    """SwiGLU 前馈：w2(SiLU(w1(x)) * w3(x))"""
+    """SwiGLU feed-forward: w2(SiLU(w1(x)) * w3(x))"""
 
     def __init__(self, d_model: int, ff_dim: int, ffn_dropout_p: float = 0.0):
         super().__init__()
@@ -325,7 +325,7 @@ class FeedForward(nn.Module):
 # ============================================================
 
 class RotaryPositionalEmbedding(nn.Module):
-    """旋转位置编码（RoPE），用于自注意力和交叉注意力"""
+    """Rotary Positional Embedding (RoPE), used for self-attention and cross-attention"""
 
     def __init__(self, dim: int):
         super().__init__()
@@ -358,11 +358,11 @@ class RotaryPositionalEmbedding(nn.Module):
 
 
 # ============================================================
-# 多头注意力（带 RoPE）
+# Multi-Head Attention (with RoPE)
 # ============================================================
 
 class MultiHeadAttentionWithRoPE(nn.Module):
-    """因果自注意力 + RoPE 位置编码"""
+    """Causal self-attention + RoPE positional encoding"""
 
     def __init__(self, d_model: int, n_heads: int, attn_dropout_p: float = 0.0,
                  resid_dropout_p: float = 0.0):
@@ -406,7 +406,7 @@ class MultiHeadAttentionWithRoPE(nn.Module):
 
 
 class MultiHeadCrossAttentionWithRoPE(nn.Module):
-    """交叉注意力 + RoPE：query 来自当前 token，key/value 来自上下文"""
+    """Cross-attention + RoPE: query from current token, key/value from context"""
 
     def __init__(self, d_model: int, n_heads: int, attn_dropout_p: float = 0.0,
                  resid_dropout: float = 0.0):
@@ -454,11 +454,11 @@ class MultiHeadCrossAttentionWithRoPE(nn.Module):
 
 
 # ============================================================
-# Transformer 块
+# Transformer Block
 # ============================================================
 
 class TransformerBlock(nn.Module):
-    """标准 Pre-LN Transformer 块：自注意力 + SwiGLU FFN"""
+    """Standard Pre-LN Transformer block: self-attention + SwiGLU FFN"""
 
     def __init__(self, d_model: int, n_heads: int, ff_dim: int = 1024,
                  ffn_dropout_p: float = 0.0, attn_dropout_p: float = 0.0,
@@ -476,15 +476,15 @@ class TransformerBlock(nn.Module):
 
 
 # ============================================================
-# 分层嵌入 — s1(粗粒度) + s2(细粒度) token 融合
+# Hierarchical Embedding — s1 (coarse) + s2 (fine) token fusion
 # ============================================================
 
 class HierarchicalEmbedding(nn.Module):
     """
-    分层嵌入：s1(粗粒度趋势) + s2(细粒度波动) → 融合向量
+    Hierarchical embedding: s1 (coarse trend) + s2 (fine fluctuation) -> fused vector
 
-    s1_bits 位粗 token（高位） + s2_bits 位细 token（低位）
-    → 各自查 Embedding 表 → concat → Linear 融合
+    s1_bits-bit coarse token (high bits) + s2_bits-bit fine token (low bits)
+    -> each looks up its Embedding table -> concat -> Linear fusion
     """
 
     def __init__(self, s1_bits: int, s2_bits: int, d_model: int = 256):
@@ -504,15 +504,15 @@ class HierarchicalEmbedding(nn.Module):
         nn.init.normal_(self.emb_s2.weight, mean=0, std=d_model ** -0.5)
 
     def split_token(self, token_ids: torch.Tensor, s2_bits: int):
-        """复合 token → (s1_ids, s2_ids)"""
+        """Composite token -> (s1_ids, s2_ids)"""
         t = token_ids.long()
         mask = (1 << s2_bits) - 1
-        s2_ids = t & mask          # 低位 = 细粒度
-        s1_ids = t >> s2_bits      # 高位 = 粗粒度
+        s2_ids = t & mask          # Low bits = fine-grained
+        s1_ids = t >> s2_bits      # High bits = coarse-grained
         return s1_ids, s2_ids
 
     def forward(self, token_ids: Union[Tuple[torch.Tensor, torch.Tensor], torch.Tensor]) -> torch.Tensor:
-        """输入 (s1_ids, s2_ids) 或复合 token → [B, T, d_model]"""
+        """Input (s1_ids, s2_ids) or composite token -> [B, T, d_model]"""
         if isinstance(token_ids, (tuple, list)):
             s1_ids, s2_ids = token_ids
         else:
@@ -524,13 +524,13 @@ class HierarchicalEmbedding(nn.Module):
 
 
 # ============================================================
-# 依赖感知层 — s1 预测 → s2 条件交叉注意力
+# Dependency-Aware Layer — s1 prediction -> s2 conditional cross-attention
 # ============================================================
 
 class DependencyAwareLayer(nn.Module):
     """
-    s1→s2 依赖感知层：用已解码的 s1 token 作为 query，
-    对 Transformer 上下文做交叉注意力，实现 s2 对 s1 的条件依赖。
+    s1->s2 dependency-aware layer: uses decoded s1 token as query,
+    performs cross-attention on Transformer context, implementing s2's conditional dependency on s1.
     """
 
     def __init__(self, d_model: int, n_heads: int = 4, attn_dropout_p: float = 0.0,
@@ -551,11 +551,11 @@ class DependencyAwareLayer(nn.Module):
 
 
 # ============================================================
-# 双头输出 — s1 粗粒度 + s2 细粒度 分类头
+# Dual-Head Output — s1 coarse + s2 fine classification heads
 # ============================================================
 
 class DualHead(nn.Module):
-    """双头输出：s1_head(趋势) + s2_head(波动)"""
+    """Dual-head output: s1_head (trend) + s2_head (fluctuation)"""
 
     def __init__(self, s1_bits: int, s2_bits: int, d_model: int):
         super().__init__()
@@ -567,7 +567,7 @@ class DualHead(nn.Module):
     def compute_loss(self, s1_logits: torch.Tensor, s2_logits: torch.Tensor,
                      s1_targets: torch.Tensor, s2_targets: torch.Tensor,
                      padding_mask: Optional[torch.Tensor] = None):
-        """交叉熵损失（s1 + s2 平均）"""
+        """Cross-entropy loss (s1 + s2 averaged)"""
         if padding_mask is not None:
             valid_mask = (padding_mask == 0)
             s1_logits = s1_logits[valid_mask]
@@ -579,20 +579,20 @@ class DualHead(nn.Module):
         return (ce_s1 + ce_s2) / 2, ce_s1, ce_s2
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """s1 输出头"""
+        """s1 output head"""
         return self.proj_s1(x)
 
     def cond_forward(self, x2: torch.Tensor) -> torch.Tensor:
-        """s2 条件输出头（在 s1 已解码后调用）"""
+        """s2 conditional output head (called after s1 is decoded)"""
         return self.proj_s2(x2)
 
 
 # ============================================================
-# 时间戳嵌入 — 将分钟/小时/星期/日/月编码为连续向量
+# Temporal Embedding — encodes minute/hour/weekday/day/month as continuous vectors
 # ============================================================
 
 class FixedEmbedding(nn.Module):
-    """固定位置编码（正弦/余弦），不可学习"""
+    """Fixed positional encoding (sine/cosine), non-learnable"""
 
     def __init__(self, c_in: int, d_model: int):
         super().__init__()
@@ -614,8 +614,8 @@ class FixedEmbedding(nn.Module):
 
 class TemporalEmbedding(nn.Module):
     """
-    时间戳嵌入：将 5 维时间特征（分钟/小时/星期/日/月）
-    分别查表嵌入后求和，注入到 token 嵌入中
+    Temporal embedding: takes 5-dim time features (minute/hour/weekday/day/month),
+    looks up each via separate embedding tables, sums them, and injects into token embeddings.
     """
 
     def __init__(self, d_model: int, learn_pe: bool):

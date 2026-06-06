@@ -110,12 +110,12 @@ def evaluate_policy(policy, signals, returns, test_months, use_rl=True):
 
 # Define OOS test windows
 windows = [
-    ('2019', '2015-01', '2018-12', '2019-01', '2019-12', '牛市反弹'),
-    ('2020', '2016-01', '2019-12', '2020-01', '2020-12', '牛市'),
-    ('2021', '2017-01', '2020-12', '2021-01', '2021-12', '结构性牛'),
-    ('2022', '2018-01', '2021-12', '2022-01', '2022-12', '熊市'),
-    ('2023', '2019-01', '2022-12', '2023-01', '2023-12', '震荡熊'),
-    ('2024-25', '2020-01', '2023-12', '2024-01', '2025-12', '牛市'),
+    ('2019', '2015-01', '2018-12', '2019-01', '2019-12', 'Bull Rebound'),
+    ('2020', '2016-01', '2019-12', '2020-01', '2020-12', 'Bull'),
+    ('2021', '2017-01', '2020-12', '2021-01', '2021-12', 'Structural Bull'),
+    ('2022', '2018-01', '2021-12', '2022-01', '2022-12', 'Bear'),
+    ('2023', '2019-01', '2022-12', '2023-01', '2023-12', 'Choppy Bear'),
+    ('2024-25', '2020-01', '2023-12', '2024-01', '2025-12', 'Bull'),
 ]
 
 def compute_metrics(rets, hs300):
@@ -201,7 +201,7 @@ valid_results = [r for r in results if r is not None]
 n_better = sum(1 for r in valid_results if r['rl_sr'] > r['ew_sr'])
 n_total = len(valid_results)
 avg_ir = np.mean([r['ir'] for r in valid_results])
-has_bear_boost = any(r['delta'] > 0.10 and '熊' in r['market'] for r in valid_results)
+has_bear_boost = any(r['delta'] > 0.10 and 'Bear' in r['market'] for r in valid_results)
 bear_delta = sr_rl18 - sr_hs18
 
 print(f"  RL > EW in {n_better}/{n_total} windows")

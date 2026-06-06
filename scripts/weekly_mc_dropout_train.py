@@ -1,13 +1,13 @@
 """Weekly MC Dropout denoising training: uncertainty quantification + discounted target + walk-forward evaluation
 
-Denoising strategy：
-  1. 目标降噪：折扣多月回报（γ=0.9, 13w+26w+39w+52w）
-  2. 推断降噪：MC Dropout 50次采样 → cv = std/|mean|
-  3. 信号降噪：过滤 high uncertainty (cv≥0.7) → 去除~31%噪音信号
+Denoising strategy:
+  1. Target denoising: discounted multi-horizon return (gamma=0.9, 13w+26w+39w+52w)
+  2. Inference denoising: MC Dropout 50 samples -> cv = std/|mean|
+  3. Signal denoising: filter high uncertainty (cv>=0.7) -> remove ~31% noisy signals
 
 Usage:
-  python scripts/weekly_mc_dropout_train.py           # 完整训练+评估
-  python scripts/weekly_mc_dropout_train.py --quick   # 快速模式（少epoch）
+  python scripts/weekly_mc_dropout_train.py           # full training+evaluation
+  python scripts/weekly_mc_dropout_train.py --quick   # quick mode (fewer epochs)
 """
 import torch, torch.nn as nn, numpy as np, pandas as pd, sqlite3, time, argparse
 from pathlib import Path
@@ -20,14 +20,14 @@ OUT = PROJECT / '.eastmoney-ai' / 'lstm'
 DB = PROJECT / '.eastmoney-ai' / 'db' / 'klines-v2.sqlite'
 DEVICE = torch.device('cuda')
 FEATURE_DIM = 16
-LOOKBACK = 104  # 2年周线
+LOOKBACK = 104  # 2-year weekly bars
 MC_SAMPLES = 50
 GAMMA = 0.9
 
 print(f"Device: {torch.cuda.get_device_name(0)}")
 print(f"MC Samples: {MC_SAMPLES}, Lookback: {LOOKBACK}w, Features: {FEATURE_DIM}")
 
-# ======== 1. 数据Loaded + 安全特征 + 折扣目标 ========
+# ======== 1. Load data + safe features + discounted target ========
 print("\n1/5 Loading weekly data + building safe features + discounted target...")
 
 conn = sqlite3.connect(str(DB))
@@ -82,25 +82,25 @@ def build_safe_sequences(df_merged):
         al = pd.Series(loss).ewm(alpha=1/14).mean().values
         F[:, 8] = np.nan_to_num(100 - 100/(1 + ag/np.maximum(al, 1e-8)), 50)
 
-        # [9:13] 周线动量 (1w, 4w, 13w, 26w, 52w)
+        # [9:13] Weekly momentum (1w, 4w, 13w, 26w, 52w)
         for j, w in enumerate([1, 4, 13, 26, 52]):
             for i in range(n):
                 if i >= w and closes[i-w] > 0.01:
                     F[i, 9+j] = np.clip((closes[i] - closes[i-w]) / closes[i-w], -2, 2)
 
-        # [14] 52周位置
+        # [14] 52-week position
         for i in range(n):
             lo = max(0, i-52)
             h52 = highs[lo:i+1].max(); l52 = lows[lo:i+1].min()
             F[i, 14] = (closes[i] - l52) / max(h52 - l52, 0.01)
 
-        # [15] MA20 位置
+        # [15] MA20 position
         ma20 = pd.Series(closes).rolling(20).mean().values
         F[:, 15] = np.nan_to_num((closes - ma20) / np.maximum(closes, 0.01), 0)
 
         F = np.nan_to_num(F, 0.0)
 
-        # 构建序列 + 折扣目标
+        # Build sequences + discounted target
         for i in range(LOOKBACK-1, n - 52):
             if closes[i] <= 0.01:
                 continue
@@ -125,12 +125,12 @@ def build_safe_sequences(df_merged):
 
 X, Y, dates, codes = build_safe_sequences(w_raw)
 
-# 清理 NaN
+# Clean NaN
 mask = np.isfinite(Y) & ~np.isnan(X).any(axis=(1, 2))
 X, Y, dates, codes = X[mask], Y[mask], dates[mask], codes[mask]
 print(f"  Clean sequences: {X.shape}, Target: mean={Y.mean():.4f}, std={Y.std():.4f}")
 
-# 时间分割
+# Time split
 train_m = (dates >= '2015-01') & (dates <= '2021-12')
 val_m = (dates >= '2022-01') & (dates <= '2023-12')
 test_m = (dates >= '2024-01')
@@ -141,7 +141,7 @@ Xte, Yte = X[test_m], Y[test_m]
 te_dates = dates[test_m]
 te_codes = codes[test_m]
 
-# 标准化（训练集统计量）
+# Standardization (train set statistics)
 X_mean = Xtr.mean(axis=(0, 1), keepdims=True)
 X_std = Xtr.std(axis=(0, 1), keepdims=True) + 1e-8
 Xtr = (Xtr - X_mean) / X_std
@@ -155,7 +155,7 @@ Yva_n = (Yva - Y_mean_tr) / Y_std_tr
 
 print(f"  Train: {Xtr.shape}, Val: {Xva.shape}, Test: {Xte.shape}")
 
-# ======== 2. MC Dropout 模型 ========
+# ======== 2. MC Dropout models ========
 print("\n2/5 Building MC Dropout models...")
 
 
@@ -192,8 +192,8 @@ class MCGRU(nn.Module):
 
 
 def mc_predict(model, X_tensor, n_samples=MC_SAMPLES, batch_size=256):
-    """MC Dropout 推断：N次前向传播，分batch避免OOM"""
-    model.train()  # dropout 活跃
+    """MC Dropout inference: N forward passes, batched to avoid OOM"""
+    model.train()  # dropout active
     n_total = X_tensor.shape[0]
     all_mean = np.zeros(n_total, dtype=np.float32)
     all_std = np.zeros(n_total, dtype=np.float32)
@@ -214,14 +214,14 @@ def mc_predict(model, X_tensor, n_samples=MC_SAMPLES, batch_size=256):
 
 
 def uncertainty_level(cv):
-    """cv ≥ 0.7 → high, cv < 0.3 → low, else medium"""
+    """cv >= 0.7 -> high, cv < 0.3 -> low, else medium"""
     levels = np.full(len(cv), 'medium', dtype=object)
     levels[cv < 0.3] = 'low'
     levels[cv >= 0.7] = 'high'
     return levels
 
 
-# ======== 3. 训练 ========
+# ======== 3. Training ========
 print("\n3/5 Training...")
 
 parser = argparse.ArgumentParser()
@@ -301,9 +301,9 @@ for name, cls, kwargs in model_configs:
     model, best_ic = train_one(cls(**kwargs), name, Xtr, Ytr_n, Xva, Yva_n, EPOCHS, PATIENCE)
     elapsed = time.time() - t0
     trained_models[name] = (model, best_ic)
-    print(f" → Val IC={best_ic:.4f}, {elapsed:.0f}s")
+    print(f" -> Val IC={best_ic:.4f}, {elapsed:.0f}s")
 
-# ======== 4. MC Dropout 推断 + 不确定性分层评估 ========
+# ======== 4. MC Dropout inference + uncertainty-stratified evaluation ========
 print(f"\n4/5 MC Dropout inference on test set ({len(Xte)} samples)...")
 
 Xte_t = torch.from_numpy(Xte).float().to(DEVICE)
@@ -312,16 +312,16 @@ for name, (model, val_ic) in trained_models.items():
     t0 = time.time()
     model.to(DEVICE)
 
-    # MC 推断
+    # MC inference
     mean, std, cv = mc_predict(model, Xte_t, MC_SAMPLES)
     ulevel = uncertainty_level(cv)
     torch.cuda.empty_cache()
 
-    # 反标准化回到原始尺度
+    # De-normalize back to original scale
     pred = mean * Y_std_tr + Y_mean_tr
-    y_true = Yte  # 原始尺度
+    y_true = Yte  # original scale
 
-    # 整体指标
+    # Overall metrics
     ic_all = spearmanr(pred, y_true)[0]
     n = len(pred)
     cut = int(n * 0.3)
@@ -329,7 +329,7 @@ for name, (model, val_ic) in trained_models.items():
     ls = y_true[idx[-cut:]] - y_true[idx[:cut]]
     sr = ls.mean() / ls.std() * np.sqrt(52/13) if ls.std() > 0 else 0
 
-    # 不确定性分层
+    # Uncertainty stratification
     strata = {}
     for level in ['low', 'medium', 'high']:
         m = ulevel == level
@@ -338,7 +338,7 @@ for name, (model, val_ic) in trained_models.items():
             continue
         p_s = pred[m]; y_s = y_true[m]
         ic_s = spearmanr(p_s, y_s)[0]
-        # F1 (方向预测)
+        # F1 (directional prediction)
         pred_dir = (p_s > 0).astype(int)
         true_dir = (y_s > 0).astype(int)
         if len(np.unique(pred_dir)) > 1 and len(np.unique(true_dir)) > 1:
@@ -356,7 +356,7 @@ for name, (model, val_ic) in trained_models.items():
             'avg_score': float(np.abs(p_s).mean()),
         }
 
-    # 过滤 high uncertainty 后
+    # After filtering high uncertainty
     keep = ulevel != 'high'
     pred_f = pred[keep]; y_f = y_true[keep]
     ic_f = spearmanr(pred_f, y_f)[0] if len(pred_f) > 10 else None
@@ -373,7 +373,7 @@ for name, (model, val_ic) in trained_models.items():
     print(f"    High: {pct_high:.0f}%  IC={strata['high']['ic']:.4f}" if strata['high']['ic'] else f"    High: {pct_high:.0f}%  IC=N/A")
     print(f"    Filtered (no high): IC={ic_f:.4f}  N={int(keep.sum())}")
 
-    # Save到 trained_models 供后续用
+    # Save to trained_models for later use
     trained_models[name] = (model, val_ic, {
         'ic_all': ic_all, 'sr': sr,
         'ic_filtered': ic_f,
@@ -382,14 +382,14 @@ for name, (model, val_ic) in trained_models.items():
         'dates': te_dates, 'codes': te_codes,
     })
 
-# ======== 5. Walk-Forward 对比（用 Ridge/LGB baseline） ========
+# ======== 5. Walk-Forward comparison (using Ridge/LGB baselines) ========
 print(f"\n5/5 Walk-forward comparison (MC models vs Ridge/LGB baselines)...")
 
-# 用 MC 模型的预计算预测做 walk-forward IC
+# Use MC model precomputed predictions for walk-forward IC
 from sklearn.linear_model import Ridge
 import lightgbm as lgb
 
-# 重建周线特征 dataframe（复用 weekly_noise_reduction 的特征）
+# Rebuild weekly feature dataframe (reuse weekly_noise_reduction features)
 df_feat_rows = []
 for code in sorted(w_raw['code'].unique()):
     g = w_raw[w_raw['code'] == code].sort_values('date').reset_index(drop=True)
@@ -506,9 +506,9 @@ for month in months_wf:
     except Exception:
         pass
 
-# ======== 最终报告 ========
+# ======== Final report ========
 print(f"\n{'='*70}")
-print("FINAL: MC Dropout 降噪训练报告")
+print("FINAL: MC Dropout Denoising Training Report")
 print(f"{'='*70}")
 
 print(f"\n{'Model':<20} {'IC All':>8} {'IC Filt':>8} {'IC Low':>8} {'IC Med':>8} {'IC High':>8} {'Val IC':>8} {'SR':>8}")
@@ -532,11 +532,11 @@ for name, (model, val_ic, res) in trained_models.items():
     gain = (res['ic_filtered'] - res['ic_all']) / max(abs(res['ic_all']), 0.001) * 100
     print(f"  {name:<20} {low_p:7.1f}% {med_p:7.1f}% {high_p:7.1f}% {gain:+9.1f}%")
 
-# F1 分层
+# F1 stratification
 print(f"\n{'Model':<20} {'F1 All':>8} {'F1 Low':>8} {'F1 Med':>8} {'F1 High':>8}")
 print(f"{'-'*20} {'-'*8} {'-'*8} {'-'*8} {'-'*8}")
 for name, (model, val_ic, res) in trained_models.items():
-    # F1 全量
+    # F1 overall
     p_all = res['pred']; y_all = res['y_true']
     pd_all = (p_all>0).astype(int); td_all = (y_all>0).astype(int)
     f1_all = f1_score(td_all, pd_all, zero_division=0) if len(np.unique(pd_all))>1 else None
@@ -554,7 +554,7 @@ print(f"{'='*70}")
 print(f"  Ridge(a=1):             IC={np.mean(ridge_ic):.4f} +- {np.std(ridge_ic):.4f}  F1={np.mean(ridge_f1):.4f}  n={len(ridge_ic)}")
 print(f"  LightGBM-small:         IC={np.mean(lgb_ic):.4f} +- {np.std(lgb_ic):.4f}  F1={np.mean(lgb_f1):.4f}  n={len(lgb_ic)}")
 
-# MC 模型也做 walk-forward（用预计算 prediction 按月算 IC）
+# MC models also walk-forward (using precomputed predictions by month)
 print(f"\n  --- MC Models Walk-Forward (precomputed predictions, by month) ---")
 for name, (model, val_ic, res) in trained_models.items():
     pred = res['pred']

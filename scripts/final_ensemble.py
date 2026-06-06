@@ -199,7 +199,7 @@ def get_lr(step):
 
 sch=torch.optim.lr_scheduler.CosineAnnealingLR(opt_l,T_max=70,eta_min=1e-5)
 best_ic_l,best_st_l=-99,None
-# SWA snapshots: 保存最后 N 个最佳 checkpoint
+# SWA snapshots: save last N best checkpoints
 swa_snapshots = []
 global_step = 0
 for ep in range(70):
@@ -208,8 +208,8 @@ for ep in range(70):
         idx=perm[i:i+BATCH]; pred=lstm(Xl_tr[idx])
         loss=huber(pred,y_tr_t[idx])+RANK_LAMBDA*rank_loss(pred,y_tr_t[idx])
         opt_l.zero_grad(); loss.backward()
-        # 梯度噪声（防止陷入局部最优）
-        if ep < 50:  # 仅在前期加噪声
+        # Gradient noise (prevent getting stuck in local optima)
+        if ep < 50:  # only add noise in early stage
             for p in lstm.parameters():
                 if p.grad is not None:
                     p.grad.add_(torch.randn_like(p.grad) * 1e-7)
@@ -224,20 +224,20 @@ for ep in range(70):
         p_v=[ema_lstm(Xl_va[i:i+BATCH]).detach().cpu().numpy() for i in range(0,len(Xl_va),BATCH)]
         ic=spearmanr(np.concatenate(p_v),ys[va_m])[0]
     if ic>best_ic_l: best_ic_l=ic; best_st_l=copy.deepcopy(ema_lstm.state_dict())
-    # SWA: 保存最后 30 epochs 的 snapshot
+    # SWA: save last 30 epochs' snapshots
     if ep >= 40:
         swa_snapshots.append(copy.deepcopy(ema_lstm.state_dict()))
-        if len(swa_snapshots) > 5: swa_snapshots.pop(0)  # 保留最近 5 个
+        if len(swa_snapshots) > 5: swa_snapshots.pop(0)  # keep most recent 5
     if (ep+1)%30==0: print(f'  ep{ep+1} IC={ic:+.4f} best={best_ic_l:+.4f}', flush=True)
 
-# SWA: 平均最后 N 个 snapshot
+# SWA: average last N snapshots
 if swa_snapshots:
     swa_state = swa_snapshots[0]
     for key in swa_state:
         for snap in swa_snapshots[1:]:
             swa_state[key] = swa_state[key] + snap[key]
         swa_state[key] = swa_state[key] / len(swa_snapshots)
-    # 用 SWA 覆盖最佳
+    # Override best with SWA average
     best_st_l = swa_state
     print(f'  SWA: averaged {len(swa_snapshots)} snapshots', flush=True)
 lstm.load_state_dict(best_st_l); lstm.eval()

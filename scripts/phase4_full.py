@@ -1,17 +1,17 @@
 """
-Phase 4: Robustness check — full version
+Phase 4: Robustness check -- full version
 =============================
-Based on industry-neutralized factors（LGB+XGB+Ridge Ensemble），执行：
-  Task 4.1: 收益延迟 IC 衰减 (T+1 ~ T+6)
-  Task 4.2: 因子噪声敏感度 (5%/10%/20% 幅度, 各50次)
-  Task 4.3: Permutation Test (1000次, 月度截面内打乱标签)
-  Step 1:  五分组多空回测 (行业中性化因子, 等权月度调仓)
-  Step 2:  交易成本叠加 (10/20/30/50bp 四档)
-  Step 3:  5-Fold 时间序列交叉验证
-  Step 4:  样本外跟踪模板 (每月因子排名+收益回填+滚动IC)
+Based on industry-neutralized factors (LGB+XGB+Ridge Ensemble), execute:
+  Task 4.1: Signal decay IC decay (T+1 ~ T+6)
+  Task 4.2: Factor noise sensitivity (5%/10%/20% amplitude, 50 trials each)
+  Task 4.3: Permutation Test (1000x, monthly cross-sectional label shuffle)
+  Step 1:  Quintile long-short backtest (industry-neutral factor, equal-weight monthly rebalance)
+  Step 2:  Transaction cost overlay (10/20/30/50bp four levels)
+  Step 3:  5-Fold time series cross-validation
+  Step 4:  OOS tracking template (monthly factor ranking + return backfill + rolling IC)
 
-因子 pipeline (复用 Phase 3):
-  61d 特征 (含 FFT+小波去噪) → Industry Neutralize → LGB+XGB+Ridge Ensemble
+Factor pipeline (reuse Phase 3):
+  61d features (incl. FFT+wavelet denoise) -> Industry Neutralize -> LGB+XGB+Ridge Ensemble
 """
 import warnings; warnings.filterwarnings('ignore')
 import numpy as np, pandas as pd, sqlite3, time, json
@@ -33,14 +33,14 @@ def ts():
     return time.strftime(DATE_FMT)
 
 def cs_ic(pred, true, dates):
-    """月度截面 IC (Spearman)"""
+    """Monthly cross-sectional IC (Spearman)"""
     ics = [spearmanr(pred[dates==m], true[dates==m])[0]
            for m in np.unique(dates) if (dates==m).sum()>=20]
     ics = np.array(ics)
     return np.mean(ics), np.mean(ics)/np.std(ics) if np.std(ics)>0 else 0, ics
 
 def cs_ic_monthly(pred, true, dates):
-    """Returns月度 IC DataFrame"""
+    """Returns monthly IC DataFrame"""
     rows = []
     for m in np.unique(dates):
         mask = dates == m
@@ -77,10 +77,10 @@ def cross_sectional_neutralize(features, dates, neutralizer, ntype='categorical'
     return neutralized
 
 # ============================================================
-# 1. Build data + features (复用 Phase 3 pipeline, 多加 T+4~T+6 标签)
+# 1. Build data + features (reuse Phase 3 pipeline, add T+4~T+6 labels)
 # ============================================================
-print(f"[{ts()}] Phase 4 Robustness check — 开始", flush=True)
-print(f"[{ts()}] Loaded数据...", flush=True)
+print(f"[{ts()}] Phase 4 Robustness check -- start", flush=True)
+print(f"[{ts()}] Loading data...", flush=True)
 
 conn = sqlite3.connect(str(DB))
 codes = [r[0] for r in conn.execute(
@@ -97,15 +97,15 @@ df = pd.read_sql_query(
 conn.close()
 
 codes_used = sorted(codes_with_ind)
-print(f"[{ts()}] {len(codes_used)} stocks(有行业映射), {len(df)} 行", flush=True)
+print(f"[{ts()}] {len(codes_used)} stocks (with industry mapping), {len(df)} rows", flush=True)
 
 df['month'] = df['date'].str[:7]
 
-# Build features: T 期因子 → T+1~T+6 期标签
-print(f"[{ts()}] 构建特征 (61d)...", flush=True)
+# Build features: T-period factor -> T+1~T+6 period labels
+print(f"[{ts()}] Building features (61d)...", flush=True)
 t0 = time.time()
 flat_list, y_lists, dates_list, inds_list = [], [[] for _ in range(6)], [], []
-# 额外存 close 用于后续回测
+# Store close prices for later backtest
 close_list, code_list = [], []
 
 for code in codes_used:
@@ -135,7 +135,7 @@ for code in codes_used:
     for i in range(1,n): up_streak[i]=up_streak[i-1]+1 if c[i]>c[i-1] else 0; dn_streak[i]=dn_streak[i-1]+1 if c[i]<c[i-1] else 0
     for i in range(60, n-6):
         if c[i]<=0.01: continue
-        # 最多 T+6 标签
+        # up to T+6 labels
         fwd_ok = True
         fwds = []
         for lag in range(1, 7):
@@ -184,19 +184,19 @@ inds_arr = np.array(inds_list)
 codes_arr = np.array(code_list)
 closes_arr = np.array(close_list, dtype=np.float32)
 
-# 清理 NaN
+# Clean NaN
 v = ~np.isnan(flat).any(axis=1)
 for yl in y_all: v &= ~np.isnan(yl)
 flat = flat[v]; dates_arr = dates_arr[v]; inds_arr = inds_arr[v]
 codes_arr = codes_arr[v]; closes_arr = closes_arr[v]
 for i in range(6): y_all[i] = y_all[i][v]
 
-print(f"[{ts()}] {len(flat):,} 样本, {flat.shape[1]}d ({time.time()-t0:.0f}s)", flush=True)
+print(f"[{ts()}] {len(flat):,} samples, {flat.shape[1]}d ({time.time()-t0:.0f}s)", flush=True)
 
 # ============================================================
 # 2. Industry Neutralize + Train Ensemble
 # ============================================================
-print(f"[{ts()}] 行业中性化...", flush=True); t0 = time.time()
+print(f"[{ts()}] Industry neutralizing...", flush=True); t0 = time.time()
 flat_ind = cross_sectional_neutralize(flat.copy(), dates_arr, inds_arr, 'categorical')
 print(f"[{ts()}] done ({time.time()-t0:.0f}s)", flush=True)
 
@@ -209,7 +209,7 @@ Xte = sc.transform(flat_ind[te_m])
 te_dates = dates_arr[te_m]
 
 # Train Ensemble (on T+3)
-print(f"[{ts()}] 训练 Ensemble (LGB+XGB+Ridge)...", flush=True); t0 = time.time()
+print(f"[{ts()}] Training Ensemble (LGB+XGB+Ridge)...", flush=True); t0 = time.time()
 y3_tr = y_all[2][tr_m]  # T+3
 
 lgb_m = lgb.LGBMRegressor(objective='regression', num_leaves=63, learning_rate=0.03,
@@ -241,7 +241,7 @@ base_ic, base_ir, base_ics = cs_ic(p_ens, y3_te, te_dates)
 print(f"[{ts()}] Ensemble IC(T+3)={base_ic:+.4f} IR={base_ir:+.2f} "
       f"weights={ {k:round(v,3) for k,v in ics_m.items()} } ({time.time()-t0:.0f}s)", flush=True)
 
-# 存预测值供后续分析
+# Save predictions for later analysis
 pred_df = pd.DataFrame({
     'date': te_dates, 'code': codes_arr[te_m], 'close': closes_arr[te_m],
     'pred_ens': p_ens, 'pred_lgb': p_lgb, 'pred_xgb': p_xgb, 'pred_ridge': p_ridge,
@@ -253,7 +253,7 @@ pred_df.to_parquet(OUT / 'ensemble_predictions.parquet', index=False)
 # Task 4.1: IC Decay T+1 ~ T+6
 # ============================================================
 print(f"\n{'='*65}")
-print("Task 4.1: Signal Decay — T+1 到 T+6 IC 衰减")
+print("Task 4.1: Signal Decay -- T+1 to T+6 IC decay")
 print(f"{'='*65}")
 
 decay_results = []
@@ -276,15 +276,15 @@ for r in decay_results:
     rel = f"{r['IC']/base_for_rel*100:.0f}%" if base_for_rel != 0 else '--'
     print(f"  {r['horizon']:<10s} {r['IC']:+8.4f} {r['IC_std']:+8.4f} {r['ICIR']:+8.3f} {r['Hit_Rate']:7.0%} {rel:>10s}")
 
-# 衰减判定
+# Decay judgment
 if len(decay_results) >= 2:
     t1, t2 = decay_results[0]['IC'], decay_results[1]['IC']
     retention = t2/max(t1, 0.001)
     print(f"\n  T+2 / T+1 = {retention*100:.0f}%")
     if retention >= 0.7:
-        print(f"  VERDICT: 月度调仓合理 (T+2 保留 >=70% 的 T+1 IC)")
+        print(f"  VERDICT: Monthly rebalance reasonable (T+2 retains >=70% of T+1 IC)")
     else:
-        print(f"  VERDICT: 信号衰减快, 考虑更高频调仓")
+        print(f"  VERDICT: Signal decays fast, consider higher frequency rebalance")
 
 decay_df.to_csv(OUT / 'task4_1_ic_decay.csv', index=False)
 
@@ -292,7 +292,7 @@ decay_df.to_csv(OUT / 'task4_1_ic_decay.csv', index=False)
 # Task 4.2: Noise Sensitivity
 # ============================================================
 print(f"\n{'='*65}")
-print("Task 4.2: Noise Sensitivity — 因子加噪 IC 衰减")
+print("Task 4.2: Noise Sensitivity -- Factor noise IC decay")
 print(f"{'='*65}")
 
 pred_std = p_ens.std()
@@ -327,7 +327,7 @@ noise_df.to_csv(OUT / 'task4_2_noise_sensitivity.csv', index=False)
 # Task 4.3: Permutation Test
 # ============================================================
 print(f"\n{'='*65}")
-print(f"Task 4.3: Permutation Test ({N_PERM} 次)")
+print(f"Task 4.3: Permutation Test ({N_PERM} times)")
 print(f"{'='*65}")
 
 y_te_target = y_all[2][te_m]
@@ -356,7 +356,7 @@ perm_mean = np.mean(perm_ics); perm_std = np.std(perm_ics)
 
 print(f"\n  Permutation Results:")
 print(f"  Real IC (T+3, Ind Neut):  {base_ic:+.4f}")
-print(f"  Perm IC (mean ± std):     {perm_mean:+.4f} ± {perm_std:.4f}")
+print(f"  Perm IC (mean +/- std):   {perm_mean:+.4f} +/- {perm_std:.4f}")
 print(f"  Perm IC 95%:              {np.percentile(perm_ics, 95):+.4f}")
 print(f"  Perm IC 99%:              {np.percentile(perm_ics, 99):+.4f}")
 print(f"  P-value:                  {p_value:.4f} ({better_count}/{N_PERM})")
@@ -380,19 +380,19 @@ print(f"\n{'='*65}")
 print("Step 1: Quintile Portfolio Backtest (Industry-Neutral)")
 print(f"{'='*65}")
 
-# 每月截面: 按 ensemble prediction 排名分 5 组
+# Monthly cross-section: rank by ensemble prediction, split into 5 groups
 pred_df_valid = pred_df.copy()
-# 只保留有 T+1 收益的样本（用于回测）
+# Only keep samples with T+1 return (for backtest)
 y1_te = y_all[0][te_m]
 pred_df_valid['fwd_ret_1m'] = y1_te
 
 dates_sorted = sorted(pred_df_valid['date'].unique())
-print(f"  回测期: {dates_sorted[0]} ~ {dates_sorted[-1]}, {len(dates_sorted)} 个月")
+print(f"  Backtest period: {dates_sorted[0]} ~ {dates_sorted[-1]}, {len(dates_sorted)} months")
 
-# 月度分组
+# Monthly grouping
 quintile_rets = {q: [] for q in range(5)}
 quintile_dates = []
-monthly_details = []  # 存每月每组的持仓数等
+monthly_details = []  # store per-month holdings count etc.
 
 for date in dates_sorted:
     g = pred_df_valid[pred_df_valid['date'] == date].dropna(subset=['fwd_ret_1m'])
@@ -414,7 +414,7 @@ for date in dates_sorted:
         **{f'Q{q}_ret': g[g['quintile'] == q]['fwd_ret_1m'].mean() for q in range(5)},
     })
 
-# 转 Series
+# Convert to Series
 for q in range(5): quintile_rets[q] = pd.Series(quintile_rets[q], index=quintile_dates)
 ls_rets = quintile_rets[4] - quintile_rets[0]
 
@@ -434,7 +434,7 @@ def port_stats(rets, name):
 all_stats = []
 prev_ret = None; monotonic = True
 for q in range(5):
-    label = ['Q1(空头)', 'Q2', 'Q3', 'Q4', 'Q5(多头)'][q]
+    label = ['Q1(Short)', 'Q2', 'Q3', 'Q4', 'Q5(Long)'][q]
     s = port_stats(quintile_rets[q], label); s['quintile'] = q
     all_stats.append(s)
     if prev_ret is not None and s['ann_ret'] < prev_ret: monotonic = False
@@ -447,11 +447,11 @@ all_stats.append(ls_stats)
 print(f"  {'Q5-Q1':10s}: AnnRet={ls_stats['ann_ret']:+.1%}  Vol={ls_stats['ann_vol']:.1%}  "
       f"Sharpe={ls_stats['sharpe']:+.3f}  MaxDD={ls_stats['max_dd']:+.1%}  "
       f"Calmar={ls_stats['calmar']:+.3f}")
-print(f"  单调性: {'PASS' if monotonic else 'FAIL'}")
+print(f"  Monotonicity: {'PASS' if monotonic else 'FAIL'}")
 
 stats_df = pd.DataFrame(all_stats)
 stats_df.to_csv(OUT / 'step1_quintile_stats.csv', index=False)
-# 存 LS 曲线
+# Save LS curve
 pd.DataFrame({'date': ls_rets.index, 'ls_ret': ls_rets.values,
               'ls_cum': (1+ls_rets).cumprod().values}).to_csv(OUT / 'step1_ls_curve.csv', index=False)
 pd.DataFrame(monthly_details).to_csv(OUT / 'step1_monthly_details.csv', index=False)
@@ -463,7 +463,7 @@ print(f"\n{'='*65}")
 print("Step 2: Transaction Cost Overlay (10/20/30/50bp)")
 print(f"{'='*65}")
 
-# 计算每月换手率
+# Calculate monthly turnover
 monthly_holdings = {}
 for date in dates_sorted:
     g = pred_df_valid[pred_df_valid['date'] == date].dropna(subset=['fwd_ret_1m'])
@@ -490,7 +490,7 @@ for i, d in enumerate(sorted_dates):
         turnovers.append((to_q5 + to_q1) / 2)
 
 avg_to = np.mean(turnovers[1:]) if len(turnovers) > 1 else 0
-print(f"  平均月度换手率: {avg_to:.1%}")
+print(f"  Average monthly turnover: {avg_to:.1%}")
 
 cost_levels = [0.0010, 0.0020, 0.0030, 0.0050]
 cost_labels = ['10bp', '20bp', '30bp', '50bp']
@@ -501,7 +501,7 @@ for cost, label in zip(cost_levels, cost_labels):
     net_rets = []
     for i, d in enumerate(sorted_dates):
         gross = ls_base.loc[d]
-        tc = turnovers[i] * 2 * cost  # 买卖双向
+        tc = turnovers[i] * 2 * cost  # round-trip (buy+sell)
         net_rets.append(gross - tc)
     net_series = pd.Series(net_rets, index=sorted_dates)
     s = port_stats(net_series, f'Net_{label}')
@@ -513,7 +513,7 @@ for cost, label in zip(cost_levels, cost_labels):
                   'net_cum': (1+net_series).cumprod().values}).to_csv(
         OUT / f'step2_net_curve_{label}.csv', index=False)
 
-# 盈亏平衡点
+# Breakeven point
 sharpes = [r['sharpe'] for r in cost_results]
 costs = [r['cost_bps'] for r in cost_results]
 breakeven = None
@@ -525,7 +525,7 @@ for i in range(len(sharpes)-1):
 if breakeven is None and sharpes[0] > 0 and sharpes[-1] > 0:
     breakeven = 0.0051  # >50bp
 
-print(f"  盈亏平衡点: {breakeven*10000:.0f}bp" if breakeven else f"  盈亏平衡点: >50bp")
+print(f"  Breakeven: {breakeven*10000:.0f}bp" if breakeven else f"  Breakeven: >50bp")
 pd.DataFrame(cost_results).to_csv(OUT / 'step2_cost_overlay.csv', index=False)
 
 # ============================================================
@@ -544,27 +544,27 @@ for f in range(5):
     end = start + fold_size if f < 4 else n_total
     folds.append(test_dates_all[start:end])
 
-print(f"  折大小: {[len(f) for f in folds]}")
+print(f"  Fold sizes: {[len(f) for f in folds]}")
 
 cv_results = []
 for f_idx, test_fold in enumerate(folds):
     train_fold = [d for d in test_dates_all if d < test_fold[0]]
     if not train_fold:
-        print(f"  Fold {f_idx+1}: 跳过 (无训练数据)")
+        print(f"  Fold {f_idx+1}: skip (no training data)")
         continue
 
-    # 在训练期 re-fit 模型
+    # Re-fit model on training period
     tr_cv = np.isin(te_dates, train_fold)
     te_cv = np.isin(te_dates, test_fold)
 
     if tr_cv.sum() < 500 or te_cv.sum() < 200:
-        print(f"  Fold {f_idx+1}: 跳过 (样本不足: tr={tr_cv.sum()} te={te_cv.sum()})")
+        print(f"  Fold {f_idx+1}: skip (insufficient samples: tr={tr_cv.sum()} te={te_cv.sum()})")
         continue
 
     Xt_cv = Xte[tr_cv]; yt_cv = y_all[2][te_m][tr_cv]
     Xte_cv = Xte[te_cv]
 
-    # 快速 re-fit
+    # Quick re-fit
     lgb_cv = lgb.LGBMRegressor(objective='regression', num_leaves=63, learning_rate=0.03,
         n_estimators=200, min_child_samples=20, subsample=0.8, colsample_bytree=0.8,
         random_state=456, verbosity=-1, n_jobs=4)
@@ -606,8 +606,8 @@ for f_idx, test_fold in enumerate(folds):
 
 cv_df = pd.DataFrame(cv_results)
 if len(cv_df) > 0:
-    print(f"\n  CV 汇总: IC={cv_df['IC'].mean():+.4f} "
-          f"范围=[{cv_df['IC'].min():+.4f}, {cv_df['IC'].max():+.4f}] "
+    print(f"\n  CV Summary: IC={cv_df['IC'].mean():+.4f} "
+          f"range=[{cv_df['IC'].min():+.4f}, {cv_df['IC'].max():+.4f}] "
           f"ICIR={cv_df['ICIR'].mean():.3f}")
 cv_df.to_csv(OUT / 'step3_cv_results.csv', index=False)
 
@@ -621,7 +621,7 @@ print(f"{'='*65}")
 tracking_dir = OUT / 'tracking'
 tracking_dir.mkdir(parents=True, exist_ok=True)
 
-# latest一期因子排名
+# Latest period factor ranking
 latest_date = dates_sorted[-1]
 latest = pred_df_valid[pred_df_valid['date'] == latest_date].copy()
 latest = latest.sort_values('pred_ens', ascending=False)
@@ -629,9 +629,9 @@ latest['rank'] = range(1, len(latest)+1)
 latest['percentile'] = latest['rank'] / len(latest) * 100
 rank_cols = ['rank', 'code', 'pred_ens', 'percentile', 'close', 'industry']
 latest[rank_cols].to_csv(tracking_dir / f'{latest_date}.csv', index=False)
-print(f"  latest因子排名: {tracking_dir / f'{latest_date}.csv'} ({len(latest)} stocks)")
+print(f"  Latest factor ranking: {tracking_dir / f'{latest_date}.csv'} ({len(latest)} stocks)")
 
-# Master log (最近36个月)
+# Master log (most recent 36 months)
 recent_dates = dates_sorted[-36:]
 log_rows = []
 for date in recent_dates:
@@ -653,15 +653,15 @@ master_log = pd.DataFrame(log_rows)
 master_log['cum_ls'] = (1 + master_log['ls_fwd_ret']).cumprod()
 master_log['rolling_12m_ic'] = master_log['monthly_ic'].rolling(12).mean()
 master_log.to_csv(tracking_dir / 'master_log.csv', index=False)
-print(f"  Master log: {tracking_dir / 'master_log.csv'} ({len(master_log)} 个月)")
+print(f"  Master log: {tracking_dir / 'master_log.csv'} ({len(master_log)} months)")
 
 if len(master_log) > 0:
-    print(f"  最近月 IC:     {master_log['monthly_ic'].iloc[-1]:+.4f}")
+    print(f"  Latest month IC:     {master_log['monthly_ic'].iloc[-1]:+.4f}")
     if len(master_log) >= 12:
-        print(f"  滚动12月 IC:   {master_log['rolling_12m_ic'].iloc[-1]:+.4f}")
-    print(f"  最近月 LS收益: {master_log['ls_fwd_ret'].iloc[-1]:+.4f}")
+        print(f"  Rolling 12m IC:     {master_log['rolling_12m_ic'].iloc[-1]:+.4f}")
+    print(f"  Latest month LS ret: {master_log['ls_fwd_ret'].iloc[-1]:+.4f}")
 
-# 摘要
+# Summary
 summary = {
     'pipeline': 'LGB+XGB+Ridge Ensemble, Industry-Neutralized',
     'last_signal_date': str(latest_date),
@@ -677,18 +677,18 @@ json.dump(summary, open(tracking_dir / 'summary.json', 'w'), indent=2)
 # Final Summary
 # ============================================================
 print(f"\n{'='*65}")
-print("Phase 4 Robustness check — done")
+print("Phase 4 Robustness check -- done")
 print(f"{'='*65}")
 print(f"  Task 4.1 IC Decay:       {decay_df['horizon'].tolist()}")
 print(f"  Task 4.2 Noise Sens:     {noise_df['IC_decay_pct'].tolist()}")
 print(f"  Task 4.3 Permutation:    p={p_value:.4f} ({sig_level})")
 print(f"  Step 1 Quintile:         LS Sharpe={ls_stats['sharpe']:.3f} Monotonic={monotonic}")
-print(f"  Step 2 Cost Overlay:     Breakeven={breakeven*10000:.0f}bp" if breakeven else f"  Step 2 Cost Overlay:     Sharpe始终为正")
+print(f"  Step 2 Cost Overlay:     Breakeven={breakeven*10000:.0f}bp" if breakeven else f"  Step 2 Cost Overlay:     Sharpe always positive")
 print(f"  Step 3 5-Fold CV:        IC={cv_df['IC'].mean():+.4f}" if len(cv_df)>0 else f"  Step 3 5-Fold CV:        insufficient data")
 print(f"  Step 4 OOS Template:     {tracking_dir}")
-print(f"\n  输出目录: {OUT}")
+print(f"\n  Output dir: {OUT}")
 files = sorted(OUT.rglob('*'))
-print(f"  输出文件 ({len(files)} 个):")
+print(f"  Output files ({len(files)}):")
 for f in files:
     if f.is_file():
         print(f"    {f.relative_to(OUT)} ({f.stat().st_size:,} bytes)")

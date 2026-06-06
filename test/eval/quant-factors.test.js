@@ -16,42 +16,42 @@ function makeKlines(config) {
 }
 
 // ---- trendStrength ----
-test('trendStrength: 强上涨→正值', async () => {
+test('trendStrength: strong uptrend -> positive', async () => {
   const { computeTrendStrength } = await import('../../lib/quant-factors.js');
   const k = makeKlines({ trend: 1.0, volatility: 0.5 });
   const r = computeTrendStrength(k);
-  assert.ok(r.value > 0.3, `应为正值，实际 ${r.value}`);
+  assert.ok(r.value > 0.3, `expected positive, actual ${r.value}`);
 });
 
-test('trendStrength: 强下跌→负值', async () => {
+test('trendStrength: strong downtrend -> negative', async () => {
   const { computeTrendStrength } = await import('../../lib/quant-factors.js');
   const k = makeKlines({ trend: -1.0, volatility: 0.5 });
   const r = computeTrendStrength(k);
-  assert.ok(r.value < -0.2, `应为负值，实际 ${r.value}`);
+  assert.ok(r.value < -0.2, `expected negative, actual ${r.value}`);
 });
 
-test('trendStrength: <24根→null', async () => {
+test('trendStrength: <24 bars -> null', async () => {
   const { computeTrendStrength } = await import('../../lib/quant-factors.js');
   assert.equal(computeTrendStrength(makeKlines({ n: 10 })), null);
 });
 
 // ---- pricePosition ----
-test('pricePosition: 高位→接近1', async () => {
+test('pricePosition: high position -> near 1', async () => {
   const { computePricePosition } = await import('../../lib/quant-factors.js');
   const k = makeKlines({ trend: 0.2, volatility: 0.1 });
   const r = computePricePosition(k, 36);
-  assert.ok(r.value > 0.6, `应为高位，实际 ${r.value}`);
+  assert.ok(r.value > 0.6, `expected high position, actual ${r.value}`);
 });
 
-test('pricePosition: 低位→接近0', async () => {
+test('pricePosition: low position -> near 0', async () => {
   const { computePricePosition } = await import('../../lib/quant-factors.js');
   const k = makeKlines({ trend: -0.3, volatility: 0.1 });
   const r = computePricePosition(k, 36);
-  assert.ok(r.value < 0.5, `应为低位，实际 ${r.value}`);
+  assert.ok(r.value < 0.5, `expected low position, actual ${r.value}`);
 });
 
 // ---- volatilityPercentile ----
-test('volatilityPercentile: 低波动→中低分位', async () => {
+test('volatilityPercentile: low vol -> medium-low percentile', async () => {
   const { computeVolatilityPercentile } = await import('../../lib/quant-factors.js');
   const k = makeKlines({ volatility: 0.1 });
   const r = computeVolatilityPercentile(k, 36);
@@ -60,22 +60,22 @@ test('volatilityPercentile: 低波动→中低分位', async () => {
 });
 
 // ---- volumePriceConfirm ----
-test('volumePriceConfirm: 放量上涨→+1', async () => {
+test('volumePriceConfirm: volume surge up -> +1', async () => {
   const { computeVolumePriceConfirm } = await import('../../lib/quant-factors.js');
-  // 手构造：最近3根放量上涨
+  // manually construct: last 3 bars volume surge up
   const k = makeKlines({ n: 50, volatility: 0.5 });
-  // 确保最后3根是上涨+放量
+  // ensure last 3 bars up + volume surge
   const last3 = k.slice(-3);
   for (const kk of last3) {
     kk.close = kk.open * 1.05;
     kk.volume = 5000;
   }
   const r = computeVolumePriceConfirm(k);
-  assert.ok(r.value >= 0, `量价确认失败: ${r.value}`);
+  assert.ok(r.value >= 0, `volume-price confirm failed: ${r.value}`);
 });
 
-// ---- quantScore综合 ----
-test('quantScore: 完整计算', async () => {
+// ---- quantScore composite ----
+test('quantScore: full calculation', async () => {
   const { computeQuantScore } = await import('../../lib/quant-factors.js');
   const k = makeKlines({ trend: 0.5 });
   const r = computeQuantScore(k);
@@ -88,13 +88,13 @@ test('quantScore: 完整计算', async () => {
   assert.ok(r.factors.f4);
 });
 
-test('quantScore: <24根→null', async () => {
+test('quantScore: <24 bars -> null', async () => {
   const { computeQuantScore } = await import('../../lib/quant-factors.js');
   assert.equal(computeQuantScore(makeKlines({ n: 10 })), null);
 });
 
 // ---- scoreFusion ----
-test('fuseScores: 方向一致→高权重LLM(adaptive)', async () => {
+test('fuseScores: direction aligned -> high LLM weight (adaptive)', async () => {
   const { fuseScores } = await import('../../lib/score-fusion.js');
   const r = fuseScores(
     { score: 70, signal: 'bull', confidence: 'high' },
@@ -105,7 +105,7 @@ test('fuseScores: 方向一致→高权重LLM(adaptive)', async () => {
   assert.ok(r.agreement > 0.5);
 });
 
-test('fuseScores: 方向矛盾→量化权重更高(adaptive)', async () => {
+test('fuseScores: direction conflict -> quant weight higher (adaptive)', async () => {
   const { fuseScores } = await import('../../lib/score-fusion.js');
   const r = fuseScores(
     { score: 70, signal: 'bull', confidence: 'medium' },
@@ -116,14 +116,14 @@ test('fuseScores: 方向矛盾→量化权重更高(adaptive)', async () => {
   assert.ok(r.components.quantWeight >= 0.4);
 });
 
-test('fuseScores: quantOnly模式', async () => {
+test('fuseScores: quantOnly mode', async () => {
   const { fuseScores } = await import('../../lib/score-fusion.js');
   const r = fuseScores(null, { score: 70, factors: {}, confidence: 0.8 });
   assert.ok(r.quant_score);
   assert.equal(r.llm_score, null);
 });
 
-test('fuseScores: llmOnly模式', async () => {
+test('fuseScores: llmOnly mode', async () => {
   const { fuseScores } = await import('../../lib/score-fusion.js');
   const r = fuseScores({ score: 30, signal: 'bull', confidence: 'high' }, null);
   assert.equal(r.quant_score, null);
@@ -161,17 +161,17 @@ test('regime: mixed (pos=0.5, vol=0.6)', async () => {
   assert.equal(detectStockRegime(qr), 'mixed');
 });
 
-test('regime: null quantResult → mixed', async () => {
+test('regime: null quantResult -> mixed', async () => {
   const { detectStockRegime } = await import('../../lib/score-fusion.js');
   assert.equal(detectStockRegime(null), 'mixed');
 });
 
-test('regime: missing factors → mixed', async () => {
+test('regime: missing factors -> mixed', async () => {
   const { detectStockRegime } = await import('../../lib/score-fusion.js');
   assert.equal(detectStockRegime({ factors: {} }), 'mixed');
 });
 
-test('regime: pos=0.8 exactly → not strong_trend', async () => {
+test('regime: pos=0.8 exactly -> not strong_trend', async () => {
   const { detectStockRegime } = await import('../../lib/score-fusion.js');
   const qr = { factors: { f2: { value: 0.8 }, f3: { value: 0.3 } } };
   assert.notEqual(detectStockRegime(qr), 'strong_trend'); // must be >0.8
@@ -220,7 +220,7 @@ test('adaptive: mixed uses 50/50', async () => {
 });
 
 // ---- scoreToSignal ----
-test('scoreToSignal: 阈值映射', async () => {
+test('scoreToSignal: threshold mapping', async () => {
   const { scoreToSignal } = await import('../../lib/score-fusion.js');
   assert.equal(scoreToSignal(75), 'strong_bull');
   assert.equal(scoreToSignal(35), 'bull');

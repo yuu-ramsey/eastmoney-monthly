@@ -3,10 +3,10 @@ Kronos weight download CLI - downloads pretrained models from HuggingFace Hub
 
 Usage:
     python -m kronos.download_weights                        # download tokenizer + model
-    python -m kronos.download_weights --tokenizer-only       # 仅download tokenizer
-    python -m kronos.download_weights --model-only           # 仅download model
+    python -m kronos.download_weights --tokenizer-only       # download tokenizer only
+    python -m kronos.download_weights --model-only           # download model only
     python -m kronos.download_weights --model-size large     # download Kronos-large
-    python -m kronos.download_weights --no-verify            # 跳过验证
+    python -m kronos.download_weights --no-verify            # skip verification
 """
 
 # Reproduced from Kronos (https://github.com/shiyu-coder/Kronos)
@@ -20,7 +20,7 @@ from pathlib import Path
 
 import torch
 
-# 添加父目录以支持独立运行
+# Add parent directory to support standalone execution
 _KRONOS_DIR = Path(__file__).resolve().parent
 if str(_KRONOS_DIR) not in sys.path:
     sys.path.insert(0, str(_KRONOS_DIR))
@@ -28,65 +28,65 @@ if str(_KRONOS_DIR) not in sys.path:
 from kronos.tokenizer import KronosTokenizer
 from kronos.transformer import Kronos
 
-# HuggingFace 模型仓库
+# HuggingFace model repositories
 REPO_TOKENIZER = "NeoQuasar/Kronos-Tokenizer-base"
 REPO_MODEL_BASE = "NeoQuasar/Kronos-base"
 REPO_MODEL_LARGE = "NeoQuasar/Kronos-large"
 
-# 本地权重保存路径
+# Local weight save paths
 WEIGHTS_DIR = _KRONOS_DIR / "weights"
 TOKENIZER_DIR = WEIGHTS_DIR / "tokenizer"
 MODEL_DIR = WEIGHTS_DIR / "model"
 
 
 def download_tokenizer() -> Path:
-    """download KronosTokenizer 权重，返回保存路径"""
-    print(f"[1/4] 从 {REPO_TOKENIZER} Loaded tokenizer 配置...")
+    """Download KronosTokenizer weights, return save path"""
+    print(f"[1/4] Loading tokenizer config from {REPO_TOKENIZER}...")
     tokenizer = KronosTokenizer.from_pretrained(REPO_TOKENIZER)
-    print(f"  配置: s1_bits={tokenizer.s1_bits}, s2_bits={tokenizer.s2_bits}, "
+    print(f"  Config: s1_bits={tokenizer.s1_bits}, s2_bits={tokenizer.s2_bits}, "
           f"d_model={tokenizer.d_model}, codebook_dim={tokenizer.codebook_dim}")
 
-    print(f"[2/4] 保存到 {TOKENIZER_DIR}...")
+    print(f"[2/4] Saving to {TOKENIZER_DIR}...")
     TOKENIZER_DIR.mkdir(parents=True, exist_ok=True)
     tokenizer.save_pretrained(str(TOKENIZER_DIR))
-    print("  完成.")
+    print("  Done.")
     return TOKENIZER_DIR
 
 
 def download_model(model_size: str = "base") -> Path:
-    """download Kronos 预测模型权重，返回保存路径"""
+    """Download Kronos prediction model weights, return save path"""
     repo = REPO_MODEL_LARGE if model_size == "large" else REPO_MODEL_BASE
-    print(f"[3/4] 从 {repo} Loaded model 配置...")
+    print(f"[3/4] Loading model config from {repo}...")
     model = Kronos.from_pretrained(repo)
-    print(f"  配置: s1_bits={model.s1_bits}, s2_bits={model.s2_bits}, "
+    print(f"  Config: s1_bits={model.s1_bits}, s2_bits={model.s2_bits}, "
           f"d_model={model.d_model}, n_layers={model.n_layers}, n_heads={model.n_heads}")
 
-    print(f"[4/4] 保存到 {MODEL_DIR}...")
+    print(f"[4/4] Saving to {MODEL_DIR}...")
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(str(MODEL_DIR))
-    print("  完成.")
+    print("  Done.")
     return MODEL_DIR
 
 
 def verify(tokenizer_path: Path, model_path: Path) -> bool:
     """
-    验证权重Loaded：创建 tokenizer + model 实例并跑一次 dummy forward pass。
+    Verify weight loading: create tokenizer + model instances and run a dummy forward pass.
 
     Returns:
-        True 表示验证通过，False 表示失败
+        True if verification passed, False if failed
     """
     print("\n========================================")
-    print("验证权重Loaded...")
+    print("Verifying weight loading...")
     print("========================================")
 
     try:
-        print("  Loaded tokenizer...")
+        print("  Loading tokenizer...")
         tokenizer = KronosTokenizer.from_pretrained(str(tokenizer_path))
 
-        print("  Loaded model...")
+        print("  Loading model...")
         model = Kronos.from_pretrained(str(model_path))
 
-        # 合成测试数据
+        # Synthetic test data
         B, T = 2, 10
         x = torch.randn(B, T, 6)
         s1_ids = torch.randint(0, 2 ** tokenizer.s1_bits - 1, (B, T))
@@ -95,26 +95,26 @@ def verify(tokenizer_path: Path, model_path: Path) -> bool:
         print("  Tokenizer encode...")
         with torch.no_grad():
             indices = tokenizer.encode(x)
-        assert indices.shape == (B, T), f"encode shape 错误: {indices.shape}"
+        assert indices.shape == (B, T), f"encode shape error: {indices.shape}"
 
         print("  Tokenizer decode...")
         with torch.no_grad():
             recon = tokenizer.decode(indices)
-        assert recon.shape == (B, T, 6), f"decode shape 错误: {recon.shape}"
+        assert recon.shape == (B, T, 6), f"decode shape error: {recon.shape}"
 
         print("  Model forward...")
         with torch.no_grad():
             s1_logits, s2_logits = model(s1_ids, s2_ids)
         assert s1_logits.shape == (B, T, 2 ** model.s1_bits), \
-            f"s1_logits shape 错误: {s1_logits.shape}"
+            f"s1_logits shape error: {s1_logits.shape}"
         assert s2_logits.shape == (B, T, 2 ** model.s2_bits), \
-            f"s2_logits shape 错误: {s2_logits.shape}"
+            f"s2_logits shape error: {s2_logits.shape}"
 
-        print("  验证通过!")
+        print("  Verification passed!")
         return True
 
     except Exception as e:
-        print(f"  验证失败: {e}")
+        print(f"  Verification failed: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -122,16 +122,16 @@ def verify(tokenizer_path: Path, model_path: Path) -> bool:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="download Kronos 预训练权重 (HuggingFace)"
+        description="Download Kronos pretrained weights (HuggingFace)"
     )
     parser.add_argument("--tokenizer-only", action="store_true",
-                        help="仅download tokenizer 权重")
+                        help="Download tokenizer weights only")
     parser.add_argument("--model-only", action="store_true",
-                        help="仅download model 权重")
+                        help="Download model weights only")
     parser.add_argument("--model-size", choices=["base", "large"],
-                        default="base", help="model 规模 (default: base)")
+                        default="base", help="Model size (default: base)")
     parser.add_argument("--no-verify", action="store_true",
-                        help="download后不跑验证")
+                        help="Skip verification after download")
     args = parser.parse_args()
 
     tokenizer_path: Path | None = None
@@ -150,7 +150,7 @@ def main():
         if not ok:
             sys.exit(1)
 
-    print("\n全部完成.")
+    print("\nAll done.")
     if tokenizer_path:
         print(f"  Tokenizer: {tokenizer_path}")
     if model_path:

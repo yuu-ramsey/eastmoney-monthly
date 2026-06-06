@@ -4,7 +4,7 @@ import assert from 'node:assert';
 import { computeDiscountedReturn, discretizeDiscountedReturn, mapSignalToNumber } from '../../lib/eval/discounted-return.js';
 
 describe('computeDiscountedReturn', () => {
-  // 构造月线：价格为 10, 11, 12, 13, 14（每月涨 10%/20%/30%/40%）
+  // build monthly klines: prices 10, 11, 12, 13, 14 (monthly gain 10%/20%/30%/40%)
   const upKlines = [
     { close: 10 }, // idx 0
     { close: 11 }, // idx 1: +10%
@@ -13,7 +13,7 @@ describe('computeDiscountedReturn', () => {
     { close: 14 }, // idx 4: +40%
   ];
 
-  it('完整 3 个月 forward return', () => {
+  it('full 3-month forward return', () => {
     const r = computeDiscountedReturn(upKlines, 0);
     // r1 = (11-10)/10 = 0.1, r2 = 0.2, r3 = 0.3
     // discounted = 0.1 + 0.9*0.2 + 0.81*0.3 = 0.1 + 0.18 + 0.243 = 0.523
@@ -22,7 +22,7 @@ describe('computeDiscountedReturn', () => {
     assert.strictEqual(r.individualReturns.length, 3);
   });
 
-  it('仅 2 个月可用（尾部不足）', () => {
+  it('only 2 months available (tail insufficient)', () => {
     const r = computeDiscountedReturn(upKlines, 2);
     // r1 = (13-12)/12 = 0.0833, r2 = (14-12)/12 = 0.1667
     // discounted = 0.0833 + 0.9*0.1667 = 0.2333
@@ -30,28 +30,28 @@ describe('computeDiscountedReturn', () => {
     assert.ok(Math.abs(r.discountedReturn - 0.2333) < 0.01);
   });
 
-  it('gamma=1 时等价于未折扣 cumsum', () => {
+  it('gamma=1 equivalent to undiscounted cumsum', () => {
     const r = computeDiscountedReturn(upKlines, 0, { gamma: 1.0, months: 3 });
     // 0.1 + 0.2 + 0.3 = 0.6
     assert.ok(Math.abs(r.discountedReturn - 0.6) < 0.001);
   });
 
-  it('下跌序列', () => {
+  it('downtrend sequence', () => {
     const downKlines = [
       { close: 10 }, { close: 9 }, { close: 8 }, { close: 7 }, { close: 6 },
     ];
     const r = computeDiscountedReturn(downKlines, 0);
-    // r1=-0.1, r2=-0.2, r3=-0.3 → -0.1 + 0.9*(-0.2) + 0.81*(-0.3) = -0.1 -0.18 -0.243 = -0.523
+    // r1=-0.1, r2=-0.2, r3=-0.3 -> -0.1 + 0.9*(-0.2) + 0.81*(-0.3) = -0.1 -0.18 -0.243 = -0.523
     assert.ok(r.discountedReturn < -0.5);
   });
 });
 
 describe('discretizeDiscountedReturn', () => {
-  it('strong_bull 边界', () => {
+  it('strong_bull boundary', () => {
     assert.strictEqual(discretizeDiscountedReturn(0.20), 'strong_bull');
     assert.strictEqual(discretizeDiscountedReturn(0.15), 'strong_bull');
   });
-  it('bull 边界', () => {
+  it('bull boundary', () => {
     assert.strictEqual(discretizeDiscountedReturn(0.06), 'bull');
     assert.strictEqual(discretizeDiscountedReturn(0.10), 'bull');
   });
@@ -72,7 +72,7 @@ describe('discretizeDiscountedReturn', () => {
 });
 
 describe('mapSignalToNumber', () => {
-  it('映射正确', () => {
+  it('mapping correct', () => {
     assert.strictEqual(mapSignalToNumber('strong_bull'), 2);
     assert.strictEqual(mapSignalToNumber('bull'), 1);
     assert.strictEqual(mapSignalToNumber('neutral'), 0);

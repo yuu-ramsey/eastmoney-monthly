@@ -122,7 +122,7 @@ print(f"\n  Kronos Block CI: Full [{k_lo:+.1f}, {k_hi:+.1f}] mean={k_mean:+.1f}%
 print(f"  Kronos Block CI: Test [{t_lo:+.1f}, {t_hi:+.1f}] mean={t_mean:+.1f}% nBlocks={t_nb}")
 
 # ── B: Kronos complementarity check ──
-print("\n=== B: 互补性检查 ===")
+print("\n=== B: Complementarity Check ===")
 
 # 1. Kronos vs short-term reversal correlation
 kronos_vals = np.array([p['kronos_raw'] for p in pairs])
@@ -138,15 +138,15 @@ agree = [p for p in test_pairs
          if p['kronos_dir'] != 0 and p['rev1m'] != 0
          and np.sign(p['kronos_dir']) == np.sign(p['rev1m'])]
 
-print(f"  Kronos-rev1m 分歧: {len(disagree)} pairs, 一致: {len(agree)} pairs")
+print(f"  Kronos-rev1m disagreement: {len(disagree)} pairs, agreement: {len(agree)} pairs")
 if disagree:
     d_correct = sum(1 for p in disagree if np.sign(p['alpha']) == np.sign(p['kronos_dir']))
-    print(f"  分歧时 Kronos 方向命中率: {d_correct}/{len(disagree)} = {d_correct/len(disagree)*100:.1f}%")
+    print(f"  When disagree, Kronos direction hit rate: {d_correct}/{len(disagree)} = {d_correct/len(disagree)*100:.1f}%")
     d_alpha = wins_mean([p['alpha'] for p in disagree])
-    print(f"  分歧时平均 alpha: {d_alpha:+.1f}%")
+    print(f"  When disagree, mean alpha: {d_alpha:+.1f}%")
 
 # 3. Reversal factor performance on 24tp (confirm sign flip)
-print("\n=== C: 反转因子确认（24tp 翻负验证）===")
+print("\n=== C: Reversal Factor Confirmation (24tp sign-flip verification) ===")
 for key in ['rev1m', 'rev3m', 'd60']:
     vals = [p[key] for p in pairs if not np.isnan(p[key])]
     m = sum(vals) / len(vals)
@@ -165,8 +165,8 @@ rev_pass = rev_tlo > 0
 print(f"  Reversal gate: {'PASS' if rev_pass else 'FAIL'}")
 
 # ── D: Clean conclusion ──
-print("\n=== D: 干净结论 ===")
-print(f"  1. Kronos Test CI [{t_lo:+.1f}, {t_hi:+.1f}] → {'✓ 通过' if t_lo > 0 else '✗ failed'}")
-print(f"  2. r(Kronos, rev1m) = {r_kronos_rev:.4f} → {'互补' if abs(r_kronos_rev) < 0.3 else '冗余' if abs(r_kronos_rev) < 0.7 else '高度相关'}")
-print(f"  3. 反转 Test CI [{rev_tlo:.1f},{rev_thi:.1f}] → 翻负确认，撤出正确")
-print(f"  4. Kronos 是唯一通过 24tp 门控的外部信号")
+print("\n=== D: Clean Conclusion ===")
+print(f"  1. Kronos Test CI [{t_lo:+.1f}, {t_hi:+.1f}] -> {'PASS' if t_lo > 0 else 'FAIL'}")
+print(f"  2. r(Kronos, rev1m) = {r_kronos_rev:.4f} -> {'complementary' if abs(r_kronos_rev) < 0.3 else 'redundant' if abs(r_kronos_rev) < 0.7 else 'highly correlated'}")
+print(f"  3. Reversal Test CI [{rev_tlo:.1f},{rev_thi:.1f}] -> sign-flip confirmed, withdrawal correct")
+print(f"  4. Kronos is the only external signal passing 24tp gate")

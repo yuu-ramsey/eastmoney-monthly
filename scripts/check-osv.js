@@ -1,4 +1,4 @@
-// OSV.dev automatic security scan — 对 package-lock.json 每个依赖查已知 CVE
+// OSV.dev automatic security scan — checks each package-lock.json dependency for known CVEs
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,22 +7,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOCK_PATH = path.resolve(__dirname, '..', 'package-lock.json');
 
 if (!fs.existsSync(LOCK_PATH)) {
-  console.log('[osv] package-lock.json 不存在，跳过');
+  console.log('[osv] package-lock.json does not exist, skipping');
   process.exit(0);
 }
 
 const lock = JSON.parse(fs.readFileSync(LOCK_PATH, 'utf-8'));
 const packages = lock.packages || {};
 
-// 提取依赖名和版本
+// Extract dependency names and versions
 const deps = Object.entries(packages)
   .filter(([name]) => name !== '')
   .map(([name, info]) => ({ name: name.replace('node_modules/', ''), version: info.version }));
 
-console.log(`[osv] 检查 ${deps.length} 个依赖...`);
+console.log(`[osv] Checking ${deps.length} dependencies...`);
 
 let cveCount = 0;
-const batchSize = 10; // OSV API 速率限制友好
+const batchSize = 10; // OSV API rate-limit friendly
 
 for (let i = 0; i < deps.length; i += batchSize) {
   const batch = deps.slice(i, i + batchSize);
@@ -54,11 +54,11 @@ for (let i = 0; i < deps.length; i += batchSize) {
     }
   }
 
-  // 速率限制
+  // Rate limiting
   if (i + batchSize < deps.length) {
     await new Promise(r => setTimeout(r, 200));
   }
 }
 
-console.log(`\n[osv] 完成。${cveCount} 个依赖有已知 CVE。`);
+console.log(`\n[osv] Complete. ${cveCount} dependencies have known CVEs.`);
 if (cveCount > 0) process.exit(1);

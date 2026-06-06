@@ -1,16 +1,16 @@
 // content.js conversationHistory logic unit test
-// 核心不变式：conversationHistory[0].content 始终是完整 prompt 原文，不是 UI 折叠摘要
-// 失败路径：sendFollowUp 三个分支都移除"思考中…"占位并渲染错误提示
+// Core invariant: conversationHistory[0].content is always the complete prompt text, not a UI collapsed summary
+// Failure path: all three sendFollowUp branches remove the "thinking..." placeholder and render error message
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 // ---------------------------------------------------------------------------
-// 从 content.js 提取的纯函数（逻辑完全一致，仅去 DOM 操作）
+// Pure functions extracted from content.js (identical logic, only DOM ops removed)
 // ---------------------------------------------------------------------------
 
 /**
- * renderResult 中的 history 初始化逻辑
- * 不变式：history[0].content === 完整 prompt 原文
+ * History initialization logic from renderResult
+ * Invariant: history[0].content === full prompt text
  */
 function initHistory(prompt, analysis) {
   const firstUserMsg = prompt || `分析 ?(?) monthly`;
@@ -21,29 +21,29 @@ function initHistory(prompt, analysis) {
 }
 
 /**
- * renderChatMessages 中首条 user 消息的 UI 渲染——只读，不修改 history
- * 不变式：调用前后 history 不变
+ * UI rendering for first user message in renderChatMessages -- read-only, does not modify history
+ * Invariant: history is unchanged before and after call
  */
 function renderFirstMessageBubble(msg, i) {
   if (i === 0 && msg.role === 'user') {
     return `📊 首次分析 prompt（已提交，长度 ${msg.content.length} 字符）`;
   }
-  return msg.content; // 非首条原样
+  return msg.content; // non-first messages returned as-is
 }
 
 /**
- * sendFollowUp 中过滤 history 用于发给 SW 的逻辑
- * 过滤条件：排除"思考中…"占位，不包含正在发送的 question
- * 不变式：过滤后 history[0] 仍为完整 prompt
+ * Filter history in sendFollowUp for sending to SW
+ * Filter condition: exclude "thinking..." placeholder, exclude the question currently being sent
+ * Invariant: after filtering, history[0] is still the full prompt
  */
 function prepareFollowUpHistory(history) {
   return history
     .filter((m) => m.content !== '⏳ 思考中…')
-    .slice(0, -1); // 去掉最后一个（刚推送的 user question 占位，或思考中占位）
+    .slice(0, -1); // remove last item (newly pushed user question placeholder or thinking placeholder)
 }
 
 /**
- * clearChat 逻辑：重置为前两条
+ * clearChat logic: reset to first two entries
  */
 function resetHistory(history) {
   if (history.length <= 2) return history;
@@ -51,21 +51,21 @@ function resetHistory(history) {
 }
 
 /**
- * sendFollowUp 三个失败分支的占位替换模拟
- * 返回处理后的 history
+ * Simulate placeholder replacement for the three failure branches in sendFollowUp
+ * Returns processed history
  */
 function handleFollowUpError(history, loadingIdx, errorMessage) {
   const h = [...history];
-  h.splice(loadingIdx, 1); // 移除"思考中…"占位
+  h.splice(loadingIdx, 1); // remove "thinking..." placeholder
   h.push({ role: 'assistant', content: `❌ 错误：${errorMessage}` });
   return h;
 }
 
 // ---------------------------------------------------------------------------
-// 1. conversationHistory[0].content 完整性
+// 1. conversationHistory[0].content integrity
 // ---------------------------------------------------------------------------
 
-test('initHistory: history[0].content 为完整 prompt 原文', () => {
+test('initHistory: history[0].content is the full prompt text', () => {
   const prompt = '你是一个 A 股技术分析师。以下是 贵州茅台(600519) 近 60 个月的月线数据…（数万字 K 线表格）';
   const analysis = '## 综合分析\n\n偏多。';
 
@@ -73,87 +73,87 @@ test('initHistory: history[0].content 为完整 prompt 原文', () => {
 
   assert.equal(history.length, 2);
   assert.equal(history[0].role, 'user');
-  assert.equal(history[0].content, prompt); // 完整原文，不是摘要
+  assert.equal(history[0].content, prompt); // full original text, not a summary
   assert.equal(history[1].role, 'assistant');
   assert.equal(history[1].content, analysis);
 });
 
-test('initHistory: prompt 为 null 时 fallback 不丢 role 结构', () => {
+test('initHistory: when prompt is null, fallback does not lose role structure', () => {
   const h1 = initHistory(null, '分析文本');
   assert.equal(h1[0].role, 'user');
   assert.ok(h1[0].content.includes('分析 ?'));
 
-  // '' 是 falsy，会走 fallback（JS 语义：'' || fallback = fallback）
+  // '' is falsy, will trigger fallback (JS semantics: '' || fallback = fallback)
   const h2 = initHistory('', '分析文本');
   assert.equal(h2[0].role, 'user');
   assert.ok(h2[0].content.includes('分析 ?'));
 });
 
-test('renderFirstMessageBubble: 首条只读渲染，不修改 history', () => {
+test('renderFirstMessageBubble: first message is read-only render, history not modified', () => {
   const prompt = '完整 prompt 原文共 15000 字符';
   const history = initHistory(prompt, '分析内容');
 
-  // 模拟 renderChatMessages 的 map 调用
+  // Simulate renderChatMessages map call
   const rendered = history.map((msg, i) => renderFirstMessageBubble(msg, i));
 
-  // rendering 输出是摘要文本（长度按 JS .length 计算，中文每字算 1）
+  // Rendering output is a summary text (length calculated by JS .length, Chinese chars count as 1 each)
   assert.ok(rendered[0].includes('📊 首次分析 prompt'));
   assert.ok(rendered[0].includes('已提交，长度'));
 
-  // 但原始 history 不变
+  // But original history is unchanged
   assert.equal(history[0].content, prompt);
   assert.ok(!history[0].content.includes('📊'));
 });
 
-test('renderFirstMessageBubble: 非首条 user 消息原样返回', () => {
+test('renderFirstMessageBubble: non-first user message returned as-is', () => {
   const q = '这只股票还能持有吗？';
-  // 模拟 history 中 index > 0 的 user 消息
+  // Simulate user message at index > 0 in history
   const result = renderFirstMessageBubble({ role: 'user', content: q }, 2);
   assert.equal(result, q);
   assert.ok(!result.includes('📊'));
 });
 
-test('prepareFollowUpHistory: 过滤后 history[0] 仍为完整 prompt', () => {
+test('prepareFollowUpHistory: after filtering, history[0] is still the full prompt', () => {
   const prompt = '完整 prompt 原文 15000 字符';
   let history = initHistory(prompt, '首次分析结果');
 
-  // 模拟一轮追问
+  // Simulate one round of follow-up
   history.push({ role: 'user', content: '追问1' });
   history.push({ role: 'assistant', content: '回复1' });
 
-  // 模拟发送追问2 前：push thinking 占位 + user question
+  // Simulate before sending follow-up 2: push thinking placeholder + user question
   history.push({ role: 'user', content: '追问2' });
   history.push({ role: 'assistant', content: '⏳ 思考中…' });
 
   const filtered = prepareFollowUpHistory(history);
 
-  // 验证第一个元素仍是完整 prompt
+  // Verify first element is still the full prompt
   assert.equal(filtered[0].content, prompt);
   assert.ok(!filtered[0].content.includes('📊'));
 
-  // 验证思考中占位被过滤
+  // Verify thinking placeholder is filtered out
   assert.equal(filtered.find((m) => m.content === '⏳ 思考中…'), undefined);
 
-  // 验证最后一条是"追问1 的回复"（追问2 被 slice(0,-1) 去掉）
+  // Verify last item is "reply to follow-up 1" (follow-up 2 removed by slice(0,-1))
   assert.equal(filtered[filtered.length - 1].content, '回复1');
 });
 
-test('prepareFollowUpHistory: 首次追问（history 仅 2 条初始）过滤后不含思考中', () => {
+test('prepareFollowUpHistory: first follow-up (history has only 2 initial entries) filters without thinking', () => {
   const prompt = '完整 prompt 原文';
   let history = initHistory(prompt, '分析结果');
 
-  // 首次追问：直接 push question + thinking
+  // First follow-up: directly push question + thinking
   history.push({ role: 'user', content: '第一次追问' });
   history.push({ role: 'assistant', content: '⏳ 思考中…' });
 
   const filtered = prepareFollowUpHistory(history);
 
-  assert.equal(filtered.length, 2); // 初始 2 条（思考中和追问都被去掉了）
+  assert.equal(filtered.length, 2); // initial 2 entries (thinking and question both removed)
   assert.equal(filtered[0].content, prompt);
   assert.equal(filtered[1].content, '分析结果');
 });
 
-test('resetHistory: 保留前两条，第 1 条仍是完整 prompt', () => {
+test('resetHistory: keeps first two entries, entry 1 is still full prompt', () => {
   const prompt = '完整 prompt 原文';
   let history = initHistory(prompt, '分析结果');
   history.push({ role: 'user', content: '追问1' });
@@ -164,39 +164,39 @@ test('resetHistory: 保留前两条，第 1 条仍是完整 prompt', () => {
   const reset = resetHistory(history);
 
   assert.equal(reset.length, 2);
-  assert.equal(reset[0].content, prompt); // 仍是完整 prompt
+  assert.equal(reset[0].content, prompt); // still the full prompt
   assert.equal(reset[1].content, '分析结果');
 });
 
-test('resetHistory: 只有 2 条时不操作，原样返回', () => {
+test('resetHistory: when only 2 entries, returns as-is without modification', () => {
   const prompt = '完整 prompt';
   const history = initHistory(prompt, '分析');
   const reset = resetHistory(history);
-  assert.equal(reset, history); // 同一个引用
+  assert.equal(reset, history); // same reference
   assert.equal(reset.length, 2);
 });
 
 // ---------------------------------------------------------------------------
-// 2. sendFollowUp 失败路径：三个分支都移除"思考中…"占位并渲染错误
+// 2. sendFollowUp failure paths: all three branches remove "thinking..." placeholder and render error
 // ---------------------------------------------------------------------------
 
-test('sendFollowUp 失败: !resp 分支——SW 无响应', () => {
+test('sendFollowUp failure: !resp branch -- SW unresponsive', () => {
   const prompt = '完整 prompt 原文';
   let history = initHistory(prompt, '分析结果');
   history.push({ role: 'user', content: '追问' });
   const loadingIdx = history.length;
   history.push({ role: 'assistant', content: '⏳ 思考中…' });
 
-  // 模拟 sendFollowUp 分支：!resp
+  // Simulate sendFollowUp branch: !resp
   const result = handleFollowUpError(history, loadingIdx, '无响应');
 
-  assert.equal(result.length, 4); // 初始2 + 追问1 + 错误1
-  assert.equal(result[0].content, prompt); // prompt 不变
-  assert.ok(!result.some((m) => m.content === '⏳ 思考中…')); // 占位已移除
+  assert.equal(result.length, 4); // initial 2 + question 1 + error 1
+  assert.equal(result[0].content, prompt); // prompt unchanged
+  assert.ok(!result.some((m) => m.content === '⏳ 思考中…')); // placeholder removed
   assert.ok(result[result.length - 1].content.includes('❌ 错误：无响应'));
 });
 
-test('sendFollowUp 失败: !resp.ok 分支——SW 返回 error', () => {
+test('sendFollowUp failure: !resp.ok branch -- SW returns error', () => {
   const prompt = '完整 prompt 原文';
   let history = initHistory(prompt, '分析结果');
   history.push({ role: 'user', content: '追问' });
@@ -211,7 +211,7 @@ test('sendFollowUp 失败: !resp.ok 分支——SW 返回 error', () => {
   assert.equal(result[result.length - 1].role, 'assistant');
 });
 
-test('sendFollowUp 失败: catch 分支——通信异常', () => {
+test('sendFollowUp failure: catch branch -- communication error', () => {
   const prompt = '完整 prompt 原文';
   let history = initHistory(prompt, '分析结果');
   history.push({ role: 'user', content: '追问' });
@@ -225,24 +225,24 @@ test('sendFollowUp 失败: catch 分支——通信异常', () => {
   assert.ok(result[result.length - 1].content.includes('通信错误'));
 });
 
-test('sendFollowUp 失败: 多次追问后 prompt 仍完整', () => {
+test('sendFollowUp failure: prompt still intact after multiple follow-ups', () => {
   const prompt = '完整 prompt 原文 15000 字符';
   let history = initHistory(prompt, '分析结果');
 
-  // 模拟 5 轮成功追问
+  // Simulate 5 successful follow-up rounds
   for (let i = 1; i <= 5; i++) {
     history.push({ role: 'user', content: `追问${i}` });
     history.push({ role: 'assistant', content: `回复${i}` });
   }
 
-  // 第 6 轮失败
+  // Round 6 fails
   history.push({ role: 'user', content: '追问6' });
   const loadingIdx = history.length;
   history.push({ role: 'assistant', content: '⏳ 思考中…' });
 
   const result = handleFollowUpError(history, loadingIdx, '触发限流');
 
-  // 经历 6 轮追问后 prompt 仍在第一位且完整
+  // After 6 rounds, prompt is still at position 0 and intact
   assert.equal(result[0].content, prompt);
   assert.ok(!result[0].content.includes('📊'));
   assert.equal(result[0].role, 'user');

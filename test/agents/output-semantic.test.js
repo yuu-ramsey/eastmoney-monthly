@@ -1,5 +1,5 @@
-// Agent 输出语义级回归测试：mock LLM provider 返回固定文本，验证处理流程 + 报告字段填充
-// 不测 LLM 输出质量，只测"假设 LLM 输出 X，扩展能否正确处理 X"
+// Agent output semantic regression test: mock LLM provider returns fixed text, verify processing flow + report field population
+// Does not test LLM output quality, only tests "if LLM outputs X, can the extension correctly handle X"
 
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,7 +7,7 @@ import { runDebate } from '../../lib/agents/runner.js';
 import { judgeAgent } from '../../lib/agents/judge.js';
 import { buildPrompt, buildMultiPeriodPrompt } from '../../lib/build-prompt.js';
 
-// ---- 共享测试数据 ----
+// ---- Shared test data ----
 
 const sampleKlines = [
   { date: '2026-04-30', open: 1550, close: 1600, high: 1620, low: 1540, volume: 120000, changePercent: 3.2, ma5: 1540, ma20: 1500, ma60: 1420, dif: 12, dea: 9, hist: 6, turnoverRate: 2.5 },
@@ -35,7 +35,7 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
-// 助⼿：按调用顺序返回不同文本的 mock fetch
+// Helper: mock fetch that returns different text per call order
 function mockFetchSequential(texts) {
   let idx = 0;
   globalThis.fetch = () => {
@@ -53,7 +53,7 @@ function mockFetchSequential(texts) {
   };
 }
 
-// 助⼿：按调用顺序可选择失败/成功的 mock fetch
+// Helper: mock fetch that can fail/succeed per call order
 function mockFetchWithFails(results) {
   let idx = 0;
   globalThis.fetch = () => {
@@ -75,9 +75,9 @@ function mockFetchWithFails(results) {
 }
 
 // ============================================================
-// 场景 1：Bull Agent mock 返回含 5 个编号论点的文本
+// Scenario 1: Bull Agent mock returns text with 5 numbered arguments
 // ============================================================
-test('场景1: Bull Agent mock 返回 5 个论点编号 → debate.partials.bull.text 含论点1-5', async () => {
+test('Scenario 1: Bull Agent mock returns 5 numbered arguments -> debate.partials.bull.text contains arguments 1-5', async () => {
   mockFetchSequential([
     '## 核心多头论点\n1. 均线多头排列形成金叉支撑\n2. MACD 金叉确认中期趋势向上\n3. 成交量放大配合价涨量增\n4. 前高压力位突破后转为支撑\n5. 月线级别趋势线完好向上',
     '## 核心空头论点\n1. x\n2. y\n3. z',
@@ -85,18 +85,18 @@ test('场景1: Bull Agent mock 返回 5 个论点编号 → debate.partials.bull
   ]);
 
   const result = await runDebate(debateCtx, debateOpts);
-  assert.ok(result.partials.bull, 'Bull Agent 应有输出');
+  assert.ok(result.partials.bull, 'Bull Agent should have output');
   const text = result.partials.bull.text;
 
   for (let i = 1; i <= 5; i++) {
-    assert.match(text, new RegExp(`^${i}\\.`, 'm'), `应包含论点${i}`);
+    assert.match(text, new RegExp(`^${i}\\.`, 'm'), `should contain argument ${i}`);
   }
 });
 
 // ============================================================
-// 场景 2：Bear Agent mock 返回含 5 个编号论点的文本
+// Scenario 2: Bear Agent mock returns text with 5 numbered arguments
 // ============================================================
-test('场景2: Bear Agent mock 返回 5 个论点编号 → debate.partials.bear.text 含论点1-5', async () => {
+test('Scenario 2: Bear Agent mock returns 5 numbered arguments -> debate.partials.bear.text contains arguments 1-5', async () => {
   mockFetchSequential([
     '## 核心多头论点\n1. 多\n2. 多\n3. 多',
     '## 核心空头论点\n1. 前高压力位尚未有效突破\n2. MACD 红柱缩短动能衰减\n3. 成交量持续萎缩量价背离\n4. 均线乖离率过大有回调需求\n5. 估值偏高缺乏安全边际',
@@ -104,18 +104,18 @@ test('场景2: Bear Agent mock 返回 5 个论点编号 → debate.partials.bear
   ]);
 
   const result = await runDebate(debateCtx, debateOpts);
-  assert.ok(result.partials.bear, 'Bear Agent 应有输出');
+  assert.ok(result.partials.bear, 'Bear Agent should have output');
   const text = result.partials.bear.text;
 
   for (let i = 1; i <= 5; i++) {
-    assert.match(text, new RegExp(`^${i}\\.`, 'm'), `应包含论点${i}`);
+    assert.match(text, new RegExp(`^${i}\\.`, 'm'), `should contain argument ${i}`);
   }
 });
 
 // ============================================================
-// 场景 3：Judge Agent mock 返回完整报告 → 验证主输出正确提取
+// Scenario 3: Judge Agent mock returns complete report -> verify main output correctly extracted
 // ============================================================
-test('场景3: Judge Agent mock 完整报告 → result.judge.text 包含综合裁判报告结构', async () => {
+test('Scenario 3: Judge Agent mock complete report -> result.judge.text contains synthesis report structure', async () => {
   const judgeReport = `# 贵州茅台(600519) 综合裁判报告
 
 ## 多空双方核心论点对比
@@ -143,7 +143,7 @@ Bull 方论点更扎实，数据引用具体，逻辑链完整。
   ]);
 
   const result = await runDebate(debateCtx, debateOpts);
-  assert.ok(result.judge, 'Judge 应有输出');
+  assert.ok(result.judge, 'Judge should have output');
   assert.match(result.judge.text, /综合裁判报告/);
   assert.match(result.judge.text, /多空双方核心论点对比/);
   assert.match(result.judge.text, /综合方向判断/);
@@ -153,9 +153,9 @@ Bull 方论点更扎实，数据引用具体，逻辑链完整。
 });
 
 // ============================================================
-// 场景 4：Judge prompt 构造时 Bull/Bear/Predictor 文本被正确注入
+// Scenario 4: Judge prompt construction correctly injects Bull/Bear/Predictor text
 // ============================================================
-test('场景4: Judge prompt 中 Bull/Bear/Predictor 文本按模板位置注入', () => {
+test('Scenario 4: Judge prompt injects Bull/Bear/Predictor text at template positions', () => {
   const ctx = {
     ...debateCtx,
     partials: {
@@ -167,28 +167,28 @@ test('场景4: Judge prompt 中 Bull/Bear/Predictor 文本按模板位置注入'
 
   const prompt = judgeAgent.buildPrompt(ctx);
 
-  // 三个 Agent 文本都在 prompt 中
+  // All three Agent texts are present in the prompt
   assert.match(prompt, /【BULL_UNIQUE_MARKER_12345】/);
   assert.match(prompt, /【BEAR_UNIQUE_MARKER_67890】/);
   assert.match(prompt, /【PREDICTOR_UNIQUE_MARKER_ABCDE】/);
 
-  // 位置验证：Bull 在 Bear 之前，Bear 在 Predictor 之前
+  // Position verification: Bull before Bear, Bear before Predictor
   const bullIdx = prompt.indexOf('【BULL_UNIQUE_MARKER_12345】');
   const bearIdx = prompt.indexOf('【BEAR_UNIQUE_MARKER_67890】');
   const predIdx = prompt.indexOf('【PREDICTOR_UNIQUE_MARKER_ABCDE】');
-  assert.ok(bullIdx < bearIdx, 'Bull 应在 Bear 之前');
-  assert.ok(bearIdx < predIdx, 'Bear 应在 Predictor 之前');
+  assert.ok(bullIdx < bearIdx, 'Bull should be before Bear');
+  assert.ok(bearIdx < predIdx, 'Bear should be before Predictor');
 
-  // 结构标签存在
+  // Structure labels present
   assert.match(prompt, /\[Bull Agent 输出\]/);
   assert.match(prompt, /\[Bear Agent 输出\]/);
   assert.match(prompt, /\[Predictor Agent 输出\]/);
 });
 
 // ============================================================
-// 场景 5：decisionMode=true 时 prompt 末尾追加 PERSONAL_DECISION_BLOCK
+// Scenario 5: decisionMode=true appends PERSONAL_DECISION_BLOCK at end of prompt
 // ============================================================
-test('场景5: Judge decisionMode=true → prompt 末尾含个人决策视角', () => {
+test('Scenario 5: Judge decisionMode=true -> prompt end contains personal decision perspective', () => {
   const ctx = {
     ...debateCtx,
     decisionMode: true,
@@ -210,36 +210,36 @@ test('场景5: Judge decisionMode=true → prompt 末尾含个人决策视角', 
 });
 
 // ============================================================
-// 场景 6：successCount < 2 时 Judge 跳过 + errors.judge 填充
+// Scenario 6: successCount < 2 -> Judge skipped + errors.judge populated
 // ============================================================
-test('场景6: 仅 1 个 Agent 成功 → Judge 跳过, errors.judge 含"不足 2 个"', async () => {
+test('Scenario 6: Only 1 Agent succeeds -> Judge skipped, errors.judge contains "less than 2"', async () => {
   mockFetchWithFails([
-    { ok: false, status: 500, error: 'bull fail' },    // Bull 失败
-    { ok: false, status: 500, error: 'bear fail' },    // Bear 失败
-    { ok: true,  text: 'predictor success' },           // Predictor 成功 → successCount=1
+    { ok: false, status: 500, error: 'bull fail' },    // Bull failed
+    { ok: false, status: 500, error: 'bear fail' },    // Bear failed
+    { ok: true,  text: 'predictor success' },           // Predictor succeeded -> successCount=1
   ]);
 
   const result = await runDebate(debateCtx, debateOpts);
 
-  // 验证 successCount = 1
+  // Verify successCount = 1
   const successCount = [result.partials.bull, result.partials.bear, result.partials.predictor]
     .filter((p) => p !== null).length;
-  assert.ok(successCount < 2, `successCount 应为 <2，实际 ${successCount}`);
+  assert.ok(successCount < 2, `successCount should be <2, actual ${successCount}`);
 
-  assert.equal(result.judge, null, 'Judge 应为 null');
-  assert.ok(result.errors.judge, 'errors.judge 应填充');
+  assert.equal(result.judge, null, 'Judge should be null');
+  assert.ok(result.errors.judge, 'errors.judge should be populated');
   assert.match(String(result.errors.judge), /不足 2 个/);
 
-  // 验证失败的 Agent 有错误记录
-  assert.ok(result.errors.bull, 'Bull 错误应有记录');
-  assert.ok(result.errors.bear, 'Bear 错误应有记录');
-  assert.equal(result.errors.predictor, null, 'Predictor 不应有错误');
+  // Verify failed Agents have error records
+  assert.ok(result.errors.bull, 'Bull error should have record');
+  assert.ok(result.errors.bear, 'Bear error should have record');
+  assert.equal(result.errors.predictor, null, 'Predictor should not have error');
 });
 
 // ============================================================
-// 场景 7：Predictor mock 返回含具体价位的文本 → 验证数字格式
+// Scenario 7: Predictor mock returns text with specific price levels -> verify number format
 // ============================================================
-test('场景7: Predictor mock 返回价位列表 → 输出包含 ≥3 处 XX.XX 格式数字', async () => {
+test('Scenario 7: Predictor mock returns price level list -> output contains >=3 XX.XX format numbers', async () => {
   mockFetchSequential([
     'bull text',
     'bear text',
@@ -255,21 +255,21 @@ test('场景7: Predictor mock 返回价位列表 → 输出包含 ≥3 处 XX.XX
   ]);
 
   const result = await runDebate(debateCtx, debateOpts);
-  assert.ok(result.partials.predictor, 'Predictor 应有输出');
+  assert.ok(result.partials.predictor, 'Predictor should have output');
   const text = result.partials.predictor.text;
 
   const priceMatches = text.match(/\d+\.\d{2}/g) || [];
-  assert.ok(priceMatches.length >= 3, `应至少 3 处 XX.XX 格式价位，实际 ${priceMatches.length} 处：${JSON.stringify(priceMatches)}`);
+  assert.ok(priceMatches.length >= 3, `should have at least 3 XX.XX format prices, actual ${priceMatches.length}: ${JSON.stringify(priceMatches)}`);
 
-  // 额外验证 Predictor 结构关键词
+  // Extra verification of Predictor structure keywords
   assert.match(text, /阻力位/);
   assert.match(text, /支撑位/);
 });
 
 // ============================================================
-// 场景 8：decisionMode=false 时 PERSONAL_DECISION_BLOCK 不出现
+// Scenario 8: decisionMode=false -> PERSONAL_DECISION_BLOCK does not appear
 // ============================================================
-test('场景8: Judge decisionMode=false → prompt 不含个人决策视角', () => {
+test('Scenario 8: Judge decisionMode=false -> prompt does not contain personal decision perspective', () => {
   const ctx = {
     ...debateCtx,
     decisionMode: false,
@@ -282,52 +282,52 @@ test('场景8: Judge decisionMode=false → prompt 不含个人决策视角', ()
 
   const prompt = judgeAgent.buildPrompt(ctx);
 
-  assert.ok(!/个人决策视角/.test(prompt), '不应含"个人决策视角"');
-  assert.ok(!/关键止损位/.test(prompt), '不应含"关键止损位"');
-  assert.ok(!/持有时间预期/.test(prompt), '不应含"持有时间预期"');
-  assert.ok(!/建议仓位/.test(prompt), '不应含"建议仓位"');
+  assert.ok(!/个人决策视角/.test(prompt), 'should not contain "personal decision perspective"');
+  assert.ok(!/关键止损位/.test(prompt), 'should not contain "key stop-loss level"');
+  assert.ok(!/持有时间预期/.test(prompt), 'should not contain "expected holding period"');
+  assert.ok(!/建议仓位/.test(prompt), 'should not contain "suggested position size"');
 });
 
 // ============================================================
-// 场景 9：4 种风格各含独有关键词
+// Scenario 9: 4 styles each contain unique keywords
 // ============================================================
-test('场景9: buildPrompt 4 种风格各有独有关键词', () => {
+test('Scenario 9: buildPrompt 4 styles each have unique keywords', () => {
   const technical    = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style: 'technical' });
   const chanlun      = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style: 'chanlun' });
   const value        = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style: 'value' });
   const comprehensive = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style: 'comprehensive' });
 
-  // technical：均线 + MACD
-  assert.match(technical, /均线/, 'technical 应含"均线"');
-  assert.match(technical, /MACD/, 'technical 应含"MACD"');
+  // technical: moving averages + MACD
+  assert.match(technical, /均线/, 'technical should contain "MA"');
+  assert.match(technical, /MACD/, 'technical should contain "MACD"');
 
-  // chanlun：中枢 + 笔 + 线段
-  assert.match(chanlun, /中枢/, 'chanlun 应含"中枢"');
-  assert.match(chanlun, /笔/, 'chanlun 应含"笔"');
-  assert.match(chanlun, /线段/, 'chanlun 应含"线段"');
+  // chanlun: pivot + stroke + segment
+  assert.match(chanlun, /中枢/, 'chanlun should contain "pivot"');
+  assert.match(chanlun, /笔/, 'chanlun should contain "stroke"');
+  assert.match(chanlun, /线段/, 'chanlun should contain "segment"');
 
-  // value：分位 + 估值
-  assert.match(value, /分位/, 'value 应含"分位"');
-  assert.match(value, /估值/, 'value 应含"估值"');
+  // value: percentile + valuation
+  assert.match(value, /分位/, 'value should contain "percentile"');
+  assert.match(value, /估值/, 'value should contain "valuation"');
 
-  // comprehensive：综合 + 共振
-  assert.match(comprehensive, /综合/, 'comprehensive 应含"综合"');
-  assert.match(comprehensive, /共振/, 'comprehensive 应含"共振"');
+  // comprehensive: synthesis + resonance
+  assert.match(comprehensive, /综合/, 'comprehensive should contain "synthesis"');
+  assert.match(comprehensive, /共振/, 'comprehensive should contain "resonance"');
 
-  // 4 种风格均包含 STRUCTURED_OUTPUT_BLOCK
+  // All 4 styles contain STRUCTURED_OUTPUT_BLOCK
   const styles = { technical, chanlun, value, comprehensive };
   for (const [name, prompt] of Object.entries(styles)) {
-    assert.match(prompt, /结构化数据输出/, `${name} 应含"结构化数据输出"段落`);
-    assert.match(prompt, /centralZone/, `${name} 应含 centralZone`);
-    assert.match(prompt, /keySupport/, `${name} 应含 keySupport`);
-    assert.match(prompt, /keyResistance/, `${name} 应含 keyResistance`);
+    assert.match(prompt, /结构化数据输出/, `${name} should contain "structured data output" section`);
+    assert.match(prompt, /centralZone/, `${name} should contain centralZone`);
+    assert.match(prompt, /keySupport/, `${name} should contain keySupport`);
+    assert.match(prompt, /keyResistance/, `${name} should contain keyResistance`);
   }
 });
 
 // ============================================================
-// 场景 9b：多周期共振模式不含 STRUCTURED_OUTPUT_BLOCK
+// Scenario 9b: multi-period resonance mode does NOT contain STRUCTURED_OUTPUT_BLOCK
 // ============================================================
-test('场景9b: buildMultiPeriodPrompt 不含结构化数据输出段落', () => {
+test('Scenario 9b: buildMultiPeriodPrompt does not contain structured data output section', () => {
   const out = buildMultiPeriodPrompt({
     name: '茅台',
     code: '600519',
@@ -335,14 +335,14 @@ test('场景9b: buildMultiPeriodPrompt 不含结构化数据输出段落', () =>
     weeklyKlines: sampleKlines,
     dailyKlines: sampleKlines,
   });
-  assert.ok(!/结构化数据输出/.test(out), '多周期模式不应含"结构化数据输出"');
-  assert.ok(!/centralZone/.test(out), '多周期模式不应含 centralZone');
+  assert.ok(!/结构化数据输出/.test(out), 'multi-period mode should not contain "structured data output"');
+  assert.ok(!/centralZone/.test(out), 'multi-period mode should not contain centralZone');
 });
 
 // ============================================================
-// 场景 10：多周期共振 prompt 包含 5 段结构关键词
+// Scenario 10: multi-period resonance prompt contains 5 section structure keywords
 // ============================================================
-test('场景10: buildMultiPeriodPrompt 包含 5 段结构关键词', () => {
+test('Scenario 10: buildMultiPeriodPrompt contains 5 section structure keywords', () => {
   const out = buildMultiPeriodPrompt({
     name: '茅台',
     code: '600519',
@@ -351,9 +351,9 @@ test('场景10: buildMultiPeriodPrompt 包含 5 段结构关键词', () => {
     dailyKlines: sampleKlines,
   });
 
-  assert.match(out, /月线趋势定位/, '应含"月线趋势定位"');
-  assert.match(out, /周线结构定位/, '应含"周线结构定位"');
-  assert.match(out, /日线入场判断/, '应含"日线入场判断"');
-  assert.match(out, /多周期共振结论/, '应含"多周期共振结论"');
-  assert.match(out, /综合结论/, '应含"综合结论"');
+  assert.match(out, /月线趋势定位/, 'should contain "monthly trend positioning"');
+  assert.match(out, /周线结构定位/, 'should contain "weekly structure positioning"');
+  assert.match(out, /日线入场判断/, 'should contain "daily entry judgment"');
+  assert.match(out, /多周期共振结论/, 'should contain "multi-period resonance conclusion"');
+  assert.match(out, /综合结论/, 'should contain "synthesis conclusion"');
 });

@@ -1,19 +1,19 @@
 // Runtime import boundary guard test
-// 锁住"Service Worker 静态 import 闭包不含 Node 原生模块"不变量
+// Enforces the invariant: "Service Worker static import closure must not contain Node native modules"
 //
-// 规则：
-// - 只跟踪【静态】import/export...from 声明
-// - 【排除】动态 import() —— 本项目刻意用动态 import() 隔离 better-sqlite3,
-//   例如 lib/multi-period/resonance.js:12 的
-//   await import('../db/klines-repo.js') 和 native-host/server.js:197 的
-//   await import('../lib/db/connection.js')。若跟踪动态导入会误报。
-// - crypto 裸名不禁 —— Chrome Service Worker 提供 Web Crypto API
-//   (crypto.subtle / crypto.randomUUID) 是合法依赖
+// Rules:
+// - Only track [static] import/export...from declarations
+// - [Exclude] dynamic import() -- this project intentionally uses dynamic import()
+//   to isolate better-sqlite3, e.g. lib/multi-period/resonance.js:12's
+//   await import('../db/klines-repo.js') and native-host/server.js:197's
+//   await import('../lib/db/connection.js'). Tracking dynamic imports would false-positive.
+// - Bare 'crypto' is not banned -- Chrome Service Worker provides Web Crypto API
+//   (crypto.subtle / crypto.randomUUID) which is a legitimate dependency
 //
-// 局限性（正则方案, 对守卫用途可接受）：
-// - 多行 import 不会被提取（本项目所有 import 均为单行）
-// - 注释/字符串内的 import 字面不会被排除（本项目无此习惯）
-// - 裸 specifier（npm 包名）不跟踪 —— 本项目不依赖任何浏览器端 npm 包
+// Limitations (regex approach, acceptable for guard purposes):
+// - Multi-line imports are not extracted (all imports in this project are single-line)
+// - Import literals inside comments/strings are not excluded (not a practice in this project)
+// - Bare specifiers (npm package names) are not tracked -- this project has no browser-side npm deps
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,22 +24,22 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 
-// ---- 禁止的 Node 原生模块 (service worker 不可用) ----
+// ---- Banned Node native modules (unavailable in service worker) ----
 const BANNED_MODULES = new Set([
-  // npm C++ 原生模块
+  // npm C++ native modules
   'better-sqlite3', 'sqlite3',
-  // node: 前缀的核心模块
+  // node: prefixed core modules
   'node:fs', 'node:path', 'node:url', 'node:crypto',
   'node:child_process', 'node:os', 'node:net', 'node:http', 'node:https',
   'node:worker_threads',
-  // 裸名核心模块（不含 crypto — Chrome Service Worker 提供 Web Crypto）
+  // Bare name core modules (excluding crypto -- Chrome Service Worker provides Web Crypto)
   'fs', 'path', 'child_process', 'os', 'net', 'http', 'https',
   'worker_threads', 'stream', 'util',
 ]);
 
-// ---- 单行静态 import/export 提取 ----
-// 只匹配 "import ... from '...'" 和 "export ... from '...'" 单行声明
-// import() 动态调用不含 from 关键字, 天然被排除
+// ---- Single-line static import/export extraction ----
+// Only matches "import ... from '...'" and "export ... from '...'" single-line declarations
+// Dynamic import() calls do not contain the 'from' keyword and are naturally excluded
 
 const IMPORT_LINE_RE = /^\s*import\s+.*\s+from\s+['"]([^'"]+)['"]/;
 const EXPORT_LINE_RE = /^\s*export\s+.*\s+from\s+['"]([^'"]+)['"]/;
@@ -61,22 +61,22 @@ function extractStaticSpecifiers(filePath) {
   return specifiers;
 }
 
-// ---- 相对路径解析 (.js 补全 / index.js 解析) ----
+// ---- Relative path resolution (.js completion / index.js resolution) ----
 function resolveSpecifier(specifier, fromFile) {
-  // 只处理相对路径, npm 包名不跟踪
+  // Only handle relative paths, npm package names not tracked
   if (!specifier.startsWith('./') && !specifier.startsWith('../')) return null;
 
   const dir = path.dirname(fromFile);
   let resolved = path.resolve(dir, specifier);
 
-  // .js 补全
+  // .js completion
   if (!resolved.endsWith('.js') && !resolved.endsWith('.mjs')) {
     if (fs.existsSync(resolved + '.js')) {
       resolved += '.js';
     } else if (fs.existsSync(resolved + '.mjs')) {
       resolved += '.mjs';
     } else if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
-      // 目录 → 尝试 index.js
+      // Directory -> try index.js
       const idx = path.join(resolved, 'index.js');
       if (fs.existsSync(idx)) resolved = idx;
       else return null;
@@ -89,7 +89,7 @@ function resolveSpecifier(specifier, fromFile) {
   return resolved;
 }
 
-// ---- BFS 构建静态 import 闭包 ----
+// ---- BFS builds static import closure ----
 function buildReachableSet(entryFile) {
   const visited = new Set();
   const queue = [path.resolve(ROOT, entryFile)];
@@ -112,7 +112,7 @@ function buildReachableSet(entryFile) {
   return visited;
 }
 
-// ---- 检查闭包内是否存在禁止模块的静态 import 声明 ----
+// ---- Check if closure contains static import declarations of banned modules ----
 function findBannedStaticImports(reachableSet) {
   const violations = [];
   for (const file of reachableSet) {
@@ -137,65 +137,65 @@ function findBannedStaticImports(reachableSet) {
   return violations;
 }
 
-// ============ 测试用例 ============
+// ============ Test cases ============
 
 let reachableSet = null;
 
-test('import-guard: 构建 Service Worker 静态 import 闭包', () => {
+test('import-guard: build Service Worker static import closure', () => {
   reachableSet = buildReachableSet('background.js');
 
-  // 统一用 / 比较, 避免 Windows \ 分隔符误判
+  // Normalize to / for comparison, avoid Windows \ separator false positives
   const relPaths = [...reachableSet].map((f) => path.relative(ROOT, f).replaceAll('\\', '/'));
 
-  // 核心入口必须在
-  assert.ok(relPaths.includes('background.js'), 'background.js 应在可达集中');
+  // Core entry must be present
+  assert.ok(relPaths.includes('background.js'), 'background.js should be in reachable set');
 
-  // 关键 lib 模块必须在（验证递归解析正确）
-  assert.ok(relPaths.some((f) => f.endsWith('build-prompt.js')), 'lib/build-prompt.js 应在可达集中');
-  assert.ok(relPaths.some((f) => f.endsWith('agents/runner.js')), 'lib/agents/runner.js 应在可达集中');
-  assert.ok(relPaths.some((f) => f.endsWith('llm/index.js')), 'lib/llm/index.js 应在可达集中');
-  assert.ok(relPaths.some((f) => f.endsWith('indicators/calculate.js')), 'lib/indicators/calculate.js 应在可达集中');
-  assert.ok(relPaths.some((f) => f.endsWith('signals/summary.js')), 'lib/signals/summary.js 应在可达集中');
-  assert.ok(relPaths.some((f) => f.endsWith('prompt-templates.js')), 'lib/prompt-templates.js 应在可达集中');
-  assert.ok(relPaths.some((f) => f.endsWith('self-backtest.js')), 'lib/self-backtest.js 应在可达集中');
+  // Key lib modules must be present (verify recursive resolution is correct)
+  assert.ok(relPaths.some((f) => f.endsWith('build-prompt.js')), 'lib/build-prompt.js should be in reachable set');
+  assert.ok(relPaths.some((f) => f.endsWith('agents/runner.js')), 'lib/agents/runner.js should be in reachable set');
+  assert.ok(relPaths.some((f) => f.endsWith('llm/index.js')), 'lib/llm/index.js should be in reachable set');
+  assert.ok(relPaths.some((f) => f.endsWith('indicators/calculate.js')), 'lib/indicators/calculate.js should be in reachable set');
+  assert.ok(relPaths.some((f) => f.endsWith('signals/summary.js')), 'lib/signals/summary.js should be in reachable set');
+  assert.ok(relPaths.some((f) => f.endsWith('prompt-templates.js')), 'lib/prompt-templates.js should be in reachable set');
+  assert.ok(relPaths.some((f) => f.endsWith('self-backtest.js')), 'lib/self-backtest.js should be in reachable set');
 });
 
-test('import-guard: lib/db/ 不在静态 import 闭包中', () => {
+test('import-guard: lib/db/ is not in static import closure', () => {
   const relPaths = [...reachableSet].map((f) => path.relative(ROOT, f).replaceAll('\\', '/'));
   const dbFiles = relPaths.filter((f) => f.includes('lib/db/'));
   assert.equal(dbFiles.length, 0,
-    `lib/db/ 不应在静态闭包中, 发现: ${dbFiles.join(', ')}`);
+    `lib/db/ should not be in static closure, found: ${dbFiles.join(', ')}`);
 });
 
-test('import-guard: lib/lstm/ 不在静态 import 闭包中', () => {
+test('import-guard: lib/lstm/ is not in static import closure', () => {
   const relPaths = [...reachableSet].map((f) => path.relative(ROOT, f).replaceAll('\\', '/'));
   const lstmFiles = relPaths.filter((f) => f.includes('lib/lstm/'));
   assert.equal(lstmFiles.length, 0,
-    `lib/lstm/ 不应在静态闭包中, 发现: ${lstmFiles.join(', ')}`);
+    `lib/lstm/ should not be in static closure, found: ${lstmFiles.join(', ')}`);
 });
 
-test('import-guard: 静态 import 闭包不含 Node 原生模块', () => {
+test('import-guard: static import closure contains no Node native modules', () => {
   const violations = findBannedStaticImports(reachableSet);
 
   if (violations.length > 0) {
-    const lines = violations.map((v) => `  ${v.file}:${v.line} → '${v.module}'`);
-    assert.fail(`发现 ${violations.length} 个违规静态 import:\n${lines.join('\n')}`);
+    const lines = violations.map((v) => `  ${v.file}:${v.line} -> '${v.module}'`);
+    assert.fail(`found ${violations.length} violation static import(s):\n${lines.join('\n')}`);
   }
 
-  // 不变量成立
+  // Invariant holds
   assert.ok(true);
 });
 
-test('import-guard: crypto 不在禁止列表中 (Web Crypto API 合法)', () => {
+test('import-guard: crypto is not in banned list (Web Crypto API is legitimate)', () => {
   assert.ok(!BANNED_MODULES.has('crypto'),
-    'crypto 不应在 BANNED_MODULES 中 — Chrome Service Worker 的 crypto.subtle 是合法依赖');
+    'crypto should not be in BANNED_MODULES -- Chrome Service Worker crypto.subtle is a legitimate dependency');
 });
 
-test('import-guard: 动态 import 未被跟踪 (设计决策验证)', () => {
-  // resonance.js 使用了 await import('../db/klines-repo.js')
-  // 如果动态导入被误跟踪, lib/db/ 就会出现在闭包中
+test('import-guard: dynamic import is not tracked (design decision verification)', () => {
+  // resonance.js uses await import('../db/klines-repo.js')
+  // If dynamic import were incorrectly tracked, lib/db/ would appear in closure
   const relPaths = [...reachableSet].map((f) => path.relative(ROOT, f).replaceAll('\\', '/'));
   const dbFiles = relPaths.filter((f) => f.includes('lib/db'));
   assert.equal(dbFiles.length, 0,
-    '动态 import() 被正确排除 — lib/db/ 不在闭包中');
+    'dynamic import() correctly excluded -- lib/db/ is not in closure');
 });

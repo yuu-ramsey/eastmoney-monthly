@@ -5,7 +5,7 @@ import Database from 'better-sqlite3';
 import { initSchema } from '../../lib/db/schema.js';
 import { saveKlinesSync, getExistingSource, checkSourceLock, clearExistingData } from '../../lib/db/klines-repo.js';
 
-// 为了隔离测试，每个测试用独立的 :memory: DB
+// For test isolation, each test uses its own :memory: DB
 let testDb = null;
 
 function setupDb() {
@@ -23,16 +23,11 @@ function useDb(db) {
   overrideDb = db;
 }
 
-// Patch: 替换 getDb 返回测试数据库
-// 注意：klines-repo.js 从 connection.js import getDb，
-// ES module live binding 允许我们通过 connection.getDb 替换...
-// 但 import 的绑定是只读的。这里只能用另一种方式：
-// 直接测试 saveKlinesSync + 再通过 getDb 的原始机制...
-
-// 实际上我们需要绕过 getDb。klines-repo 内部调 getDb()，
-// 而 getDb 返回文件路径的数据库。测试应该用 :memory: 替代。
-// 方案：用 DI —— 让 getKlines 接受 db 参数，或者临时改 connection。
-// 简化方案：直接测 saveKlinesSync + 底层 SQL，不绕 getDb。
+// Patch: replace getDb to return test database
+// Note: klines-repo.js imports getDb from connection.js,
+// ES module live binding allows us to replace via connection.getDb...
+// but import bindings are read-only. Alternative approach:
+// directly test saveKlinesSync + raw SQL, bypassing getDb.
 
 function makeSampleKlines(n = 5) {
   const klines = [];
@@ -54,7 +49,7 @@ function makeSampleKlines(n = 5) {
   return klines;
 }
 
-test('saveKlinesSync 写入 + 读取验证', () => {
+test('saveKlinesSync write + read verification', () => {
   const db = setupDb();
   const klines = makeSampleKlines(3);
   saveKlinesSync(db, 'monthly_klines', '600519', '1', '贵州茅台', klines);
@@ -65,7 +60,7 @@ test('saveKlinesSync 写入 + 读取验证', () => {
   assert.equal(rows[2].date, '2026-03');
 });
 
-test('saveKlinesSync 写入 stocks 表', () => {
+test('saveKlinesSync writes stocks table', () => {
   const db = setupDb();
   const klines = makeSampleKlines(1);
   saveKlinesSync(db, 'monthly_klines', '000001', '0', '平安银行', klines);
@@ -75,7 +70,7 @@ test('saveKlinesSync 写入 stocks 表', () => {
   assert.equal(stock.market, '0');
 });
 
-test('saveKlinesSync upsert 去重', () => {
+test('saveKlinesSync upsert dedup', () => {
   const db = setupDb();
   const klines1 = makeSampleKlines(2);
   const klines2 = [
@@ -86,12 +81,12 @@ test('saveKlinesSync upsert 去重', () => {
 
   const rows = db.prepare('SELECT * FROM monthly_klines WHERE code = ? ORDER BY date').all('600519');
   assert.equal(rows.length, 2);
-  // 2026-02 被更新为新的 close=210
+  // 2026-02 was updated to new close=210
   const feb = rows.find((r) => r.date === '2026-02');
   assert.equal(feb.close, 210);
 });
 
-test('批量写入多周期', () => {
+test('batch write multiple periods', () => {
   const db = setupDb();
   const klines = makeSampleKlines(3);
   saveKlinesSync(db, 'monthly_klines', '600519', '1', '茅台', klines);
@@ -103,14 +98,14 @@ test('批量写入多周期', () => {
   assert.equal(db.prepare('SELECT count(*) as c FROM daily_klines').get().c, 10);
 });
 
-test('空 klines 不报错', () => {
+test('empty klines does not throw', () => {
   const db = setupDb();
   assert.doesNotThrow(() => {
     saveKlinesSync(db, 'monthly_klines', '600519', '1', '空', []);
   });
 });
 
-test('null 字段可写入', () => {
+test('null fields can be written', () => {
   const db = setupDb();
   const klines = [
     { date: '2026-01', open: 10, close: null, high: null, low: null, volume: null, amount: null, amplitude: null, changePercent: null, change: null, turnoverRate: null },
@@ -121,9 +116,9 @@ test('null 字段可写入', () => {
   assert.equal(row.close, null);
 });
 
-// ---- 源锁定测试 ----
+// ---- source lock tests ----
 
-test('source 列写入', () => {
+test('source column write', () => {
   const db = setupDb();
   const klines = makeSampleKlines(2);
   saveKlinesSync(db, 'monthly_klines', '600519', '1', '茅台', klines, 'baidu');
@@ -131,7 +126,7 @@ test('source 列写入', () => {
   assert.equal(row.source, 'baidu');
 });
 
-test('getExistingSource 返回正确源', () => {
+test('getExistingSource returns correct source', () => {
   const db = setupDb();
   const klines = makeSampleKlines(1);
   saveKlinesSync(db, 'monthly_klines', '600519', '1', '茅台', klines, 'sina');
@@ -139,13 +134,13 @@ test('getExistingSource 返回正确源', () => {
   assert.equal(source, 'sina');
 });
 
-test('getExistingSource 无数据返回 null', () => {
+test('getExistingSource no data returns null', () => {
   const db = setupDb();
   const source = getExistingSource(db, 'monthly_klines', '999999');
   assert.equal(source, null);
 });
 
-test('同源写入不抛错', () => {
+test('same source write does not throw', () => {
   const db = setupDb();
   saveKlinesSync(db, 'monthly_klines', '600519', '1', '茅台', makeSampleKlines(2), 'baidu');
   assert.doesNotThrow(() => {
@@ -153,7 +148,7 @@ test('同源写入不抛错', () => {
   });
 });
 
-test('跨源写入抛错', () => {
+test('cross-source write throws', () => {
   const db = setupDb();
   saveKlinesSync(db, 'monthly_klines', '600519', '1', '茅台', makeSampleKlines(2), 'baidu');
   assert.throws(() => {
@@ -161,7 +156,7 @@ test('跨源写入抛错', () => {
   }, /Cross-source contamination/);
 });
 
-test('不同周期可用不同源（不互锁）', () => {
+test('different periods can use different sources (not interlocked)', () => {
   const db = setupDb();
   saveKlinesSync(db, 'monthly_klines', '600519', '1', '茅台', makeSampleKlines(2), 'baidu');
   assert.doesNotThrow(() => {
@@ -169,7 +164,7 @@ test('不同周期可用不同源（不互锁）', () => {
   });
 });
 
-test('clearExistingData 清除后可用新源', () => {
+test('clearExistingData enables new source after clearing', () => {
   const db = setupDb();
   saveKlinesSync(db, 'monthly_klines', '600519', '1', '茅台', makeSampleKlines(2), 'baidu');
   clearExistingData(db, 'monthly_klines', '600519');

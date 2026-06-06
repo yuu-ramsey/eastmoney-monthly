@@ -1,5 +1,5 @@
 """Permutation test: verify statistical significance of monthly LightGBM IC=0.063.
-Method: cross-sectional shuffle fwd_ret（破坏 X→y 关系）+ price series shuffle（破坏时序结构）
+Method: cross-sectional shuffle fwd_ret (break X->y relationship) + price series shuffle (break temporal structure)
 """
 import numpy as np, pandas as pd, sqlite3, time, json
 from pathlib import Path
@@ -7,10 +7,10 @@ from scipy.stats import spearmanr
 import lightgbm as lgb
 
 DB = '.eastmoney-ai/db/klines-v2.sqlite'
-N_PERM = 500  # 截面打乱次数
-N_PRICE_PERM = 50  # 价格打乱次数（较慢）
+N_PERM = 500  # cross-sectional shuffle count
+N_PRICE_PERM = 50  # price shuffle count (slower)
 
-# ── 特征工程（与 monthly_enhanced_v6.py 完全一致）─────────────────────
+# ── Feature engineering (identical to monthly_enhanced_v6.py) ─────────────────────
 def build_features(df, codes, ind_map):
     rows = []
     for code in codes:
@@ -62,7 +62,7 @@ def build_features(df, codes, ind_map):
                 'sector_id':hash(industry)%31/31.0})
     return pd.DataFrame(rows).dropna()
 
-# ── LightGBM 训练 + 月截面 IC ──────────────────────────────────────────
+# ── LightGBM training + monthly cross-sectional IC ────────────────────────
 def train_eval(train, test, feat_cols, seed=456):
     model = lgb.LGBMRegressor(
         objective='regression', metric='l1', num_leaves=63, learning_rate=0.03,
@@ -80,8 +80,8 @@ def train_eval(train, test, feat_cols, seed=456):
 # ── Main flow ─────────────────────────────────────────────────────────────
 def main():
     print("="*60)
-    print("月线 LightGBM 排列检验")
-    print(f"截面打乱: {N_PERM}次 | 价格打乱: {N_PRICE_PERM}次")
+    print("Monthly kline LightGBM permutation test")
+    print(f"Cross-sectional shuffle: {N_PERM} times | Price shuffle: {N_PRICE_PERM} times")
     print("="*60)
 
     # Loaded
@@ -92,19 +92,19 @@ def main():
     params = ','.join('?'*len(codes))
     df = pd.read_sql_query(f"SELECT code,date,open,high,low,close,volume,turnover_rate FROM monthly_klines WHERE code IN ({params}) AND date>='2010-01' ORDER BY code,date", conn, params=codes)
     conn.close()
-    print(f"[1/4] 数据: {len(codes)}stocks, {len(df):,}行 ({time.time()-t0:.0f}s)")
+    print(f"[1/4] Data: {len(codes)}stocks, {len(df):,} rows ({time.time()-t0:.0f}s)")
 
-    # 真实 IC
-    print("[2/4] 真实 IC 基线...")
+    # Real IC
+    print("[2/4] Real IC baseline...")
     data = build_features(df, codes, ind_map)
     feat_cols = [c for c in data.columns if c not in ['code','date','fwd_ret']]
     train = data[(data['date']>='2015-01')&(data['date']<='2021-12')]
     test = data[data['date']>='2024-01']
     real_ic = train_eval(train, test, feat_cols)
-    print(f"  真实 IC = {real_ic:+.4f} | 训练: {len(train):,} 测试: {len(test):,} 特征: {len(feat_cols)}")
+    print(f"  Real IC = {real_ic:+.4f} | Train: {len(train):,} Test: {len(test):,} Features: {len(feat_cols)}")
 
-    # 截面打乱排列
-    print(f"\n[3/4] 截面打乱排列 ({N_PERM}次)...")
+    # Cross-sectional permutation
+    print(f"\n[3/4] Cross-sectional permutation ({N_PERM} times)...")
     perm_ics, better = [], 0
     t0 = time.time()
     for n in range(N_PERM):
@@ -120,8 +120,8 @@ def main():
             print(f"  [{n+1}/{N_PERM}] IC={ic:+.4f} better={better}/{n+1} ({e:.0f}s ETA{(e/(n+1)*(N_PERM-n-1)):.0f}s)")
     p_cross = better/N_PERM
 
-    # 价格打乱排列
-    print(f"\n[4/4] 价格打乱排列 ({N_PRICE_PERM}次)...")
+    # Price series permutation
+    print(f"\n[4/4] Price series permutation ({N_PRICE_PERM} times)...")
     price_ics, price_better = [], 0
     t0 = time.time()
     for n in range(N_PRICE_PERM):
@@ -148,15 +148,15 @@ def main():
         print(f"  [{n+1}/{N_PRICE_PERM}] IC={ic:+.4f} better={price_better}/{n+1} ({e:.0f}s)")
     p_price = price_better/N_PRICE_PERM
 
-    # 结果
+    # Results
     print("\n"+"="*60)
-    print("结果")
-    print(f"  真实 IC:                 {real_ic:+.4f}")
-    print(f"  截面打乱 P-value:        {p_cross:.4f} {'**显著' if p_cross<0.05 else '不显著'}")
-    print(f"  价格打乱 P-value:        {p_price:.4f} {'**显著' if p_price<0.05 else '不显著'}")
-    print(f"  截面打乱 IC 95%分位:     {np.percentile(perm_ics,95):+.4f}")
-    print(f"  截面打乱 IC 99%分位:     {np.percentile(perm_ics,99):+.4f}")
-    print(f"  截面打乱 IC mean±std:   {np.mean(perm_ics):+.4f}±{np.std(perm_ics):.4f}")
+    print("Results")
+    print(f"  Real IC:                 {real_ic:+.4f}")
+    print(f"  Cross-sectional P-value: {p_cross:.4f} {'**significant' if p_cross<0.05 else 'not significant'}")
+    print(f"  Price shuffle P-value:   {p_price:.4f} {'**significant' if p_price<0.05 else 'not significant'}")
+    print(f"  Cross-sectional IC 95pct:     {np.percentile(perm_ics,95):+.4f}")
+    print(f"  Cross-sectional IC 99pct:     {np.percentile(perm_ics,99):+.4f}")
+    print(f"  Cross-sectional IC mean+/-std:   {np.mean(perm_ics):+.4f}+/-{np.std(perm_ics):.4f}")
 
     out = {k:v for k,v in locals().items() if isinstance(v,(int,float,str,bool))}
     out['perm_ics'] = [float(x) for x in perm_ics]
@@ -164,7 +164,7 @@ def main():
     Path('.eastmoney-ai/eval').mkdir(parents=True, exist_ok=True)
     with open('.eastmoney-ai/eval/permutation_test.json','w') as f:
         json.dump(out, f, indent=2)
-    print(f"\n保存到 .eastmoney-ai/eval/permutation_test.json")
+    print(f"\nSaved to .eastmoney-ai/eval/permutation_test.json")
 
 if __name__ == '__main__':
     main()

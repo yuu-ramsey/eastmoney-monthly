@@ -9,35 +9,35 @@ test('parseStockUrl: Shanghai standard URL', () => {
   );
 });
 
-test('parseStockUrl: 深市标准 URL', () => {
+test('parseStockUrl: Shenzhen standard URL', () => {
   assert.deepEqual(
     parseStockUrl('https://quote.eastmoney.com/sz000001.html'),
     { market: '0', code: '000001' },
   );
 });
 
-test('parseStockUrl: 大写也能识别', () => {
+test('parseStockUrl: uppercase also recognized', () => {
   assert.deepEqual(
     parseStockUrl('https://quote.eastmoney.com/SH600519.html'),
     { market: '1', code: '600519' },
   );
 });
 
-test('parseStockUrl: sh.xxxxxx 点号格式', () => {
+test('parseStockUrl: sh.xxxxxx dot format', () => {
   assert.deepEqual(
     parseStockUrl('https://quote.eastmoney.com/sh.600519'),
     { market: '1', code: '600519' },
   );
 });
 
-test('parseStockUrl: 无效输入返回 null', () => {
+test('parseStockUrl: invalid input returns null', () => {
   assert.equal(parseStockUrl('https://www.baidu.com'), null);
   assert.equal(parseStockUrl(''), null);
   assert.equal(parseStockUrl(null), null);
   assert.equal(parseStockUrl(undefined), null);
 });
 
-test('parseStockUrl: 代码位数不对', () => {
-  // 5 位
+test('parseStockUrl: incorrect code digit count', () => {
+  // 5 digits
   assert.equal(parseStockUrl('https://quote.eastmoney.com/sh60019.html'), null);
 });

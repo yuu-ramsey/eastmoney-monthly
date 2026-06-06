@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-test('nightly: mock 链路（不调真实 API）', async () => {
+test('nightly: mock pipeline (no real API calls)', async () => {
   // mock DeepSeek
   let callCount = 0;
   const mockDeepSeek = async (prompt) => {
@@ -13,7 +13,7 @@ test('nightly: mock 链路（不调真实 API）', async () => {
     };
   };
 
-  // mock K 线
+  // mock K-lines
   const mockKlines = (() => {
     const data = [];
     for (let i = 0; i < 24; i++) {
@@ -45,11 +45,11 @@ test('nightly: mock 链路（不调真实 API）', async () => {
     prompt: `prompt #${i}`,
   }));
 
-  // 不 import nightly 直接测核心逻辑 — 只测 evaluateBatch + computeStats + pickFailureCases
+  // do not import nightly, test core logic directly -- only test evaluateBatch + computeStats + pickFailureCases
   const { evaluateBatch } = await import('../../lib/evaluation/collector.js');
   const { computeStats, pickFailureCases } = await import('../../lib/evaluation/draft-review.js');
 
-  // 内存 storage
+  // in-memory storage
   const memEvals = [];
   const storage = {
     async getEvaluations() { return [...memEvals]; },

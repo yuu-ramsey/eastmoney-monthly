@@ -29,12 +29,12 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
-// ---- 正常响应 ----
+// ---- Normal response ----
 
 test('handler: 正常解析完整财务指标', async () => {
   mockFetch(200, {
     data: {
-      // 东财原始单位：f43/f162/f167 需 ÷100
+      // Eastmoney raw units: f43/f162/f167 need ÷100
       f43: 4374, f57: '600522', f58: '中天科技',
       f162: 2530, f167: 310,
       f116: 150000000000, f117: 120000000000,
@@ -50,14 +50,14 @@ test('handler: 正常解析完整财务指标', async () => {
   assert.ok(result.includes('通信设备'));
 });
 
-// ---- 字段缺失 fallback ----
+// ---- Field missing fallback ----
 
 test('handler: 部分字段缺失时标注"该数据暂不可用"', async () => {
   mockFetch(200, {
     data: {
       f43: 1050, f57: '000001', f58: '平安银行',
-      // f162 PE 缺失
-      // f167 PB 缺失
+      // f162 PE missing
+      // f167 PB missing
       f116: null,
       f117: 50000000000,
       f127: '',
@@ -68,12 +68,12 @@ test('handler: 部分字段缺失时标注"该数据暂不可用"', async () => 
   assert.ok(result.includes('市净率: 该数据暂不可用'));
   assert.ok(result.includes('总市值: 该数据暂不可用'));
   assert.ok(result.includes('行业: 该数据暂不可用'));
-  // 有的字段正常
+  // Some fields are normal
   assert.ok(result.includes('10.50'));
   assert.ok(result.includes('500 亿'));
 });
 
-// ---- 接口错误 ----
+// ---- API error ----
 
 test('handler: data 为 null 返回错误信息', async () => {
   mockFetch(200, { data: null });
@@ -87,7 +87,7 @@ test('handler: HTTP 错误返回状态码', async () => {
   assert.ok(result.includes('HTTP 500'));
 });
 
-// ---- 网络错误 ----
+// ---- Network error ----
 
 test('handler: 超时返回超时文本', async () => {
   mockFetchAbort();
@@ -101,7 +101,7 @@ test('handler: 网络错误返回网络错误文本', async () => {
   assert.ok(result.includes('网络请求失败'));
 });
 
-// ---- 输入校验 ----
+// ---- Input validation ----
 
 test('handler: 缺少 secid 返回错误', async () => {
   const result = await getFinancialsTool.handler({});
@@ -113,7 +113,7 @@ test('handler: 空对象返回错误', async () => {
   assert.ok(result.includes('缺少 secid'));
 });
 
-// ---- 工具定义 ----
+// ---- Tool definition ----
 
 test('工具定义: 有 name/description/input_schema/handler', () => {
   assert.equal(getFinancialsTool.name, 'get_financials');

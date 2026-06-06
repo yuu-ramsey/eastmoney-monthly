@@ -1,8 +1,8 @@
-"""MC Dropout 不确定性量化 + 置信度惩罚
-基于 Andrej Karpathy 推荐的 LSTM 股票预测方法：
-- 推理时保留 Dropout，N 次前向传播收集预测分布
-- 标准差量化不确定性
-- 置信度惩罚: 不确定性越高，信号衰减越强
+"""MC Dropout uncertainty quantification + confidence penalty
+Based on Andrej Karpathy's recommended LSTM stock prediction method:
+- Keep Dropout active during inference, N forward passes collect prediction distribution
+- Standard deviation quantifies uncertainty
+- Confidence penalty: higher uncertainty → stronger signal decay
 """
 import torch, numpy as np
 from pathlib import Path
@@ -12,19 +12,19 @@ MODEL_DIR = PROJECT / '.eastmoney-ai' / 'lstm' / 'models_v2'
 
 
 def mc_predict(model, X_tensor, n_samples=50):
-    """MC Dropout 推理：N 次前向传播，dropout 保持开启
+    """MC Dropout inference: N forward passes, dropout kept active
 
     Args:
-        model: nn.Module（调用前需已Loaded权重）
+        model: nn.Module (must have weights loaded before calling)
         X_tensor: torch.Tensor, shape (1, seq_len, input_dim)
-        n_samples: 前向传播次数
+        n_samples: number of forward passes
 
     Returns:
-        mean: np.ndarray, shape (1, n_targets), 预测均值
-        std:  np.ndarray, shape (1, n_targets), 预测标准差（不确定性）
-        samples: np.ndarray, shape (n_samples, 1, n_targets), 全部样本
+        mean: np.ndarray, shape (1, n_targets), prediction mean
+        std:  np.ndarray, shape (1, n_targets), prediction standard deviation (uncertainty)
+        samples: np.ndarray, shape (n_samples, 1, n_targets), all samples
     """
-    model.train()  # dropout 保持活跃
+    model.train()  # dropout kept active
     samples = []
     with torch.no_grad():
         for _ in range(n_samples):
@@ -36,21 +36,21 @@ def mc_predict(model, X_tensor, n_samples=50):
 
 
 def confidence_penalty(mean, std, strength=1.0):
-    """置信度惩罚：高不确定性 → 信号向 0 收缩
+    """Confidence penalty: high uncertainty → signal shrinks toward 0
 
-    公式：
-        cv = std / (|mean| + ε)          — 变异系数
-        penalty = 1 / (1 + strength × cv) — 惩罚因子 ∈ (0, 1]
-        adjusted = mean × penalty         — 惩罚后信号
-        confidence = clip(1 - cv, 0, 1)   — 置信度 ∈ [0, 1]
+    Formula:
+        cv = std / (|mean| + ε)          — coefficient of variation
+        penalty = 1 / (1 + strength × cv) — penalty factor ∈ (0, 1]
+        adjusted = mean × penalty         — penalized signal
+        confidence = clip(1 - cv, 0, 1)   — confidence ∈ [0, 1]
 
     Args:
-        mean: np.ndarray, 预测均值
-        std:  np.ndarray, 预测标准差
-        strength: 惩罚强度，越大越保守（默认 1.0）
+        mean: np.ndarray, prediction mean
+        std:  np.ndarray, prediction standard deviation
+        strength: penalty strength, higher = more conservative (default 1.0)
 
     Returns:
-        dict: {adjusted, penalty, confidence, cv} — 每个都是 np.ndarray
+        dict: {adjusted, penalty, confidence, cv} — each is np.ndarray
     """
     eps = 1e-8
     cv = std / (np.abs(mean) + eps)
@@ -67,34 +67,34 @@ def confidence_penalty(mean, std, strength=1.0):
 
 def predict_signal_with_uncertainty(model, X_array, n_samples=50,
                                      penalty_strength=1.0, device='cuda'):
-    """端到端：从 numpy 数组到带不确定性的信号
+    """End-to-end: from numpy array to signal with uncertainty
 
     Args:
-        model: nn.Module（已Loaded权重）
-        X_array: np.ndarray, shape (seq_len, input_dim) 单条序列
-        n_samples: MC 采样次数
-        penalty_strength: 置信度惩罚强度
+        model: nn.Module (weights already loaded)
+        X_array: np.ndarray, shape (seq_len, input_dim) single sequence
+        n_samples: MC sampling count
+        penalty_strength: confidence penalty strength
         device: 'cuda' | 'cpu'
 
     Returns:
         dict with keys:
             y3_mean, y3_std, y3_adjusted, y3_confidence
             y6_mean, y6_std, y6_adjusted, y6_confidence
-            overall_confidence — y3 和 y6 置信度的均值
-            signal — 综合信号（y3 调整后），正=看多，负=看空
+            overall_confidence — mean of y3 and y6 confidence
+            signal — composite signal (y3 adjusted), positive=bullish, negative=bearish
             uncertainty_level — 'low' | 'medium' | 'high'
             n_samples
     """
     X_tensor = torch.from_numpy(X_array.astype(np.float32)).unsqueeze(0).to(device)
     mean, std, samples = mc_predict(model, X_tensor, n_samples)
 
-    # y3 / y6 的置信度惩罚
+    # Confidence penalty for y3 / y6
     y3 = confidence_penalty(mean[0, 0], std[0, 0], penalty_strength)
     y6 = confidence_penalty(mean[0, 1], std[0, 1], penalty_strength)
 
     overall_conf = float((y3['confidence'] + y6['confidence']) / 2.0)
 
-    # 不确定性分级
+    # Uncertainty grading
     avg_cv = float((y3['cv'] + y6['cv']) / 2.0)
     if avg_cv < 0.3:
         uncertainty_level = 'low'
@@ -121,16 +121,16 @@ def predict_signal_with_uncertainty(model, X_array, n_samples=50,
 
 
 def format_uncertainty_for_prompt(result):
-    """将 MC Dropout 结果格式化为可注入 prompt 的 dict"""
+    """Format MC Dropout result as a dict injectable into prompts"""
     if not result:
         return None
 
     ulevel = result.get('uncertainty_level', 'medium')
     level_emoji = {'low': '🟢', 'medium': '🟡', 'high': '🔴'}
     level_desc = {
-        'low': '模型预测一致性强，信号可信度较高',
-        'medium': '模型预测存在分歧，信号需结合技术面验证',
-        'high': '模型预测分歧大，信号不可靠，以技术分析为主',
+        'low': 'Model predictions highly consistent, signal reliability high',
+        'medium': 'Model predictions show divergence, signal needs technical verification',
+        'high': 'Model predictions highly divergent, signal unreliable, rely on technical analysis',
     }
 
     return {

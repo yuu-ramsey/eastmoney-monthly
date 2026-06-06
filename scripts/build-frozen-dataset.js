@@ -4,7 +4,7 @@ import * as fs from 'node:fs';
 const records = fs.readFileSync('.eastmoney-ai/eval/runs/runA-no-sector-2026-05-18-05-12-20.jsonl', 'utf-8')
   .trim().split('\n').filter(Boolean).map(l => JSON.parse(l));
 
-// 提取 stocks
+// Extract stocks
 const stocks = new Map();
 for (const r of records) {
   if (!stocks.has(r.stockCode)) {
@@ -17,7 +17,7 @@ for (const r of records) {
   }
 }
 
-// 提取 testPoints (unique code+cutoff)
+// Extract testPoints (unique code+cutoff)
 const tpMap = new Map();
 for (const r of records) {
   const key = r.stockCode + '_' + r.cutoffDate;

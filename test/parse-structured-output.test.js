@@ -3,9 +3,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { extractStructuredOutput } from '../lib/parse-structured-output.js';
 
-test('extractStructuredOutput: 正常 JSON 块提取通过', () => {
-  const text = `# 分析报告
-...略...
+test('extractStructuredOutput: normal JSON block extraction passes', () => {
+  const text = `# Analysis report
+...skipped...
 \`\`\`json
 {
   "period": "monthly",
@@ -32,14 +32,14 @@ test('extractStructuredOutput: 正常 JSON 块提取通过', () => {
   assert.equal(result.data.trend, 'up');
 });
 
-test('extractStructuredOutput: 无 JSON 块返回 error', () => {
-  const text = '# 分析报告\n\n没有 JSON 块的分析\n\n纯文本输出';
+test('extractStructuredOutput: no JSON block returns error', () => {
+  const text = '# Analysis report\n\nNo JSON block in analysis\n\nPlain text output';
   const result = extractStructuredOutput(text);
   assert.equal(result.data, null);
   assert.equal(result.error, 'JSON 块未找到');
 });
 
-test('extractStructuredOutput: JSON 解析失败返回 error', () => {
+test('extractStructuredOutput: JSON parse failure returns error', () => {
   const text = `\`\`\`json
 { broken json, missing quotes }
 \`\`\``;
@@ -49,7 +49,7 @@ test('extractStructuredOutput: JSON 解析失败返回 error', () => {
   assert.ok(result.rawJsonText);
 });
 
-test('extractStructuredOutput: JSON 结构不完整返回 error（缺少 period）', () => {
+test('extractStructuredOutput: incomplete JSON structure returns error (missing period)', () => {
   const text = `\`\`\`json
 {
   "centralZone": { "lower": 10, "upper": 20, "exists": true },
@@ -64,7 +64,7 @@ test('extractStructuredOutput: JSON 结构不完整返回 error（缺少 period�
   assert.match(String(result.error), /period/);
 });
 
-test('extractStructuredOutput: 缺少 centralZone 也报不完整', () => {
+test('extractStructuredOutput: missing centralZone also reports incomplete', () => {
   const text = `\`\`\`json
 {
   "period": "daily",
@@ -78,7 +78,7 @@ test('extractStructuredOutput: 缺少 centralZone 也报不完整', () => {
   assert.match(String(result.error), /JSON 结构不完整/);
 });
 
-test('extractStructuredOutput: centralZone.exists=false 且 lower/upper=null 合法', () => {
+test('extractStructuredOutput: centralZone.exists=false with lower/upper=null is valid', () => {
   const text = `\`\`\`json
 {
   "period": "weekly",
@@ -96,11 +96,11 @@ test('extractStructuredOutput: centralZone.exists=false 且 lower/upper=null 合
   assert.equal(result.data.centralZone.upper, null);
 });
 
-test('extractStructuredOutput: 多个代码块时只匹配第一个 json 块', () => {
+test('extractStructuredOutput: only first json block matched when multiple blocks present', () => {
   const text = `\`\`\`json
 { "period": "monthly", "centralZone": { "lower": 10, "upper": 20, "exists": true }, "keySupport": [], "keyResistance": [], "trend": "up" }
 \`\`\`
-后面还有别的代码块
+Followed by another code block
 \`\`\`json
 { "period": "daily" }
 \`\`\``;
@@ -109,7 +109,7 @@ test('extractStructuredOutput: 多个代码块时只匹配第一个 json 块', (
   assert.equal(result.data.period, 'monthly');
 });
 
-test('extractStructuredOutput: 字段名大小写归一化处理', () => {
+test('extractStructuredOutput: field name case normalization handled', () => {
   const text = `\`\`\`json
 {
   "Period": "monthly",
@@ -134,7 +134,7 @@ test('extractStructuredOutput: 字段名大小写归一化处理', () => {
   assert.equal(result.data.trend, 'up');
 });
 
-test('extractStructuredOutput: JSON 前后有多余空白的处理', () => {
+test('extractStructuredOutput: extra whitespace around JSON handled', () => {
   const text = `
 
 \`\`\`json

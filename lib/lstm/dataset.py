@@ -1,6 +1,6 @@
 """
-Phase 17 LSTM: 数据 pipeline
-从 SQLite 提取 21 维特征, 严格 walk-forward z-score, 输出 train/val/test npz
+Phase 17 LSTM: Data pipeline
+Extract 21-dim features from SQLite, strict walk-forward z-score, output train/val/test npz
 """
 import sqlite3
 import numpy as np

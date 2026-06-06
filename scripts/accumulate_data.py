@@ -63,16 +63,16 @@ def run_mc_dropout_today():
     return latest_df
 
 def accumulate_history(new_df):
-    """将New data合并到历史 parquet，去重 (code, date)，保留latest值"""
+    """Merge new data into history parquet, deduplicate (code, date), keep latest values"""
     if HISTORY_PARQUET.exists():
         old_df = pd.read_parquet(HISTORY_PARQUET)
         log(f"  History data: {len(old_df)} rows, {old_df['code'].nunique()} stocks")
-        # 合并 + 去重（New dataCovering旧数据）
+        # Merge + deduplicate (new data overwrites old data)
         combined = pd.concat([old_df, new_df], ignore_index=True)
         combined = combined.drop_duplicates(subset=['code', 'date'], keep='last')
         combined = combined.sort_values(['code', 'date']).reset_index(drop=True)
     else:
-        log("  无History data，创建新文件")
+        log("  No history data, creating new file")
         combined = new_df
 
     combined.to_parquet(HISTORY_PARQUET, index=False)
@@ -87,11 +87,11 @@ def accumulate_history(new_df):
     return combined
 
 def export_native_host_json(latest_df):
-    """导出每个股票的latest MC Dropout JSON 供 native-host 读取"""
+    """Export latest MC Dropout JSON for each stock, for native-host to read"""
     STORAGE_DIR.mkdir(parents=True, exist_ok=True)
     exported = 0
     for code, group in latest_df.groupby('code'):
-        # 取latestdate
+        # Take latest date
         row = group.sort_values('date').iloc[-1]
         ulevel = str(row.get('uncertainty_level', 'medium'))
         data = {
@@ -111,7 +111,7 @@ def export_native_host_json(latest_df):
         exported += 1
     log(f"  Exported native-host JSON: {exported} stocks → {STORAGE_DIR}")
 
-# ======== 2. v2 Dataset 更新 ========
+# ======== 2. v2 Dataset Update ========
 def check_new_monthly_data():
     """Check if new monthly data exists (since last v2 dataset build)"""
     v2_path = DATA_DIR / 'frozen-eval-dataset-v2.json'
@@ -123,7 +123,7 @@ def check_new_monthly_data():
     existing_cutoffs = set(tp['cutoffDate'] for tp in v2.get('testPoints', []))
 
     conn = sqlite3.connect(str(DB))
-    # 检查是否有比现有最大 cutoffDate 更新的月线
+    # Check if there are monthly klines newer than the existing max cutoffDate
     max_existing = max(existing_cutoffs) if existing_cutoffs else '2010-01'
     new_months = conn.execute(
         "SELECT DISTINCT substr(date,1,7) FROM monthly_klines WHERE date > ?",
@@ -132,9 +132,9 @@ def check_new_monthly_data():
     conn.close()
 
     if new_months:
-        log(f"Found new months: {[m[0] for m in new_months[:5]]}... (共 {len(new_months)} 个月)")
+        log(f"Found new months: {[m[0] for m in new_months[:5]]}... ({len(new_months)} months total)")
         return True
-    log(f"无新月份（latest: {max_existing}）")
+    log(f"No new months (latest: {max_existing})")
     return False
 
 # ======== Main flow ========
@@ -153,7 +153,7 @@ def main():
     if not args.skip_mc:
         if args.force_all:
             log("Full mode: rerun all historical MC Dropout")
-            # 重命名旧文件作为备份
+            # Rename old file as backup
             if HISTORY_PARQUET.exists():
                 bak = HISTORY_PARQUET.with_suffix('.parquet.bak')
                 shutil.move(str(HISTORY_PARQUET), str(bak))
@@ -165,9 +165,9 @@ def main():
                 cwd=str(PROJECT), capture_output=True, text=True,
             )
             if result.returncode != 0:
-                log(f"全量 MC Dropout failed:\n{result.stderr[-500:]}")
+                log(f"Full MC Dropout failed:\n{result.stderr[-500:]}")
                 return
-            # 将输出文件作为历史起点
+            # Use output file as history baseline
             if LATEST_PARQUET.exists():
                 full_df = pd.read_parquet(LATEST_PARQUET)
                 full_df.to_parquet(HISTORY_PARQUET, index=False)
@@ -178,7 +178,7 @@ def main():
             if new_df is not None:
                 accumulate_history(new_df)
 
-        # 导出 production JSON
+        # Export production JSON
         if LATEST_PARQUET.exists():
             export_native_host_json(pd.read_parquet(LATEST_PARQUET))
 
@@ -192,21 +192,21 @@ def main():
             cwd=str(PROJECT), capture_output=True, text=True,
         )
         if result.returncode == 0:
-            log("v2 dataset 重建done")
-            # 打印最后几行输出
+            log("v2 dataset rebuild done")
+            # Print last few lines of output
             for line in result.stdout.strip().split('\n')[-8:]:
                 print(f"  {line}")
         else:
-            log(f"v2 重建failed:\n{result.stderr[-300:]}")
+            log(f"v2 rebuild failed:\n{result.stderr[-300:]}")
 
-    # ---- 摘要 ----
+    # ---- Summary ----
     print(f"\n{'='*60}")
-    print("积累done")
+    print("Accumulation done")
     if HISTORY_PARQUET.exists():
         h = pd.read_parquet(HISTORY_PARQUET)
         months = sorted(h['date'].str[:7].unique())
-        print(f"  MC Dropout 历史: {len(h)} rows, {h['code'].nunique()} stocks, "
-              f"{len(months)} 个月 ({months[0]} ~ {months[-1]})")
+        print(f"  MC Dropout history: {len(h)} rows, {h['code'].nunique()} stocks, "
+              f"{len(months)} months ({months[0]} ~ {months[-1]})")
     v2_path = DATA_DIR / 'frozen-eval-dataset-v2.json'
     if v2_path.exists():
         v2 = json.loads(open(v2_path, encoding='utf-8').read())

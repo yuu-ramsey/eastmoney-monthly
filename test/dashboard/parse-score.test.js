@@ -5,7 +5,7 @@ import { parseScoreBlock, validateScoreData, computeWeightedScore } from '../../
 
 // ---- parseScoreBlock ----
 
-test('解析标准 JSON 块', () => {
+test('parse standard JSON block', () => {
   const text = `## 分析结果
   方向判断：【偏多】...
   \`\`\`json
@@ -22,41 +22,41 @@ test('解析标准 JSON 块', () => {
   assert.equal(data.position_percentile, 45.2);
 });
 
-test('LLM 忘写 JSON → null', () => {
-  assert.equal(parseScoreBlock('纯文本分析，没有 JSON'), null);
+test('LLM forgot JSON -> null', () => {
+  assert.equal(parseScoreBlock('plain text analysis, no JSON'), null);
   assert.equal(parseScoreBlock(null), null);
   assert.equal(parseScoreBlock(''), null);
 });
 
-test('JSON 字段缺失 → null', () => {
+test('JSON field missing -> null', () => {
   const text = '```json\n{"score":50}\n```';
   assert.equal(parseScoreBlock(text), null);
 });
 
-test('JSON 字段超范围 → null', () => {
+test('JSON field out of range -> null', () => {
   assert.equal(parseScoreBlock('```json\n{"score":-1,"signal":"bull","confidence":"high","key_levels":{"support":[1],"resistance":[2],"stop_loss":3},"trend":"uptrend","position_percentile":50,"one_line_summary":"x"}\n```'), null);
   assert.equal(parseScoreBlock('```json\n{"score":101,"signal":"bull","confidence":"high","key_levels":{"support":[1],"resistance":[2],"stop_loss":3},"trend":"uptrend","position_percentile":50,"one_line_summary":"x"}\n```'), null);
 });
 
-test('signal 拼错 → null', () => {
+test('signal typo -> null', () => {
   const text = '```json\n{"score":50,"signal":"bullish","confidence":"high","key_levels":{"support":[1],"resistance":[2],"stop_loss":3},"trend":"uptrend","position_percentile":50,"one_line_summary":"x"}\n```';
   assert.equal(parseScoreBlock(text), null);
 });
 
-test('多个 JSON 块取最后一个', () => {
+test('multiple JSON blocks -> pick last', () => {
   const text = '```json\n{"score":30}\n```\n中间文字\n```json\n{"score":72,"signal":"bull","confidence":"high","key_levels":{"support":[35,28],"resistance":[42],"stop_loss":33},"trend":"uptrend","position_percentile":45,"one_line_summary":"看好"}\n```';
   const data = parseScoreBlock(text);
   assert.equal(data.score, 72);
 });
 
-test('包含中文转义符的 JSON', () => {
+test('JSON with unicode escapes', () => {
   const text = '```json\n{"score":68,"signal":"bull","confidence":"medium","key_levels":{"support":[35.03],"resistance":[42.90],"stop_loss":33.50},"trend":"uptrend","position_percentile":55,"one_line_summary":"\\u5747\\u7ebf\\u591a\\u5934"}\n```';
   const data = parseScoreBlock(text);
   assert.ok(data);
   assert.equal(data.score, 68);
 });
 
-test('JSON 键带多余空格仍解析', () => {
+test('JSON key with extra spaces still parses', () => {
   const text = '```json\n{ "score" : 55 , "signal":"neutral","confidence":"low","key_levels":{"support":[10],"resistance":[20],"stop_loss":9},"trend":"sideways","position_percentile":50,"one_line_summary":"震荡" }\n```';
   const data = parseScoreBlock(text);
   assert.equal(data.score, 55);
@@ -64,7 +64,7 @@ test('JSON 键带多余空格仍解析', () => {
 
 // ---- validateScoreData ----
 
-test('validateScoreData: 完整有效数据', () => {
+test('validateScoreData: complete valid data', () => {
   const { valid } = validateScoreData({
     score: 72, signal: 'bull', confidence: 'high',
     key_levels: { support: [1, 2], resistance: [3], stop_loss: 4 },
@@ -73,7 +73,7 @@ test('validateScoreData: 完整有效数据', () => {
   assert.equal(valid, true);
 });
 
-test('validateScoreData: support 非数组', () => {
+test('validateScoreData: support not array', () => {
   const { valid, errors } = validateScoreData({
     score: 50, signal: 'neutral', confidence: 'medium',
     key_levels: { support: 'not_array', resistance: [1], stop_loss: 2 },
@@ -85,7 +85,7 @@ test('validateScoreData: support 非数组', () => {
 
 // ---- computeWeightedScore ----
 
-test('computeWeightedScore: 标准权重', () => {
+test('computeWeightedScore: standard weights', () => {
   const arr = [
     { template: 'technical', scoreData: { score: 80 } },
     { template: 'trend', scoreData: { score: 60 } },
@@ -97,7 +97,7 @@ test('computeWeightedScore: 标准权重', () => {
   assert.ok(result > 65 && result < 69);
 });
 
-test('computeWeightedScore: 缺失模板重新分配权重', () => {
+test('computeWeightedScore: missing template reallocates weight', () => {
   const arr = [
     { template: 'technical', scoreData: { score: 80 } },
     { template: 'trend', scoreData: { score: 60 } },
@@ -107,7 +107,7 @@ test('computeWeightedScore: 缺失模板重新分配权重', () => {
   assert.ok(result > 70 && result < 73);
 });
 
-test('computeWeightedScore: 全部 null → null', () => {
+test('computeWeightedScore: all null -> null', () => {
   assert.equal(computeWeightedScore([]), null);
   assert.equal(computeWeightedScore([{ template: 'technical', scoreData: null }]), null);
 });

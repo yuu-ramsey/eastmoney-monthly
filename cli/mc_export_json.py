@@ -1,5 +1,5 @@
-"""Export mc_dropout_signals.parquet为 per-stock JSON 文件
-For Chrome extension native-host consumption。
+"""Export mc_dropout_signals.parquet to per-stock JSON files
+For Chrome extension native-host consumption.
 Output location: .eastmoney-ai/storage/mc_dropout/<code>.json
 """
 import pandas as pd, json
@@ -46,7 +46,7 @@ def main():
         out_path.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
         exported += 1
 
-    print(f"Export done: {exported} 文件 → {OUT_DIR}")
+    print(f"Export done: {exported} files → {OUT_DIR}")
 
 if __name__ == '__main__':
     main()

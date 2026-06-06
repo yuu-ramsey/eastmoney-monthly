@@ -1,11 +1,11 @@
 """
 v32 OOS (Out-of-Sample) tracking: record monthly predictions+realized returns, rolling IC calculation
 Usage:
-  每月初:  python scripts/v32_oos_track.py predict   # 生成当月预测
-  下月初:  python scripts/v32_oos_track.py realize   # 填写上月实现收益
-  随时查:  python scripts/v32_oos_track.py report    # 滚动IC报告
+  Early month:  python scripts/v32_oos_track.py predict   # generate current month predictions
+  Next month:   python scripts/v32_oos_track.py realize   # fill in last month's realized returns
+  Any time:     python scripts/v32_oos_track.py report    # rolling IC report
 
-数据文件: .eastmoney-ai/oos/v32_oos_tracker.json
+Data file: .eastmoney-ai/oos/v32_oos_tracker.json
 records[]: {predict_month, generated_at, predictions{code:score},
             realized{T+1:{code:ret}, T+2:...}, realized_at}
 """
@@ -48,7 +48,7 @@ def wd(s):
 
 
 def build_latest_features():
-    """构建latest一个月的特征(仅当月截面)"""
+    """Build features for the latest month (current month cross-section only)"""
     conn = sqlite3.connect(str(DB))
     codes = [r[0] for r in conn.execute(
         'SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
@@ -64,12 +64,12 @@ def build_latest_features():
     conn.close()
     df['month'] = df['date'].str[:7]
     latest_month = df['month'].max()
-    print(f"[{ts()}] latest月线: {latest_month}")
+    print(f"[{ts()}] latest monthly: {latest_month}")
     X_list, meta_list = [], []
     for code in sorted(codes_with_ind):
         g = df[df['code'] == code].sort_values('date').reset_index(drop=True)
         if len(g) < 72: continue
-        i = len(g) - 1  # 最后一行
+        i = len(g) - 1  # last row
         if i < 60: continue
         c = g['close'].values.astype(float); o = g['open'].values.astype(float)
         h = g['high'].values.astype(float); l = g['low'].values.astype(float)
@@ -118,8 +118,8 @@ def build_latest_features():
 
 
 def retrain_model():
-    """用History data重训LGB+XGB+Ridge"""
-    print(f"[{ts()}] 重训模型...", flush=True)
+    """Retrain LGB+XGB+Ridge with historical data"""
+    print(f"[{ts()}] Retraining models...", flush=True)
     conn = sqlite3.connect(str(DB))
     codes = [r[0] for r in conn.execute(
         'SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
@@ -195,12 +195,12 @@ def retrain_model():
                              random_state=456, verbosity=0, n_jobs=4)
     xgb_m.fit(Xs, y)
     ridge_m = Ridge(alpha=1.0); ridge_m.fit(Xs, y)
-    print(f"[{ts()}] 训练done ({len(y):,} 样本)", flush=True)
+    print(f"[{ts()}] Training complete ({len(y):,} samples)", flush=True)
     return sc, lgb_m, xgb_m, ridge_m
 
 
 def cmd_predict():
-    """生成当月预测并追加到tracker"""
+    """Generate current month predictions and append to tracker"""
     print(f"[{ts()}] ===== OOS Predict =====")
     X_latest, meta, latest_month = build_latest_features()
     sc, lgb_m, xgb_m, ridge_m = retrain_model()
@@ -216,7 +216,7 @@ def cmd_predict():
         tracker = {'version': 'v32', 'start_month': latest_month, 'records': []}
     for rec in tracker['records']:
         if rec['predict_month'] == latest_month:
-            print(f"  Covering: {latest_month} 已存在")
+            print(f"  Overwriting: {latest_month} already exists")
             tracker['records'].remove(rec); break
     tracker['records'].append({
         'predict_month': latest_month, 'generated_at': ts(), 'predictions': predictions,
@@ -224,25 +224,25 @@ def cmd_predict():
     with open(OOS_FILE, 'w') as f:
         json.dump(tracker, f, indent=2, ensure_ascii=False)
     top10 = sorted(predictions.items(), key=lambda x: x[1], reverse=True)[:10]
-    print(f"  当月: {latest_month}  |  {len(predictions)} stocks")
+    print(f"  Month: {latest_month}  |  {len(predictions)} stocks")
     print(f"  Top 10: {top10}")
-    print(f"  保存: {OOS_FILE}")
+    print(f"  Saved: {OOS_FILE}")
 
 
 def cmd_realize():
-    """填写上月预测的实现收益"""
+    """Fill in realized returns for last month's predictions"""
     print(f"[{ts()}] ===== OOS Realize =====")
     if not OOS_FILE.exists():
-        print("  ERROR: tracker 不存在"); return
+        print("  ERROR: tracker does not exist"); return
     with open(OOS_FILE) as f: tracker = json.load(f)
     target = None
     for rec in reversed(tracker['records']):
         if 'realized' not in rec:
             target = rec; break
     if target is None:
-        print("  所有记录已有实现收益"); return
+        print("  All records already have realized returns"); return
     predict_month = target['predict_month']
-    print(f"  填写 {predict_month} 实现收益...")
+    print(f"  Filling realized returns for {predict_month}...")
     conn = sqlite3.connect(str(DB))
     codes_str = ','.join(f"'{c}'" for c in target['predictions'].keys())
     df = pd.read_sql_query(
@@ -269,19 +269,19 @@ def cmd_realize():
     with open(OOS_FILE, 'w') as f:
         json.dump(tracker, f, indent=2, ensure_ascii=False)
     for lag in [1, 2, 3]:
-        print(f"  T+{lag}: {len(realized[f'T+{lag}'])} 只")
+        print(f"  T+{lag}: {len(realized[f'T+{lag}'])} stocks")
 
 
 def cmd_report():
-    """滚动IC报告"""
-    print(f"[{ts()}] ===== OOS 滚动IC =====")
+    """Rolling IC report"""
+    print(f"[{ts()}] ===== OOS Rolling IC =====")
     if not OOS_FILE.exists():
-        print("  tracker 为空"); return
+        print("  tracker is empty"); return
     with open(OOS_FILE) as f: tracker = json.load(f)
     complete = [r for r in tracker['records'] if 'realized' in r]
-    print(f"  总: {len(tracker['records'])} 月, 已实现: {len(complete)}")
+    print(f"  Total: {len(tracker['records'])} months, realized: {len(complete)}")
     if not complete:
-        print("  暂无实现收益"); return
+        print("  No realized returns yet"); return
     print(f"\n{'Month':<10s} {'T+1_IC':>8s} {'T+1_N':>8s} {'T+3_IC':>8s} {'T+6_IC':>8s}")
     print('-'*46)
     all_t1, all_t3 = [], []
@@ -301,13 +301,13 @@ def cmd_report():
         if not np.isnan(t1_ic): all_t1.append(t1_ic)
         if not np.isnan(t3_ic): all_t3.append(t3_ic)
         print(f"{month:<10s} {t1_ic:+8.4f} {vals[1]['n']:>8d} {t3_ic:+8.4f} {t6_ic:+8.4f}")
-    print(f"\n汇总:")
+    print(f"\nSummary:")
     for label, ics in [('T+1', all_t1), ('T+3', all_t3)]:
         if ics:
             a = np.array(ics)
             print(f"  {label}: mean={a.mean():+.4f}  ICIR={a.mean()/a.std():+.3f}  "
                   f"IC>0={np.mean(a>0):.1%}  n={len(a)}")
-    print(f"  文件: {OOS_FILE}")
+    print(f"  File: {OOS_FILE}")
 
 
 if __name__ == '__main__':

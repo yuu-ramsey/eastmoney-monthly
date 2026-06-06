@@ -13,7 +13,7 @@ function setupDb() {
 }
 
 function seedMapping(db) {
-  // 食品饮料行业：3只成分股，不同市值
+  // Food & Beverage sector: 3 constituents, different market caps
   db.prepare('INSERT INTO industries (industry_code, industry_name) VALUES (?, ?)').run('801120.SI', 'Food & Beverage');
   db.prepare('INSERT INTO stock_industry_mapping (stock_code, industry_code, stock_name, market_cap) VALUES (?,?,?,?)').run('600519', '801120.SI', '贵州茅台', 25000);
   db.prepare('INSERT INTO stock_industry_mapping (stock_code, industry_code, stock_name, market_cap) VALUES (?,?,?,?)').run('000858', '801120.SI', '五粮液', 8000);
@@ -21,7 +21,7 @@ function seedMapping(db) {
 }
 
 function seedKlines(db) {
-  // 个股月线：3只股票各 13 个月
+  // Individual stock monthly klines: 3 stocks, 13 months each
   const stocks = [
     { code: '600519', closes: [1600, 1580, 1550, 1500, 1520, 1480, 1450, 1400, 1420, 1380, 1350, 1400, 1450] },
     { code: '000858', closes: [140, 135, 130, 125, 120, 115, 110, 105, 100, 95, 90, 92, 95] },
@@ -35,8 +35,8 @@ function seedKlines(db) {
     }
   }
 
-  // 行业K线：市值加权合成（验证手工计算）
-  // 权重：600519=25000/(25000+8000+5000)=0.658, 000858=0.211, 600809=0.132
+  // Sector klines: market-cap weighted composite (verify manual calculation)
+  // Weights: 600519=25000/(25000+8000+5000)=0.658, 000858=0.211, 600809=0.132
   const sectorCloses = [
     0.658*1600 + 0.211*140 + 0.132*200, // = 1052.8 + 29.54 + 26.4 = 1108.74
     0.658*1580 + 0.211*135 + 0.132*195, // = 1039.64 + 28.485 + 25.74 = 1093.87
@@ -70,8 +70,8 @@ test('calcSectorAlpha: 茅台 12 月 alpha 与手工计算结果一致', () => {
   assert.equal(result.sector_name, 'Food & Beverage');
   assert.equal(result.sector_code, '801120.SI');
 
-  // 茅台：首月 1600 → 末月 1450，涨幅 = (1450-1600)/1600*100 = -9.375%
-  // 行业：首月 1108.74 → 末月 995.27，涨幅 = -10.23%
+  // Moutai: first month 1600 → last month 1450, return = (1450-1600)/1600*100 = -9.375%
+  // Sector: first month 1108.74 → last month 995.27, return = -10.23%
   // alpha = -9.38 - (-10.23) = +0.86pp
   assert.ok(Math.abs(result.hs300_sector_alpha - 0.86) < 0.5, `alpha=${result.hs300_sector_alpha}`);
   assert.equal(result.hs300_sector_total, 3);
@@ -88,7 +88,7 @@ test('calcSectorAlpha: 无行业映射返回 null', () => {
 test('calcSectorAlpha: 行业 K 线不足 2 根返回 null', () => {
   const db = setupDb();
   seedMapping(db);
-  // 只写 1 根 K 线
+  // Only insert 1 kline
   db.prepare('INSERT INTO monthly_klines (code, date, close) VALUES (?,?,?)').run('600519', '2025-01', 1600);
   db.prepare('INSERT INTO hs300_sector_klines (sector_code, period, date, close) VALUES (?,?,?,?)').run('801120.SI', 'monthly', '2025-01', 1100);
 
@@ -101,7 +101,7 @@ test('calcSectorAlpha: asOfDate 限制生效（walk-forward）', () => {
   seedMapping(db);
   seedKlines(db);
 
-  // 限定到 2025-06，只看前 6 个月
+  // Limit to 2025-06, only look at first 6 months
   const result = calcSectorAlpha(db, '600519', 'monthly', 6, '2025-06');
   assert.ok(result);
   assert.equal(result.as_of_date, '2025-06');
@@ -115,12 +115,12 @@ test('calcAllSectorAlpha: 返回含排名和百分位', () => {
   const results = calcAllSectorAlpha(db, 'monthly', 12);
   assert.ok(results.length >= 2);
 
-  // 验证有排名字段
+  // Verify rank fields exist
   for (const r of results) {
     assert.ok(typeof r.hs300_sector_rank === 'number', `${r.code} 缺 rank`);
     assert.ok(typeof r.hs300_sector_percentile === 'number', `${r.code} 缺 percentile`);
   }
-  // 按 alpha 降序排列
+  // Sort by alpha descending
   for (let i = 1; i < results.length; i++) {
     assert.ok(results[i-1].hs300_sector_alpha >= results[i].hs300_sector_alpha);
   }

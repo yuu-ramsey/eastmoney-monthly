@@ -1,18 +1,18 @@
 """
 v32_freq_eval.py — 32d factor monthly/weekly/daily three-frequency evaluation (based on v32_final_eval.py logic)
 ============================================================
-Unified fix：单期收益 + date分组 + 32维 + CSRC L2 中性化
+Unified fix: single-period returns + date grouping + 32-dim + CSRC L2 neutralization
 
-频率Parameters化：
-  月线: YYYY-MM, MA(5,20,60),  FFT60,  训练60月
-  周线: YYYY-Www,  MA(12,48,96), FFT104, 训练156周
-  日线: YYYY-MM-DD,MA(20,60,120),FFT252, 训练504日
+Frequency parameterization:
+  monthly: YYYY-MM, MA(5,20,60),  FFT60,  train 60 months
+  weekly:  YYYY-Www,  MA(12,48,96), FFT104, train 156 weeks
+  daily:   YYYY-MM-DD,MA(20,60,120),FFT252, train 504 days
 
-输出（每频率）：
-  - T+1~T+6 单期 IC/IC_std/ICIR/命中率
-  - 5-Fold 时间序列 CV
-  - 五分组回测（Q1/Q3/Q5/LS 年化收益/Sharpe/MaxDD/单调性）
-  - 交易成本（10/20/30/50bp Net Sharpe + 盈亏平衡点）
+Output (per frequency):
+  - T+1~T+6 single-period IC/IC_std/ICIR/hit rate
+  - 5-Fold time-series CV
+  - 5-group backtest (Q1/Q3/Q5/LS annualized return/Sharpe/MaxDD/monotonicity)
+  - Transaction costs (10/20/30/50bp Net Sharpe + breakeven point)
 """
 import numpy as np
 import sqlite3
@@ -32,10 +32,10 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 np.random.seed(RANDOM_SEED)
 
 # ============================================================
-# 频率配置
+# Frequency configuration
 # ============================================================
 def _to_iso_week(date_str):
-    """date字符串 → ISO week (YYYY-Www)"""
+    """date string -> ISO week (YYYY-Www)"""
     s = str(date_str)[:10]
     d = datetime.strptime(s, '%Y-%m-%d')
     iso = d.isocalendar()
@@ -44,7 +44,7 @@ def _to_iso_week(date_str):
 FREQ_CONFIG = {
     "monthly": {
         "table": "monthly_klines",
-        "label": "月线",
+        "label": "Monthly",
         "group_fn": lambda d: str(d)[:7],                    # YYYY-MM
         "ma_windows": (5, 20, 60),
         "fft_window": 60,
@@ -57,12 +57,12 @@ FREQ_CONFIG = {
         "max_horizons": 6,
         "n_folds": 5,
         "start_date": "2015-01",
-        "ann_factor": 12,  # 年化系数
+        "ann_factor": 12,  # annualization factor
         "min_periods_bt": 12,
     },
     "weekly": {
         "table": "weekly_klines",
-        "label": "周线",
+        "label": "Weekly",
         "group_fn": _to_iso_week,                              # YYYY-Www
         "ma_windows": (12, 48, 96),
         "fft_window": 104,
@@ -75,12 +75,12 @@ FREQ_CONFIG = {
         "max_horizons": 6,
         "n_folds": 5,
         "start_date": "2015-01-01",
-        "ann_factor": 52,  # 年化系数（周）
+        "ann_factor": 52,  # annualization factor (weekly)
         "min_periods_bt": 52,
     },
     "daily": {
         "table": "daily_klines",
-        "label": "日线",
+        "label": "Daily",
         "group_fn": lambda d: str(d)[:10],                     # YYYY-MM-DD
         "ma_windows": (20, 60, 120),
         "fft_window": 252,
@@ -93,13 +93,13 @@ FREQ_CONFIG = {
         "max_horizons": 6,
         "n_folds": 5,
         "start_date": "2018-01-01",
-        "ann_factor": 252,  # 年化系数（日）
+        "ann_factor": 252,  # annualization factor (daily)
         "min_periods_bt": 252,
     },
 }
 
 # ============================================================
-# 技术指标
+# Technical indicators
 # ============================================================
 def calc_ma(arr, n):
     ma = np.full_like(arr, np.nan, dtype=float)
@@ -152,7 +152,7 @@ def calc_fft_amplitudes(close_segment, n_peaks=10):
     return [float(a) / max_amp for a in amps]
 
 # ============================================================
-# 32维特征提取（频率Parameters化）
+# 32-dim feature extraction (frequency parameterized)
 # ============================================================
 def extract_features_32d(records, idx, cfg):
     if idx < cfg["min_bars"]:
@@ -186,11 +186,11 @@ def extract_features_32d(records, idx, cfg):
 
     features = []
 
-    # FFT 振幅 (10维)
+    # FFT amplitude (10-dim)
     fft_amps = calc_fft_amplitudes(c[max(0, i - fft_w + 1):i + 1], n_peaks=10)
     features.extend(fft_amps)
 
-    # G7 量价K线 (14维)
+    # G7 volume-price (14-dim)
     vol_long_mean = np.mean(v[max(0, i - v_long + 1):i + 1])
     vol_short_mean = np.mean(v[max(0, i - v_short + 1):i + 1])
 
@@ -228,17 +228,17 @@ def extract_features_32d(records, idx, cfg):
         else: break
     features.append(float(streak / float(v_long)))                               # 14. dn_streak
 
-    # G2 均线偏离 (3维)
+    # G2 MA deviation (3-dim)
     features.append(float((ci - ma1[i]) / eps))   # ma1_dev
     features.append(float((ci - ma2[i]) / eps))   # ma2_dev
     features.append(float((ci - ma3[i]) / eps))   # ma3_dev
 
-    # G3 MACD (3维)
+    # G3 MACD (3-dim)
     features.append(float(dif[i]))
     features.append(float(dea[i]))
     features.append(float(macd_hist[i]))
 
-    # G4 精选 (2维)
+    # G4 selected (2-dim)
     features.append(float(atr[i] / eps))                                          # ATR
     if i >= v_mid:
         rets_mid = np.diff(c[i - v_mid:i + 1]) / np.maximum(np.abs(c[i - v_mid:i]), 0.01)
@@ -246,14 +246,14 @@ def extract_features_32d(records, idx, cfg):
     else:
         features.append(0.0)
 
-    assert len(features) == 32, f"特征数={len(features)}, 期望32"
+    assert len(features) == 32, f"feature count={len(features)}, expected 32"
     if any(np.isnan(f) for f in features):
         return None
     return features
 
 
 # ============================================================
-# 数据Loaded
+# Data Loading
 # ============================================================
 def load_data(period):
     cfg = FREQ_CONFIG[period]
@@ -275,7 +275,7 @@ def load_data(period):
             'close': c, 'volume': v, 'turnover': t or 0.0
         })
 
-    # 去重：按频率的分组键去重，保留每组最后一条
+    # Deduplicate: group by frequency key, keep last record per group
     for code in stock_data:
         seen = {}
         for rec in stock_data[code]:
@@ -283,7 +283,7 @@ def load_data(period):
             seen[key] = rec
         stock_data[code] = sorted(seen.values(), key=lambda r: r['date'])
 
-    # Loaded CSRC L2 行业映射
+    # Load CSRC L2 industry mapping
     industry_map = {}
     if os.path.exists(INDUSTRY_PATH):
         with open(INDUSTRY_PATH, 'r', encoding='utf-8') as f:
@@ -292,46 +292,46 @@ def load_data(period):
 
     covered = sum(1 for c in stock_data if c in industry_map)
     print(f"  Loaded {len(stock_data)} stocks, {sum(len(v) for v in stock_data.values()):,} records "
-          f"| 行业Covering {covered}/{len(stock_data)} ({covered/max(len(stock_data),1)*100:.0f}%)")
+          f"| industry coverage {covered}/{len(stock_data)} ({covered/max(len(stock_data),1)*100:.0f}%)")
 
     return stock_data, industry_map
 
 
 # ============================================================
-# 截面构建
+# Build cross-sections
 # ============================================================
 def build_cross_sections(stock_data, period):
     """
-    按频率原生分组构建截面：
-    - 月线：每月最后一条K线 → 下月收益
-    - 周线：每周最后一条K线 → 下周收益
-    - 日线：每条K线 → 下一日收益
+    Build cross-sections by native frequency grouping:
+    - monthly: last bar of each month -> next month's return
+    - weekly: last bar of each week -> next week's return
+    - daily: each bar -> next day's return
     """
     cfg = FREQ_CONFIG[period]
     group_fn = cfg["group_fn"]
     max_h = cfg["max_horizons"]
 
-    # 为每stocks建立 group_key → bar_index 的映射
+    # Build group_key -> bar_index mapping for each stock
     stock_groups = {}
     for code, records in stock_data.items():
         groups = {}
         for j, r in enumerate(records):
             key = group_fn(r['date'])
-            groups[key] = j  # 每组的最后一条（同组内Covering）
+            groups[key] = j  # last entry per group (covering within group)
         stock_groups[code] = groups
 
-    # 收集所有有效的 period key
+    # Collect all valid period keys
     all_keys = set()
     for groups in stock_groups.values():
         all_keys.update(groups.keys())
     all_keys = sorted(k for k in all_keys if k >= cfg["start_date"])
-    period_index = {k: i for i, k in enumerate(all_keys)}  # key → 全局序号
-    print(f"  回测窗口: {all_keys[0]} ~ {all_keys[-1]} ({len(all_keys)} 个截面)")
+    period_index = {k: i for i, k in enumerate(all_keys)}  # key -> global index
+    print(f"  Backtest window: {all_keys[0]} ~ {all_keys[-1]} ({len(all_keys)} cross-sections)")
 
     cross_sections = {}
     for period_key in all_keys:
         section = []
-        pi = period_index[period_key]  # 当前期在全局日历中的位置
+        pi = period_index[period_key]  # current period's position in global calendar
         for code, records in stock_data.items():
             groups = stock_groups[code]
             if period_key not in groups:
@@ -341,9 +341,9 @@ def build_cross_sections(stock_data, period):
             if feat is None:
                 continue
 
-            # 用全局 period 日历计算单期收益（非accumulated）
-            # T+N: 取 all_keys[pi+N] 的收盘 vs all_keys[pi+N-1] 的收盘
-            # 关键：必须两stocks都有数据才能算（停牌则跳过该期的收益）
+            # Compute single-period returns using global period calendar (not accumulated)
+            # T+N: take close at all_keys[pi+N] vs close at all_keys[pi+N-1]
+            # Key: both stocks must have data to calculate (skip if suspended)
             rets = {}
             for lag in range(1, max_h + 1):
                 fwd_pi = pi + lag
@@ -365,12 +365,12 @@ def build_cross_sections(stock_data, period):
             cross_sections[period_key] = section
 
     avg_n = np.mean([len(v) for v in cross_sections.values()])
-    print(f"  有效截面: {len(cross_sections)} | 每截面均 {avg_n:.0f} stocks")
+    print(f"  Valid cross-sections: {len(cross_sections)} | avg {avg_n:.0f} stocks per section")
     return cross_sections
 
 
 # ============================================================
-# 行业中性化
+# Industry neutralization
 # ============================================================
 def neutralize_industry(cross_sections, industry_map):
     neutralized = {}
@@ -395,7 +395,7 @@ def neutralize_industry(cross_sections, industry_map):
 
 
 # ============================================================
-# IC 计算
+# IC calculation
 # ============================================================
 def spearman_ic(predictions, returns):
     if len(predictions) < 10:
@@ -406,7 +406,7 @@ def spearman_ic(predictions, returns):
 
 
 # ============================================================
-# 模型训练（IC 加权集成，同 v32_final_eval.py）
+# Model training (IC-weighted ensemble, same as v32_final_eval.py)
 # ============================================================
 def train_predict(train_X, train_y, test_X):
     from sklearn.linear_model import Ridge
@@ -457,7 +457,7 @@ def train_predict(train_X, train_y, test_X):
     if len(predictions) == 1:
         return list(predictions.values())[0], models
 
-    # IC 加权集成
+    # IC-weighted ensemble
     ics = {}
     for name, m in models.items():
         ic = spearman_ic(m.predict(train_X), train_y)
@@ -472,7 +472,7 @@ def train_predict(train_X, train_y, test_X):
 
 
 # ============================================================
-# 滚动训练 + 截面 IC 评估
+# Rolling training + cross-sectional IC evaluation
 # ============================================================
 def rolling_evaluation(cross_sections, period):
     cfg = FREQ_CONFIG[period]
@@ -523,13 +523,13 @@ def rolling_evaluation(cross_sections, period):
 
         progress = t_idx - train_periods + 1
         if progress % max(1, total // 20) == 0 or progress == total:
-            print(f"  滚动: {test_key} ({progress}/{total})", flush=True)
+            print(f"  Rolling: {test_key} ({progress}/{total})", flush=True)
 
     return results, period_predictions
 
 
 # ============================================================
-# 5-Fold 时间序列 CV
+# 5-Fold time-series CV
 # ============================================================
 def time_series_cv(cross_sections, period):
     cfg = FREQ_CONFIG[period]
@@ -561,7 +561,7 @@ def time_series_cv(cross_sections, period):
         train_X = np.array(train_X, dtype=float)
         train_y = np.array(train_y, dtype=float)
 
-        # 每折训一次（用 Ridge 足够验证稳健性，避免 LGB/XGB 每期重训）
+        # Train once per fold (Ridge sufficient for robustness check, avoid retraining LGB/XGB each period)
         from sklearn.linear_model import Ridge as CVRidge
         valid_mask = ~np.isnan(train_X).any(axis=1) & ~np.isnan(train_y)
         cv_model = CVRidge(alpha=1.0)
@@ -602,7 +602,7 @@ def time_series_cv(cross_sections, period):
 
 
 # ============================================================
-# 纯多头回测（五分组等权）
+# Long-only backtest (5-group, equal-weight)
 # ============================================================
 def long_only_backtest(period_predictions, period):
     cfg = FREQ_CONFIG[period]
@@ -677,7 +677,7 @@ def long_only_backtest(period_predictions, period):
 
 
 # ============================================================
-# 交易成本分析（含盈亏平衡点）
+# Transaction cost analysis (with breakeven)
 # ============================================================
 def cost_analysis(period_predictions, period):
     cfg = FREQ_CONFIG[period]
@@ -706,16 +706,16 @@ def cost_analysis(period_predictions, period):
     rets_arr = np.array(all_rets)
 
     results = []
-    turnover = 0.5  # 单边换手率 50%
+    turnover = 0.5  # one-way turnover rate 50%
     for bps in COST_BPS:
-        cost = turnover * 2 * bps / 10000  # 双边
+        cost = turnover * 2 * bps / 10000  # round-trip
         net_rets = rets_arr - cost
         ann_ret = float(np.mean(net_rets) * ann_factor)
         ann_vol = float(np.std(rets_arr) * np.sqrt(ann_factor))
         net_sharpe = float(ann_ret / ann_vol) if ann_vol > 0 else 0.0
         results.append({'bps': bps, 'net_sharpe': net_sharpe, 'net_ann_ret': ann_ret})
 
-    # 盈亏平衡点搜索
+    # Breakeven point search
     for bps in range(1, 500):
         cost = turnover * 2 * bps / 10000
         net_rets = rets_arr - cost
@@ -728,16 +728,16 @@ def cost_analysis(period_predictions, period):
 
 
 # ============================================================
-# 输出打印
+# Output display
 # ============================================================
 def print_period_results(period, ic_results, cv_results, bt, costs):
     cfg = FREQ_CONFIG[period]
     max_h = cfg["max_horizons"]
     label = cfg["label"]
 
-    # IC 衰减
+    # IC decay
     print(f"\n{'─'*60}")
-    print(f"  {label} T+1 ~ T+{max_h} 单期 IC 衰减")
+    print(f"  {label} T+1 ~ T+{max_h} Single-Period IC Decay")
     print(f"{'─'*60}")
     print(f"  {'Lag':>6} {'IC':>8} {'ICstd':>8} {'ICIR':>8} {'IC>0':>8} {'N':>6}")
     print(f"  {'─'*50}")
@@ -759,37 +759,37 @@ def print_period_results(period, ic_results, cv_results, bt, costs):
         for f in cv_results:
             print(f"  Fold {f['fold']}  {f['period']:>20}  IC={f['ic']:+.4f}  ICIR={f['icir']:+.2f}  n={f['n_periods']}")
         if cv_ics:
-            print(f"  均值 IC={np.mean(cv_ics):+.4f}")
+            print(f"  Mean IC={np.mean(cv_ics):+.4f}")
 
-    # 回测
+    # Backtest
     if bt:
         print(f"\n{'─'*60}")
-        print(f"  纯多头回测（五分组等权）")
+        print(f"  Long-Only Backtest (5-group, equal-weight)")
         print(f"{'─'*60}")
         print(f"  {'Group':>6} {'AnnRet':>8} {'Sharpe':>8} {'MaxDD':>8} {'WinRate':>8} {'#Stocks':>8}")
         print(f"  {'─'*60}")
         for g, s in [('Q1', bt['q1']), ('Q3', bt['q3']), ('Q5', bt['q5']), ('LS', bt['ls'])]:
             print(f"  {g:>6} {s['ann_ret']:>+7.1%} {s['sharpe']:>8.2f} {s['max_dd']:>+7.1%} {s['win_rate']:>7.1%} {bt['avg_n'].get(g.lower(), 0):>8}")
-        print(f"  单调性: {'PASS' if bt['monotonic'] else 'FAIL'}")
+        print(f"  Monotonicity: {'PASS' if bt['monotonic'] else 'FAIL'}")
 
-    # 成本
+    # Costs
     if costs:
         print(f"\n{'─'*60}")
-        print(f"  交易成本敏感性")
+        print(f"  Transaction Cost Sensitivity")
         print(f"{'─'*60}")
         for c in costs:
             if 'bps' in c:
                 print(f"  {c['bps']}bp → Net Sharpe {c['net_sharpe']:+.2f} (Net AnnRet {c['net_ann_ret']:+.1%})")
             if 'breakeven_bps' in c:
-                print(f"  盈亏平衡点: {c['breakeven_bps']}bp")
+                print(f"  Breakeven: {c['breakeven_bps']}bp")
 
 
 def print_summary_table(all_results):
-    """三频率对比汇总表"""
+    """Three-frequency comparison summary table"""
     print(f"\n{'='*90}")
-    print(f"  三频率对比汇总")
+    print(f"  Three-Frequency Comparison Summary")
     print(f"{'='*90}")
-    print(f"  {'频率':>6} {'股票':>6} {'样本':>8} {'期数':>6} {'IC':>8} {'ICIR':>8} {'Q5 Sharpe':>10} {'LS Sharpe':>10}")
+    print(f"  {'Freq':>6} {'Stocks':>6} {'Samples':>8} {'Periods':>6} {'IC':>8} {'ICIR':>8} {'Q5 Sharpe':>10} {'LS Sharpe':>10}")
     print(f"  {'─'*80}")
     for period in ["monthly", "weekly", "daily"]:
         if period not in all_results:
@@ -805,7 +805,7 @@ def print_summary_table(all_results):
 
 
 # ============================================================
-# 单频率运行
+# Single frequency run
 # ============================================================
 def run_period(period):
     cfg = FREQ_CONFIG[period]
@@ -813,29 +813,29 @@ def run_period(period):
     max_h = cfg["max_horizons"]
 
     print(f"\n{'='*70}")
-    print(f"  {label} ({period}) — v32 全修复评估")
+    print(f"  {label} ({period}) -- v32 Full-Fix Evaluation")
     print(f"{'='*70}")
 
-    print(f"\n[1/5] Loaded数据...")
+    print(f"\n[1/5] Loading data...")
     stock_data, industry_map = load_data(period)
 
-    print(f"\n[2/5] 构建截面...")
+    print(f"\n[2/5] Building cross-sections...")
     cross_sections = build_cross_sections(stock_data, period)
     cross_sections = neutralize_industry(cross_sections, industry_map)
 
-    print(f"\n[3/5] 滚动训练 + 截面IC...")
+    print(f"\n[3/5] Rolling training + cross-sectional IC...")
     ic_results, period_predictions = rolling_evaluation(cross_sections, period)
 
     print(f"\n[4/5] 5-Fold CV...")
     cv_results = time_series_cv(cross_sections, period)
 
-    print(f"\n[5/5] 回测 + 成本分析...")
+    print(f"\n[5/5] Backtest + cost analysis...")
     bt = long_only_backtest(period_predictions, period)
     costs = cost_analysis(period_predictions, period)
 
     print_period_results(period, ic_results, cv_results, bt, costs)
 
-    # 汇总数据
+    # Summary data
     t1_ics = [r['ic'] for r in ic_results[1]] if ic_results[1] else []
     total_samples = sum(
         len([x for x in section if 1 in x[2]])
@@ -870,15 +870,15 @@ def run_period(period):
     out_path = os.path.join(OUTPUT_DIR, f"v32_{period}_results.json")
     with open(out_path, 'w', encoding='utf-8') as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
-    print(f"\n  结果已保存: {out_path}")
+    print(f"\n  Results saved: {out_path}")
 
     return output
 
 
 def main():
     periods = [p for p in sys.argv[1:] if p in FREQ_CONFIG] if len(sys.argv) > 1 else ["monthly", "weekly", "daily"]
-    print(f"v32 三频率全量评估 | 周期: {periods}")
-    print(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"v32 Three-Frequency Full Evaluation | periods: {periods}")
+    print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     all_results = {}
     for period in periods:
@@ -892,7 +892,7 @@ def main():
     if len(all_results) >= 2:
         print_summary_table(all_results)
 
-    print(f"\n全部done: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"\nAll done: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 if __name__ == '__main__':

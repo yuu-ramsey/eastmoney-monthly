@@ -45,7 +45,7 @@ test('tencent: data key lookup', async () => {
   assert.equal(result.klines[0].close, 11);
 });
 
-// ---- dispatcher: manual fallback chain (不 import dispatcher 模块,原位测试降级逻辑) ----
+// ---- dispatcher: manual fallback chain (inline test degradation logic, does not import dispatcher module) ----
 test('fallback: eastmoney→sina→tencent chain', async () => {
   const klines = Array.from({ length: 20 }, (_, i) => ({ day: `2024-${String(i + 1).padStart(2, '0')}-01`, open: '10', close: '11', high: '12', low: '9', volume: '1000' }));
   const emData = { data: { name: 'stock', klines: Array.from({ length: 30 }, (_, i) => `2024-${String(i + 1).padStart(2, '0')},10,10,11,9,1000,10000,5,2,0.5,3`) } };

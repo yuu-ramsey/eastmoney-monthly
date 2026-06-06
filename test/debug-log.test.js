@@ -1,5 +1,5 @@
 // debug:lastAnalysis record test
-// 只能在 Node 测试框架中模拟 chrome.storage.local
+// Can only simulate chrome.storage.local in Node test framework
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -40,7 +40,7 @@ globalThis.chrome = {
   },
 };
 
-test('debug:lastAnalysis 写入', async () => {
+test('debug:lastAnalysis write', async () => {
   storage.clear();
   const record = {
     timestamp: Date.now(),
@@ -63,7 +63,7 @@ test('debug:lastAnalysis 写入', async () => {
   assert.equal(items['debug:lastAnalysis'].toolCalls.length, 1);
 });
 
-test('debug:lastAnalysis 覆盖旧记录', async () => {
+test('debug:lastAnalysis overwrites old record', async () => {
   storage.clear();
   await chrome.storage.local.set({ 'debug:lastAnalysis': { code: 'old' } });
   await chrome.storage.local.set({ 'debug:lastAnalysis': { code: 'new' } });
@@ -72,7 +72,7 @@ test('debug:lastAnalysis 覆盖旧记录', async () => {
   assert.equal(items['debug:lastAnalysis'].code, 'new');
 });
 
-test('debug:lastAnalysis 不含 API key', async () => {
+test('debug:lastAnalysis does not contain API key', async () => {
   storage.clear();
   const record = {
     fullPrompt: '分析任务：...',
@@ -83,14 +83,14 @@ test('debug:lastAnalysis 不含 API key', async () => {
 
   const items = await chrome.storage.local.get(['debug:lastAnalysis']);
   const saved = items['debug:lastAnalysis'];
-  // fullPrompt 不包含任何 key 相关信息
+  // fullPrompt does not contain any key info
   assert.ok(!String(saved.fullPrompt).includes('sk-ant'));
   assert.ok(!String(saved.fullPrompt).includes('sk-'));
-  // settings 里没有 apiKey
+  // settings has no apiKey
   assert.equal(saved.settings.apiKey, undefined);
 });
 
-test('debug:lastAnalysis 手动清空', async () => {
+test('debug:lastAnalysis manual clear', async () => {
   storage.clear();
   await chrome.storage.local.set({ 'debug:lastAnalysis': { code: 'test' } });
   let items = await chrome.storage.local.get(['debug:lastAnalysis']);
@@ -101,7 +101,7 @@ test('debug:lastAnalysis 手动清空', async () => {
   assert.equal(items['debug:lastAnalysis'], undefined);
 });
 
-test('debug:lastAnalysis toolCalls 为空时不报错', async () => {
+test('debug:lastAnalysis empty toolCalls does not throw', async () => {
   storage.clear();
   const record = {
     toolCalls: [],

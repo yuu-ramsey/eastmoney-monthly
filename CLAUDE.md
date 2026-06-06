@@ -147,18 +147,18 @@ the same prompt paragraph to save tokens.
 - ``test/*.test.js`` — Pure function tests
 - ``test/agents/*.test.js`` — Agent layer tests
 
-Run tests: ``D:/node.js/node.exe --test test/*.test.js test/agents/*.test.js``
+Run tests: ``node --test test/*.test.js test/agents/*.test.js``
 
 ## Working Environment
 
 - Windows system, PowerShell environment
-- Node.js v24.15.0 installed at ``D:\node.js\node.exe``
-- Project root: ``D:\ClaudeProjects\test\eastmoney-monthly-ai``
+- Node.js v24.15.0 installed at ``node`` (from PATH)
+- Project root: ``.``
 
 ### Scraping Tool
 
 - **Scrapling v0.4.8**: Adaptive web scraping framework, bypasses Cloudflare
-  - Python path: ``D:\ClaudeProjects\eastmoney-monthly-ai\.venv\Scripts\python.exe``
+  - Python path: ``.venv\Scripts\python.exe``
   - Invocation: Isolated within project venv, called via absolute path
   - Features: CSS/XPath selectors, adaptive parsing, anti-crawler bypass, concurrent scraping
   - GitHub: https://github.com/D4Vinci/Scrapling
@@ -321,7 +321,7 @@ Run tests: ``D:/node.js/node.exe --test test/*.test.js test/agents/*.test.js``
   do not change function signatures and code logic
 - Changing cache key structure invalidates all old cache, do so carefully
 - Do not reverse-modify src to make tests pass (test failure means src has a problem, pause and wait for user decision)
-- When running JS tests, use ``D:/node.js/node.exe --test test/*.test.js test/agents/*.test.js``
+- When running JS tests, use ``node --test test/*.test.js test/agents/*.test.js``
 - After completing a task, must tell user: changed file list, test pass status, key design points
 - User prefers concise responses, no need for excessive explanation
 

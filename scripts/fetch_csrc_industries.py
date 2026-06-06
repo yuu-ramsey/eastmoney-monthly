@@ -27,7 +27,7 @@ for row in industries:
     else:
         stock_code = code
 
-    # Parse CSRC industry string: 'C39计算机、通信和其他电子设备制造业'
+    # Parse CSRC industry string: 'C39 Computers, Communications & Other Electronic Equipment Manufacturing'
     # L2 = first 3 chars, name = rest
     if industry_str and len(industry_str) >= 3:
         l2 = industry_str[:3]
@@ -68,7 +68,7 @@ for stock, l2 in stock_to_l2.items():
     stock_to_industry_name[stock] = l2_to_name.get(l2, l2)
 
 output = {
-    'description': 'CSRC (证监会) level-2 industry classification for A-shares, from Baostock',
+    'description': 'CSRC (China Securities Regulatory Commission) level-2 industry classification for A-shares, from Baostock',
     'source': 'Baostock query_stock_industry()',
     'fetchDate': '2026-05-24',
     'version': '2026-05-v1',

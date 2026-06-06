@@ -16,21 +16,21 @@ test('parseKlines: single row parsing', () => {
   assert.equal(out[0].turnoverRate, 1.5);
 });
 
-test('parseKlines: 空数组', () => {
+test('parseKlines: empty array', () => {
   assert.deepEqual(parseKlines([]), []);
 });
 
-test('parseKlines: 非数组输入', () => {
+test('parseKlines: non-array input', () => {
   assert.deepEqual(parseKlines(null), []);
   assert.deepEqual(parseKlines(undefined), []);
   assert.deepEqual(parseKlines('foo'), []);
 });
 
-test('parseKlines: 字段不够的行被丢弃', () => {
+test('parseKlines: rows with insufficient fields are discarded', () => {
   assert.deepEqual(parseKlines(['2024-01,1.0,2.0']), []);
 });
 
-test('parseKlines: 多行', () => {
+test('parseKlines: multiple rows', () => {
   const out = parseKlines([
     '2024-01-31,1700,1750,1780,1690,100,1000,5,2,40,1',
     '2024-02-29,1750,1800,1820,1740,200,2000,4,3,50,2',
@@ -40,7 +40,7 @@ test('parseKlines: 多行', () => {
   assert.equal(out[1].close, 1800);
 });
 
-test('parseKlines: open/close 非数字的行丢弃', () => {
+test('parseKlines: rows with non-numeric open/close are discarded', () => {
   const out = parseKlines([
     'X,abc,def,1,1,1,1,1,1,1,1',
     '2024-01,1,2,3,4,5,6,7,8,9,10',

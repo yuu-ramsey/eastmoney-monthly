@@ -17,7 +17,7 @@ for t in tables:
     cnt = db.execute(f"SELECT COUNT(*) FROM {tname}").fetchone()[0]
     print(f'  {tname}: {cnt} rows')
 
-# 检查monthly_klines
+# Check monthly_klines
 cnt = db.execute("SELECT COUNT(DISTINCT code) FROM monthly_klines").fetchone()[0]
 print(f'\nmonthly_klines unique codes: {cnt}')
 cnt84 = db.execute(
@@ -25,13 +25,13 @@ cnt84 = db.execute(
 ).fetchone()[0]
 print(f'codes with >=84 months: {cnt84}')
 
-# 加载新行业映射
+# Load new industry mapping
 with open('data/industry-map.json', 'r', encoding='utf-8') as f:
     ind_map = json.load(f)
 stock_to_ind = ind_map['stockToIndustry']
 print(f'\nIndustry map: {len(stock_to_ind)} stocks, {ind_map["industryCount"]} industries')
 
-# 创建stock_industry_mapping表
+# Create stock_industry_mapping table
 snapshot_date = '2026-05-24'
 db.execute("DROP TABLE IF EXISTS stock_industry_mapping")
 db.execute("""
@@ -44,17 +44,17 @@ db.execute("""
     )
 """)
 
-# 写入数据
+# Write data
 insert_sql = "INSERT OR REPLACE INTO stock_industry_mapping (stock_code, industry_code, industry_name, snapshot_date) VALUES (?, ?, ?, ?)"
 data = [(sc, ind, ind, snapshot_date) for sc, ind in stock_to_ind.items()]
 db.executemany(insert_sql, data)
 db.commit()
 
-# 验证
+# Verify
 cnt = db.execute("SELECT COUNT(*) FROM stock_industry_mapping").fetchone()[0]
 print(f'\nWritten: {cnt} rows to stock_industry_mapping')
 
-# 检查覆盖
+# Check coverage
 monthly_codes = set()
 for row in db.execute("SELECT DISTINCT code FROM monthly_klines"):
     monthly_codes.add(row[0])

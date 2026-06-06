@@ -10,7 +10,7 @@ function newDb() {
   return db;
 }
 
-test('所有表创建成功', () => {
+test('all tables created successfully', () => {
   const db = newDb();
   const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((r) => r.name);
   assert.ok(tables.includes('stocks'));
@@ -21,30 +21,30 @@ test('所有表创建成功', () => {
   assert.ok(tables.includes('adjust_events'));
 });
 
-test('所有索引创建成功', () => {
+test('all indexes created successfully', () => {
   const db = newDb();
   const count = db.prepare("SELECT count(*) as c FROM sqlite_master WHERE type='index'").get();
   assert.ok(count.c >= 8);
 });
 
-test('tableForPeriod 返回正确表名', () => {
+test('tableForPeriod returns correct table names', () => {
   assert.equal(tableForPeriod('monthly'), 'monthly_klines');
   assert.equal(tableForPeriod('weekly'), 'weekly_klines');
   assert.equal(tableForPeriod('daily'), 'daily_klines');
   assert.equal(tableForPeriod('60min'), 'kline_60min');
 });
 
-test('tableForPeriod 未知周期抛错', () => {
+test('tableForPeriod unknown period throws error', () => {
   assert.throws(() => tableForPeriod('yearly'), /未知周期/);
 });
 
-test('PERIOD_TABLES 包含 4 个周期', () => {
+test('PERIOD_TABLES contains 4 periods', () => {
   assert.equal(Object.keys(PERIOD_TABLES).length, 4);
   assert.equal(PERIOD_TABLES.monthly, 'monthly_klines');
   assert.equal(PERIOD_TABLES['60min'], 'kline_60min');
 });
 
-test('K 线表有正确的列', () => {
+test('K-line tables have correct columns', () => {
   const db = newDb();
   const cols = db.prepare('PRAGMA table_info(monthly_klines)').all().map((c) => c.name);
   assert.ok(cols.includes('code'));
@@ -62,7 +62,7 @@ test('K 线表有正确的列', () => {
   assert.ok(cols.includes('adjust'));
 });
 
-test('stocks 表主键约束', () => {
+test('stocks table primary key constraint', () => {
   const db = newDb();
   db.prepare("INSERT INTO stocks (code, market, name) VALUES ('600519', '1', '茅台')").run();
   assert.throws(() => {
@@ -70,8 +70,8 @@ test('stocks 表主键约束', () => {
   }, /UNIQUE/);
 });
 
-test(':memory: 数据库 journal_mode 为 memory', () => {
+test(':memory: database journal_mode is memory', () => {
   const db = newDb();
   const jm = db.prepare('PRAGMA journal_mode').get();
-  assert.equal(jm.journal_mode, 'memory'); // :memory: 不支持 WAL
+  assert.equal(jm.journal_mode, 'memory'); // :memory: does not support WAL
 });

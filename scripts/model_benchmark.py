@@ -1,5 +1,5 @@
-"""Multi-model benchmark: local models vs Qlib SOTA public benchmark + Ken French dataset。
-当 Qlib 成功安装后，可运行完整对比；否则仅 sklearn+LightGBM 对比。
+"""Multi-model benchmark: local models vs Qlib SOTA public benchmark + Ken French dataset.
+When Qlib is installed successfully, run full comparison; otherwise sklearn+LightGBM only.
 """
 import numpy as np, pandas as pd, sqlite3, time, json, sys
 from pathlib import Path
@@ -15,12 +15,12 @@ OUT = Path('.eastmoney-ai/benchmark')
 OUT.mkdir(parents=True, exist_ok=True)
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Qlib 公开发布的 benchmark 数据（作为 SOTA 对标基线）
-# 来源: github.com/microsoft/qlib, CSI300日线 Alpha158
+# Qlib public benchmark data (as SOTA baseline reference)
+# Source: github.com/microsoft/qlib, CSI300 daily Alpha158
 # ═══════════════════════════════════════════════════════════════════════════
 
 QLIB_BENCHMARKS = {
-    # 模型名: {IC, ICIR, Rank_IC, Rank_ICIR, Ann_Return, IR, Max_DD}
+    # model_name: {IC, ICIR, Rank_IC, Rank_ICIR, Ann_Return, IR, Max_DD}
     'LightGBM':       {'IC':0.0448, 'ICIR':0.3660, 'Rank_IC':0.0469, 'Rank_ICIR':0.3877, 'Ann_Return':0.0901, 'IR':1.0164, 'Max_DD':-0.1038},
     'XGBoost':        {'IC':0.0498, 'ICIR':0.3779, 'Rank_IC':0.0505, 'Rank_ICIR':0.4131, 'Ann_Return':0.0780, 'IR':0.9070, 'Max_DD':-0.1168},
     'CatBoost':       {'IC':0.0460, 'ICIR':0.3641, 'Rank_IC':0.0479, 'Rank_ICIR':0.3935, 'Ann_Return':0.0761, 'IR':0.8810, 'Max_DD':-0.1107},
@@ -35,7 +35,7 @@ QLIB_BENCHMARKS = {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 本地数据加载 & 特征工程（与 monthly_enhanced_v6.py 一致）
+# Local data loading & feature engineering (consistent with monthly_enhanced_v6.py)
 # ═══════════════════════════════════════════════════════════════════════════
 
 def load_ashare():
@@ -92,7 +92,7 @@ def load_ashare():
     return pd.DataFrame(rows).dropna()
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 评估
+# Evaluation
 # ═══════════════════════════════════════════════════════════════════════════
 
 def monthly_ic(test, pred):
@@ -110,11 +110,11 @@ def monthly_ic(test, pred):
 
 def main():
     print("="*70)
-    print("多模型对标: 本地模型 vs Qlib SOTA Benchmark")
+    print("Multi-model benchmark: Local models vs Qlib SOTA Benchmark")
     print("="*70)
 
-    # 数据
-    print("\n[1] 加载 A 股月线...")
+    # Data
+    print("\n[1] Loading A-share monthly klines...")
     t0 = time.time()
     data = load_ashare()
     feat_cols = [c for c in data.columns if c not in ['date','fwd_ret']]
@@ -122,14 +122,14 @@ def main():
     test = data[data['date']>='2024-01']
     X_tr, y_tr = train[feat_cols].values.astype(float), train['fwd_ret'].values.astype(float)
     X_te, y_te = test[feat_cols].values.astype(float), test['fwd_ret'].values.astype(float)
-    print(f"  训练: {len(train):,} 测试: {len(test):,} 特征: {len(feat_cols)} ({time.time()-t0:.0f}s)")
+    print(f"  Train: {len(train):,} Test: {len(test):,} Features: {len(feat_cols)} ({time.time()-t0:.0f}s)")
 
-    # 标准化
+    # Standardize
     sc = StandardScaler()
     X_tr_s = sc.fit_transform(X_tr)
     X_te_s = sc.transform(X_te)
 
-    # 本地模型
+    # Local models
     models = {
         'LightGBM': lgb.LGBMRegressor(objective='regression',num_leaves=63,learning_rate=0.03,
                         n_estimators=200,min_child_samples=10,subsample=0.8,colsample_bytree=0.8,
@@ -145,8 +145,8 @@ def main():
     }
 
     results = {}
-    print("\n[2] 本模型结果 vs Qlib SOTA:")
-    print(f"{'模型':<18s} {'IC':>8s} {'ICIR':>8s} {'vs Qlib IC':>12s} {'差距':>8s} {'Note':>20s}")
+    print("\n[2] Local model results vs Qlib SOTA:")
+    print(f"{'Model':<18s} {'IC':>8s} {'ICIR':>8s} {'vs Qlib IC':>12s} {'Gap':>8s} {'Note':>20s}")
     print("-"*78)
 
     for name, model in models.items():
@@ -167,34 +167,34 @@ def main():
             gap = ic - qlib_ic if not np.isnan(qlib_ic) else np.nan
             note = ''
             if not np.isnan(gap):
-                note = '>>优于SOTA' if gap > 0.01 else '>优于' if gap > 0 else '<劣于'
+                note = '>>Better' if gap > 0.01 else '>Better' if gap > 0 else '<Worse'
             print(f"{name:<18s} {ic:+.4f} {icir:+.4f} {qlib_ic:+.4f} {gap:+.4f} {note}")
         except Exception as e:
             print(f"{name:<18s} failed: {e}")
             results[name] = {'error':str(e)}
 
-    # Qlib 专有模型（仅对比用）
+    # Qlib-specific models (for comparison only)
     print(f"\n{'─'*78}")
-    print("Qlib 专有模型 (本地无对应，仅供Reference):")
+    print("Qlib-specific models (no local equivalent, reference only):")
     for name in ['DoubleEnsemble','ALSTM','GRU','TRA','TabNet']:
         qlib = QLIB_BENCHMARKS.get(name, {})
         print(f"  {name:<16s} IC={qlib.get('IC',0):+.4f} IR={qlib.get('IR',0):.4f} AnnRet={qlib.get('Ann_Return',0):.2%}")
 
-    # Qlib run（如果可用）
+    # Qlib run (if available)
     print(f"\n{'─'*78}")
     try:
         import qlib
         from qlib.config import C
-        print("Qlib 可用，跳过其内置 benchmark（需额外配置）")
+        print("Qlib available, skipping its built-in benchmark (needs extra config)")
     except ImportError:
-        print("Qlib 未安装（需 Visual C++ Build Tools），以上为本地模型对标")
+        print("Qlib not installed (needs Visual C++ Build Tools), above is local model benchmark")
 
-    # 保存
+    # Save
     out = {'local_results':{k:{kk:float(vv) if isinstance(vv,(np.floating,float)) else vv for kk,vv in v.items()} for k,v in results.items()},
            'qlib_benchmarks':QLIB_BENCHMARKS}
     with open(OUT/'model_benchmark.json','w') as f:
         json.dump(out, f, indent=2, default=str)
-    print(f"\n结果: {OUT/'model_benchmark.json'}")
+    print(f"\nResults: {OUT/'model_benchmark.json'}")
 
     return results
 

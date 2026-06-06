@@ -1,4 +1,4 @@
-// Audit script: re-parse with current parser v4-signals jsonl，验证 score 可还原性
+// Audit script: re-parse v4-signals jsonl with current parser, verify score reproducibility
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_DIR = path.resolve(__dirname, '..');
 const RUNS_DIR = path.join(PROJECT_DIR, '.eastmoney-ai', 'eval', 'runs');
 
-// 与 lib/eval/runner.js 完全一致的 score 逻辑
+// Score logic identical to lib/eval/runner.js
 function mapSignal(s) {
   if (s === 'strong_bull') return 2;
   if (s === 'bull') return 1;
@@ -34,12 +34,12 @@ function reparseRecord(record) {
   const raw = record.rawResponse;
   if (!raw) return { error: 'rawResponse missing' };
 
-  // 用与 runner.js 完全相同的 JSON 提取逻辑
+  // Use exact same JSON extraction logic as runner.js
   let scoreData = null;
   try {
     const m = raw.match(/```json\s*([\s\S]*?)```/);
     if (m) scoreData = JSON.parse(m[1].trim());
-  } catch (_) { /* JSON 解析失败 */ }
+  } catch (_) { /* JSON parse failed */ }
 
   const reparsedSignal = scoreData?.signal || 'neutral';
   const groundTruth = record.groundTruth;
@@ -99,59 +99,59 @@ function signalDistribution(results) {
 
 // ---- v4-signals ----
 console.log('='.repeat(60));
-console.log('任务 1c: 重解析 v4-signals (最新文件: 00-41)');
+console.log('Task 1c: Re-parse v4-signals (latest file: 00-41)');
 console.log('='.repeat(60));
 
 const v4Path = path.join(RUNS_DIR, 'v4-signals-2026-05-17-00-41.jsonl');
 if (!fs.existsSync(v4Path)) {
-  console.log('FATAL: v4 jsonl 不存在');
+  console.log('FATAL: v4 jsonl does not exist');
   process.exit(1);
 }
 
 const v4Lines = fs.readFileSync(v4Path, 'utf-8').trim().split('\n').filter(Boolean);
-console.log(`文件行数: ${v4Lines.length}`);
+console.log(`File lines: ${v4Lines.length}`);
 
 const v4Records = v4Lines.map(l => JSON.parse(l));
 const v4Results = v4Records.map(reparseRecord);
 
-// 统计
+// Statistics
 const v4Stats = computeStats(v4Results);
-console.log('\n--- v4 重解析统计 ---');
-console.log(`总记录: ${v4Stats.total}`);
-console.log(`加权 score (重解析): ${v4Stats.weightedScore}`);
-console.log(`完全正确率: ${v4Stats.perfectPct}`);
-console.log(`方向正确率: ${v4Stats.dirCorrectPct}`);
-console.log(`方向错误率: ${v4Stats.dirWrongPct}`);
+console.log('\n--- v4 Re-parse Statistics ---');
+console.log(`Total records: ${v4Stats.total}`);
+console.log(`Weighted score (re-parsed): ${v4Stats.weightedScore}`);
+console.log(`Perfect accuracy: ${v4Stats.perfectPct}`);
+console.log(`Direction correct rate: ${v4Stats.dirCorrectPct}`);
+console.log(`Direction wrong rate: ${v4Stats.dirWrongPct}`);
 
 const v4SigDist = signalDistribution(v4Results);
-console.log('\n--- 重解析后 signal 分布 ---');
+console.log('\n--- Signal Distribution After Re-parse ---');
 for (const [sig, info] of Object.entries(v4SigDist)) {
   console.log(`  ${sig}: ${info.count} (${info.pct})`);
 }
 
-// 兼容性检查
+// Compatibility check
 const v4NoRaw = v4Results.filter(r => !r.hasRawResponse).length;
 const v4NoJson = v4Results.filter(r => r.hasRawResponse && !r.hasJsonBlock).length;
 const v4SignalMismatch = v4Results.filter(r => !r.error && !r.signalMatch).length;
 const v4ScoreMismatch = v4Results.filter(r => !r.error && !r.scoreMatch).length;
 const v4Error = v4Results.filter(r => r.error).length;
 
-console.log('\n--- 兼容性检查 ---');
-console.log(`rawResponse 缺失: ${v4NoRaw}/${v4Results.length}`);
-console.log(`JSON block 缺失: ${v4NoJson}/${v4Results.length}`);
-console.log(`signal 不一致: ${v4SignalMismatch}/${v4Results.length}`);
-console.log(`score 不一致: ${v4ScoreMismatch}/${v4Results.length}`);
-console.log(`解析错误: ${v4Error}/${v4Results.length}`);
+console.log('\n--- Compatibility Check ---');
+console.log(`rawResponse missing: ${v4NoRaw}/${v4Results.length}`);
+console.log(`JSON block missing: ${v4NoJson}/${v4Results.length}`);
+console.log(`signal mismatch: ${v4SignalMismatch}/${v4Results.length}`);
+console.log(`score mismatch: ${v4ScoreMismatch}/${v4Results.length}`);
+console.log(`Parse errors: ${v4Error}/${v4Results.length}`);
 
 if (v4SignalMismatch > 0) {
-  console.log('\n--- signal 不一致样本 (前 5) ---');
+  console.log('\n--- signal mismatch samples (first 5) ---');
   v4Results.filter(r => !r.error && !r.signalMatch).slice(0, 5).forEach(r => {
     console.log(`  ${r.code} ${r.cutoffDate} ${r.template}: orig=${r.originalSignal} reparse=${r.reparsedSignal} gt=${r.groundTruth}`);
   });
 }
 
 if (v4ScoreMismatch > 0) {
-  console.log('\n--- score 不一致样本 (前 5) ---');
+  console.log('\n--- score mismatch samples (first 5) ---');
   v4Results.filter(r => !r.error && !r.scoreMatch).slice(0, 5).forEach(r => {
     console.log(`  ${r.code} ${r.cutoffDate} ${r.template}: orig=${r.originalScore} new=${r.newScore} signal=[${r.originalSignal}→${r.reparsedSignal}]`);
   });
@@ -159,30 +159,30 @@ if (v4ScoreMismatch > 0) {
 
 // ---- v5-resonance ----
 console.log('\n' + '='.repeat(60));
-console.log('任务 1d: 重解析 v5-resonance');
+console.log('Task 1d: Re-parse v5-resonance');
 console.log('='.repeat(60));
 
 const v5Path = path.join(RUNS_DIR, 'v5-resonance-2026-05-17-03-16.jsonl');
 if (!fs.existsSync(v5Path)) {
-  console.log('FATAL: v5 jsonl 不存在');
+  console.log('FATAL: v5 jsonl does not exist');
   process.exit(1);
 }
 
 const v5Lines = fs.readFileSync(v5Path, 'utf-8').trim().split('\n').filter(Boolean);
-console.log(`文件行数: ${v5Lines.length}`);
+console.log(`File lines: ${v5Lines.length}`);
 
 const v5Records = v5Lines.map(l => JSON.parse(l));
 const v5Results = v5Records.map(reparseRecord);
 
 const v5Stats = computeStats(v5Results);
-console.log('\n--- v5 重解析统计 ---');
-console.log(`总记录: ${v5Stats.total}`);
-console.log(`加权 score (重解析): ${v5Stats.weightedScore}`);
-console.log(`完全正确率: ${v5Stats.perfectPct}`);
-console.log(`方向正确率: ${v5Stats.dirCorrectPct}`);
+console.log('\n--- v5 Re-parse Statistics ---');
+console.log(`Total records: ${v5Stats.total}`);
+console.log(`Weighted score (re-parsed): ${v5Stats.weightedScore}`);
+console.log(`Perfect accuracy: ${v5Stats.perfectPct}`);
+console.log(`Direction correct rate: ${v5Stats.dirCorrectPct}`);
 
 const v5SigDist = signalDistribution(v5Results);
-console.log('\n--- 重解析后 signal 分布 ---');
+console.log('\n--- Signal Distribution After Re-parse ---');
 for (const [sig, info] of Object.entries(v5SigDist)) {
   console.log(`  ${sig}: ${info.count} (${info.pct})`);
 }
@@ -191,24 +191,24 @@ const v5NoRaw = v5Results.filter(r => !r.hasRawResponse).length;
 const v5SignalMismatch = v5Results.filter(r => !r.error && !r.signalMatch).length;
 const v5ScoreMismatch = v5Results.filter(r => !r.error && !r.scoreMatch).length;
 
-console.log('\n--- 兼容性检查 ---');
-console.log(`rawResponse 缺失: ${v5NoRaw}/${v5Results.length}`);
-console.log(`signal 不一致: ${v5SignalMismatch}/${v5Results.length}`);
-console.log(`score 不一致: ${v5ScoreMismatch}/${v5Results.length}`);
+console.log('\n--- Compatibility Check ---');
+console.log(`rawResponse missing: ${v5NoRaw}/${v5Results.length}`);
+console.log(`signal mismatch: ${v5SignalMismatch}/${v5Results.length}`);
+console.log(`score mismatch: ${v5ScoreMismatch}/${v5Results.length}`);
 
 if (v5ScoreMismatch > 0) {
-  console.log('\n--- score 不一致样本 (前 5) ---');
+  console.log('\n--- score mismatch samples (first 5) ---');
   v5Results.filter(r => !r.error && !r.scoreMatch).slice(0, 5).forEach(r => {
     console.log(`  ${r.code} ${r.cutoffDate} ${r.template}: orig=${r.originalScore} new=${r.newScore} signal=[${r.originalSignal}→${r.reparsedSignal}]`);
   });
 }
 
-// 最终结论
+// Final conclusion
 console.log('\n' + '='.repeat(60));
-console.log('结论');
+console.log('Conclusion');
 console.log('='.repeat(60));
 const v4AllMatch = v4SignalMismatch === 0 && v4ScoreMismatch === 0 && v4NoRaw === 0;
 const v5AllMatch = v5SignalMismatch === 0 && v5ScoreMismatch === 0 && v5NoRaw === 0;
 
-console.log(`v4: ${v4AllMatch ? '✓ 完全可还原 — 数据真实' : '✗ 存在不一致'}`);
-console.log(`v5: ${v5AllMatch ? '✓ 完全可还原 — 数据真实' : '✗ 存在不一致'}`);
+console.log(`v4: ${v4AllMatch ? '✓ Fully reproducible — data is authentic' : '✗ Inconsistencies exist'}`);
+console.log(`v5: ${v5AllMatch ? '✓ Fully reproducible — data is authentic' : '✗ Inconsistencies exist'}`);

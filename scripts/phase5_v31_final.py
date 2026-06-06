@@ -1,8 +1,9 @@
+
 """
 Phase 5: 31d final vs 61d baseline
-FFT: Peak1(3d)+Peak2(3d)+Peaks3-10统计(4d) = 10d
-删: G1(4d)+G5(2d)+G4×3(rsi14/bb_pos/amplitude)+G7×1(above_ma5) = 10d
-保留: G2(3d)+G3(3d)+G4精选(2d)+G7精简(13d) = 21d + FFT(10d) = 31d
+FFT: Peak1(3d)+Peak2(3d)+Peaks3-10 stats(4d) = 10d
+Drop: G1(4d)+G5(2d)+G4x3(rsi14/bb_pos/amplitude)+G7x1(above_ma5) = 10d
+Keep: G2(3d)+G3(3d)+G4 pruned(2d)+G7 slim(13d) = 21d + FFT(10d) = 31d
 """
 import warnings; warnings.filterwarnings('ignore')
 import numpy as np, pandas as pd, sqlite3, time, json
@@ -20,14 +21,14 @@ N_FFT = 10
 DATE_FMT = '%Y-%m-%d %H:%M:%S'
 
 FEATURE_NAMES_31 = [
-    'ma5_dev', 'ma20_dev', 'ma60_dev',                       # G2 均线偏离 (0-2)
+    'ma5_dev', 'ma20_dev', 'ma60_dev',                       # G2 MA deviation (0-2)
     'dif', 'dea', 'macd_hist',                                # G3 MACD (3-5)
-    'vol_6m', 'atr14',                                        # G4精选 (6-7)
+    'vol_6m', 'atr14',                                        # G4 pruned (6-7)
     'fft_p1_freq', 'fft_p1_amp', 'fft_p1_phase',             # FFT Peak1 (8-10)
     'fft_p2_freq', 'fft_p2_amp', 'fft_p2_phase',             # FFT Peak2 (11-13)
-    'fft_amp_mean', 'fft_amp_std',                            # FFT Peaks3-10统计 (14-17)
+    'fft_amp_mean', 'fft_amp_std',                            # FFT Peaks3-10 stats (14-17)
     'fft_freq_median', 'fft_freq_range',
-    'vol_ratio', 'turnover', 'turnover_dev',                  # G7精简 (18-30)
+    'vol_ratio', 'turnover', 'turnover_dev',                  # G7 slim (18-30)
     'vol_ma3_ratio', 'log_volume', 'log_turnover',
     'body_pct', 'price_pos', 'ma_spread',
     'vol_12m', 'ma5_ma20_ratio',
@@ -54,7 +55,7 @@ def cs_ic_full(pred, true, dates):
 
 
 def fft_v31(p):
-    """10维FFT: Peak1(freq+amp+phase) + Peak2(freq+amp+phase) + Peaks3-10统计(amp_mean+amp_std+freq_median+freq_range)"""
+    """10d FFT: Peak1(freq+amp+phase) + Peak2(freq+amp+phase) + Peaks3-10 stats(amp_mean+amp_std+freq_median+freq_range)"""
     x = np.arange(len(p)); t = np.polyfit(x, p, 1); d = p - np.polyval(t, x)
     fp = np.fft.rfft(d); a = np.abs(fp); fq = np.fft.rfftfreq(len(d))
     if len(a) <= 1: return np.zeros(10, dtype=np.float32)
@@ -79,7 +80,7 @@ def fft_v31(p):
 
 
 def fft_full_30(p):
-    """原30维FFT"""
+    """Original 30d FFT"""
     x = np.arange(len(p)); t = np.polyfit(x, p, 1); d = p - np.polyval(t, x)
     fp = np.fft.rfft(d); a = np.abs(fp); fq = np.fft.rfftfreq(len(d))
     if len(a) <= 1: return np.zeros(30, dtype=np.float32)
@@ -111,7 +112,7 @@ def cross_sectional_neutralize(features, dates, neutralizer, ntype='categorical'
 
 
 def build_features():
-    print(f"[{ts()}] Loaded数据...", flush=True)
+    print(f"[{ts()}] Loading data...", flush=True)
     conn = sqlite3.connect(str(DB))
     codes = [r[0] for r in conn.execute(
         'SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
@@ -129,7 +130,7 @@ def build_features():
     print(f"[{ts()}] {len(codes_used)} stocks, {len(df)} rows", flush=True)
 
     df['month'] = df['date'].str[:7]
-    print(f"[{ts()}] 构建特征 (61d + 31d)...", flush=True); t0 = time.time()
+    print(f"[{ts()}] Building features (61d + 31d)...", flush=True); t0 = time.time()
     flat61_list, flat31_list, y_list, dates_list, inds_list = [], [], [], [], []
     fwd_dict = {h: [] for h in range(1, 7)}
 
@@ -169,7 +170,7 @@ def build_features():
             if i + 6 >= n: continue
             fwd_ret_t3 = np.clip((c[i+3] - c[i+2]) / np.maximum(abs(c[i+2]), 0.01), -2, 2)
 
-            # ====== 61维 完整版 ======
+            # ====== 61d full version ======
             g1 = [(c[i]-c[i-j])/max(abs(c[i-j]),0.01) if i>=j else 0 for j in [1,3,6,12]]
             g2 = [(c[i]-ma[i])/max(abs(c[i]),0.01) if not np.isnan(ma[i]) else 0 for ma in [ma5,ma20,ma60]]
             g3 = [dif[i] if not np.isnan(dif[i]) else 0,
@@ -182,7 +183,7 @@ def build_features():
                   (h[i]-l[i])/max(abs(c[i]),0.01)]
             g5 = [1.0 if c[i]>ma20[i] else 0.0, 1.0 if c[i]>ma60[i] else 0.0]
 
-            # G7 完整14维
+            # G7 full 14d
             g7_full = [v[i]/max(vol_ma12[i],1)-1 if i>=12 and vol_ma12[i]>0 else 0,
                        tr[i] if not np.isnan(tr[i]) else 0,
                        tr[i]/max(np.mean(tr[max(0,i-12):i+1]),0.001)-1 if i>=12 and not np.isnan(tr[i]) else 0,
@@ -199,9 +200,9 @@ def build_features():
 
             flat61_list.append(g1 + g2 + g3 + g4 + g5 + fft_full_30(cc[i-60+1:i+1]).tolist() + g7_full)
 
-            # ====== 31维 精简版 ======
-            # 删G1(4d), G5(2d), G4中rsi14/bb_pos/amplitude(3d), G7中above_ma5(1d)
-            # 保留: G2(3d) + G3(3d) + G4精选(vol_6m+atr14=2d) + FFTv31(10d) + G7精简(13d)
+            # ====== 31d pruned version ======
+            # Drop G1(4d), G5(2d), G4 rsi14/bb_pos/amplitude(3d), G7 above_ma5(1d)
+            # Keep: G2(3d) + G3(3d) + G4 pruned(vol_6m+atr14=2d) + FFTv31(10d) + G7 slim(13d)
             g4_sel = [np.std(np.diff(c[max(0,i-6):i+1])/np.maximum(np.abs(c[max(0,i-5):i+1]),0.01)) if i>=6 else 0,
                       atr14[i]/max(abs(c[i]),0.01) if not np.isnan(atr14[i]) else 0]
             g7_slim = [v[i]/max(vol_ma12[i],1)-1 if i>=12 and vol_ma12[i]>0 else 0,
@@ -215,7 +216,7 @@ def build_features():
                        (ma20[i]-ma60[i])/max(abs(c[i]),0.01) if i>=60 else 0,
                        np.std(c[max(0,i-12):i+1])/max(abs(c[i]),0.01) if i>=12 else 0,
                        ma5[i]/max(ma20[i],0.01)-1 if i>=20 else 0,
-                       up_streak[i]/12.0, dn_streak[i]/12.0]  # 删above_ma5
+                       up_streak[i]/12.0, dn_streak[i]/12.0]  # drop above_ma5
 
             flat31_list.append(g2 + g3 + g4_sel + fft_v31(cc[i-60+1:i+1]).tolist() + g7_slim)
 
@@ -246,7 +247,7 @@ def build_features():
         fwd_arr = np.array(fwd_dict[lag], dtype=np.float32)
         fwd_returns[lag] = fwd_arr[v]
 
-    print(f"[{ts()}] {len(y):,} 样本, 61d={flat61.shape[1]}d 31d={flat31.shape[1]}d ({time.time()-t0:.0f}s)", flush=True)
+    print(f"[{ts()}] {len(y):,} samples, 61d={flat61.shape[1]}d 31d={flat31.shape[1]}d ({time.time()-t0:.0f}s)", flush=True)
     return flat61, flat31, y, dates_arr, inds_arr, fwd_returns
 
 
@@ -273,7 +274,7 @@ def train_and_eval(X_tr, y_tr, X_te, y_te, dates_te, fwd_te, label, n_folds=5):
     if w_sum <= 0: ics_m, w_sum = {'LGB': 1.0, 'XGB': 1.0, 'Ridge': 1.0}, 3.0
     p_ens = sum(ics_m[n]*p for n,p in [('LGB',p_lgb),('XGB',p_xgb),('Ridge',p_ridge)]) / w_sum
 
-    # 全期 IC
+    # Full period IC
     ic_full, icir, ic_std, ic_pos, _ = cs_ic_full(p_ens, y_te, dates_te)
 
     # IC Decay T+1~T+6
@@ -313,7 +314,7 @@ def train_and_eval(X_tr, y_tr, X_te, y_te, dates_te, fwd_te, label, n_folds=5):
 if __name__ == '__main__':
     flat61, flat31, y, dates_arr, inds_arr, fwd_returns = build_features()
 
-    print(f"[{ts()}] 行业中性化...", flush=True); t0 = time.time()
+    print(f"[{ts()}] Industry neutralizing...", flush=True); t0 = time.time()
     flat61_ind = cross_sectional_neutralize(flat61.copy(), dates_arr, inds_arr, 'categorical')
     flat31_ind = cross_sectional_neutralize(flat31.copy(), dates_arr, inds_arr, 'categorical')
     print(f"[{ts()}] done ({time.time()-t0:.0f}s)", flush=True)
@@ -325,10 +326,10 @@ if __name__ == '__main__':
     y_tr=y[tr_m]; y_te=y[te_m]; dates_te=dates_arr[te_m]
     fwd_te={lag: fwd_returns[lag][te_m] for lag in range(1,7)}
 
-    # ====== 训练 ======
+    # ====== Training ======
     print(f"\n{'='*75}")
-    print("31维最终版 vs 61维baseline")
-    print(f"Train: 2010-2014, Test: 2015-01~2025-11, {len(np.unique(dates_te))} 测试月")
+    print("31d Final vs 61d Baseline")
+    print(f"Train: 2010-2014, Test: 2015-01~2025-11, {len(np.unique(dates_te))} test months")
     print(f"{'='*75}")
 
     r61 = train_and_eval(X61_tr, y_tr, X61_te, y_te, dates_te, fwd_te, "61d")
@@ -345,19 +346,19 @@ if __name__ == '__main__':
 
     # ====== IC Decay ======
     print(f"\n{'='*75}")
-    print("IC Decay: T+1 ~ T+6 (单月口径)")
+    print("IC Decay: T+1 ~ T+6 (single-month basis)")
     print(f"{'='*75}")
     print(f"{'Horizon':<8s} {'61d_IC':>8s} {'61d_IR':>8s} {'61d_IC>0':>10s} "
-          f"{'31d_IC':>8s} {'31d_IR':>8s} {'31d_IC>0':>10s} {'ΔIC':>8s}")
+          f"{'31d_IC':>8s} {'31d_IR':>8s} {'31d_IC>0':>10s} {'delta_IC':>8s}")
     print('-'*75)
     for i in range(6):
         d61=r61['decay'][i]; d31=r31['decay'][i]; dic=d31['IC']-d61['IC']
         print(f"{d61['horizon']:<8s} {d61['IC']:+8.4f} {d61['ICIR']:+8.3f} {d61['IC>0']:>9.1%} "
               f"{d31['IC']:+8.4f} {d31['ICIR']:+8.3f} {d31['IC>0']:>9.1%} {dic:+8.4f}")
 
-    # ====== 5-Fold CV 展开 ======
+    # ====== 5-Fold CV Breakdown ======
     print(f"\n{'='*75}")
-    print("5-Fold CV 展开")
+    print("5-Fold CV Breakdown")
     print(f"{'='*75}")
     for i in range(5):
         c61 = r61['cv_details'][i]; c31 = r31['cv_details'][i]
@@ -366,7 +367,7 @@ if __name__ == '__main__':
 
     # ====== Feature Importance (31d) ======
     print(f"\n{'='*75}")
-    print("31维Feature importance (LGB gain + XGB gain)")
+    print("31d Feature Importance (LGB gain + XGB gain)")
     print(f"{'='*75}")
     lgb_gain = r31['lgb'].feature_importances_
     xgb_gain_dict = r31['xgb'].get_booster().get_score(importance_type='gain')
@@ -379,12 +380,12 @@ if __name__ == '__main__':
                          'xgb_gain': round(float(xgb_g), 4)})
     imp_df = pd.DataFrame(imp_rows).sort_values('lgb_gain', ascending=False)
 
-    # 分组汇总
+    # Group summary
     groups_31 = {
-        'G2_均线偏离': range(0, 3), 'G3_MACD': range(3, 6),
-        'G4_精选': range(6, 8),
+        'G2_MA_deviation': range(0, 3), 'G3_MACD': range(3, 6),
+        'G4_pruned': range(6, 8),
         'FFT_Peak1': range(8, 11), 'FFT_Peak2': range(11, 14),
-        'FFT_P3-10统计': range(14, 18), 'G7_精简': range(18, 31),
+        'FFT_P3-10_stats': range(14, 18), 'G7_slim': range(18, 31),
     }
     print(f"\n{'Group':<18s} {'LGB_gain':>10s} {'XGB_gain':>10s} {'N_feat':>6s}")
     print('-'*48)
@@ -395,7 +396,7 @@ if __name__ == '__main__':
     print(f"\nTop 15 (LGB gain):")
     print(imp_df.head(15)[['feature', 'lgb_gain', 'xgb_gain']].to_string(index=False))
 
-    # ====== 保存 ======
+    # ====== Save ======
     delta_ic = r31['IC'] - r61['IC']
     delta_ic_pct = delta_ic / abs(r61['IC']) * 100
 
@@ -427,4 +428,4 @@ if __name__ == '__main__':
     with open(OUT / 'v31_summary.json', 'w') as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
 
-    print(f"\n[{ts()}] 31维对比done. ΔIC={delta_ic:+.4f} ({delta_ic_pct:+.1f}%). 结果: {OUT}")
+    print(f"\n[{ts()}] 31d comparison done. delta_IC={delta_ic:+.4f} ({delta_ic_pct:+.1f}%). Results: {OUT}")

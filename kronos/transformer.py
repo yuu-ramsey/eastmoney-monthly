@@ -3,11 +3,11 @@ Kronos autoregressive Transformer - hierarchical token prediction model
 
 Decoder-only architecture:
 1. Input s1+s2 token -> HierarchicalEmbedding + TemporalEmbedding
-2. N 层 TransformerBlock 处理
-3. decode_s1: 先预测 s1（粗粒度趋势），采样得到 s1
-4. decode_s2: 用 s1 作为条件，经 DependencyAwareLayer 预测 s2（细粒度波动）
+2. N layer TransformerBlock processing
+3. decode_s1: first predict s1 (coarse trend), sample to get s1
+4. decode_s2: use s1 as condition, via DependencyAwareLayer predict s2 (fine fluctuation)
 
-自回归生成时逐 token 采样（temperature + top-p），s1 先于 s2。
+Autoregressive generation samples token by token (temperature + top-p), s1 before s2.
 """
 
 # Reproduced from Kronos (https://github.com/shiyu-coder/Kronos)
@@ -34,19 +34,19 @@ from .module import (
 
 class Kronos(nn.Module, PyTorchModelHubMixin):
     """
-    Kronos 预测模型：自回归预测 K线 token 序列
+    Kronos prediction model: autoregressive K-line token sequence prediction
 
-    输入historical token → Transformer → 逐 token 生成未来序列。
-    s1/s2 双级解码：先定趋势 (s1) 再定细节 (s2)。
+    Input historical tokens -> Transformer -> generate future sequence token by token.
+    s1/s2 dual-level decoding: decide trend (s1) first, then details (s2).
 
     Args:
-        s1_bits: 粗粒度 token 比特数
-        s2_bits: 细粒度 token 比特数
-        n_layers: Transformer 层数
-        d_model: 隐藏维度
-        n_heads: 注意力头数
-        ff_dim: FFN 隐藏维度
-        learn_te: 是否学习时间嵌入（True=可学习, False=固定正弦）
+        s1_bits: coarse token bit count
+        s2_bits: fine token bit count
+        n_layers: number of Transformer layers
+        d_model: hidden dimension
+        n_heads: number of attention heads
+        ff_dim: FFN hidden dimension
+        learn_te: whether to learn temporal embeddings (True=learnable, False=fixed sinusoidal)
     """
 
     def __init__(
@@ -116,18 +116,18 @@ class Kronos(nn.Module, PyTorchModelHubMixin):
         s1_targets: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        训练用前向传播。
+        Forward pass for training.
 
         Args:
             s1_ids: [B, T] s1 token IDs
             s2_ids: [B, T] s2 token IDs
-            stamp: [B, T, 5] 时间戳
+            stamp: [B, T, 5] timestamps
             padding_mask: [B, T] padding mask (True=padding)
-            use_teacher_forcing: 是否用真实 s1 作为 s2 的条件
-            s1_targets: teacher forcing 时的目标 s1
+            use_teacher_forcing: whether to use ground-truth s1 as s2's condition
+            s1_targets: target s1 for teacher forcing
 
         Returns:
-            (s1_logits, s2_logits): 形状分别为 [B,T,2^s1_bits] 和 [B,T,2^s2_bits]
+            (s1_logits, s2_logits): shapes [B,T,2^s1_bits] and [B,T,2^s2_bits] respectively
         """
         x = self.embedding([s1_ids, s2_ids])
 
@@ -142,10 +142,10 @@ class Kronos(nn.Module, PyTorchModelHubMixin):
 
         x = self.norm(x)
 
-        # s1 粗粒度预测
+        # s1 coarse trend prediction
         s1_logits = self.head(x)
 
-        # s2 条件预测：依赖 s1
+        # s2 conditional prediction: depends on s1
         if use_teacher_forcing:
             sibling_embed = self.embedding.emb_s1(s1_targets)
         else:
@@ -168,9 +168,10 @@ class Kronos(nn.Module, PyTorchModelHubMixin):
         padding_mask: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        仅解码 s1：返回 s1 logits + Transformer 上下文（供后续 decode_s2 使用）
+        Decode s1 only: returns s1 logits + Transformer context (for subsequent decode_s2 use)
 
-        自回归生成时，每步先用此方法预测 s1，采样后再调 decode_s2 预测 s2。
+        During autoregressive generation, first use this method to predict s1 at each step,
+        then call decode_s2 to predict s2 after sampling.
         """
         x = self.embedding([s1_ids, s2_ids])
 
@@ -195,11 +196,11 @@ class Kronos(nn.Module, PyTorchModelHubMixin):
         padding_mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """
-        基于 decode_s1 的上下文和 s1 token 预测 s2。
+        Predict s2 based on decode_s1's context and s1 tokens.
 
         Args:
-            context: decode_s1 返回的 Transformer 上下文 [B, T, d_model]
-            s1_ids: 已采样的 s1 token [B, T]
+            context: Transformer context returned by decode_s1 [B, T, d_model]
+            s1_ids: sampled s1 tokens [B, T]
             padding_mask: padding mask
 
         Returns:

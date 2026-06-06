@@ -1,16 +1,16 @@
 """Weekly noise diagnosis + denoising plan: systematically solve high noise + complex model overfitting
 
-Diagnostic dimensions：
-  1. 目标噪声：13周收益的方差分解（市场β vs 个股α）
-  2. 特征噪声：各特征的自相关衰减（信号持续性）
-  3. 过拟合诊断：模型容量 vs 有效样本量
-  4. 截面归一化：去除市场波动后信号是否增强
+Diagnostic dimensions:
+  1. Target noise: 13-week return variance decomposition (market beta vs stock alpha)
+  2. Feature noise: autocorrelation decay of each feature (signal persistence)
+  3. Overfitting diagnosis: model capacity vs effective sample size
+  4. Cross-sectional normalization: whether signal strengthens after removing market volatility
 
-降噪方案：
-  A. 截面rank归一化（每周期内将特征/目标转为rank分位）
-  B. 目标平滑（折扣多月回报 vs 单点回报）
-  C. 模型容量缩减（小模型 + 强正则化）
-  D. 样本降噪（波动率加权的训练损失）
+Denoising approaches:
+  A. Cross-sectional rank normalization (convert features/targets to rank percentiles per period)
+  B. Target smoothing (discounted multi-horizon return vs single-point return)
+  C. Model capacity reduction (small model + strong regularization)
+  D. Sample denoising (volatility-weighted training loss)
 """
 import numpy as np, pandas as pd, sqlite3, warnings
 from pathlib import Path
@@ -25,7 +25,7 @@ PROJECT = Path(__file__).parent.parent
 OUT = PROJECT / '.eastmoney-ai' / 'lstm'
 DB = PROJECT / '.eastmoney-ai' / 'db' / 'klines-v2.sqlite'
 
-# ======== 0. 数据Loaded（复用 weekly_daily_bridge 的特征构建逻辑） ========
+# ======== 0. Load data (reuse weekly_daily_bridge feature build logic) ========
 print("0/5 Loading & building features...")
 
 conn = sqlite3.connect(str(DB))
@@ -38,7 +38,7 @@ w_df = pd.read_sql_query(f"""
 conn.close()
 w_df['date'] = w_df['date'].astype(str)
 
-# 日线聚合（v6: 时间安全，含 in_sample 标记）
+# Daily aggregation (v6: time-safe, with in_sample flag)
 sig_path = OUT / 'daily_signals_v6.parquet'
 if not sig_path.exists():
     sig_path = OUT / 'daily_signals.parquet'  # fallback to old
@@ -47,7 +47,7 @@ daily_sig = pd.read_parquet(sig_path)
 daily_sig['date_dt'] = pd.to_datetime(daily_sig['date'])
 daily_sig['week_id'] = daily_sig['date_dt'].dt.isocalendar().year.astype(str) + '-W' + \
     daily_sig['date_dt'].dt.isocalendar().week.astype(str).str.zfill(2)
-# 聚合时排除 in_sample 标记（只聚合 out-of-sample 信号）
+# When aggregating, exclude in_sample flag (only aggregate out-of-sample signals)
 has_in_sample = 'in_sample' in daily_sig.columns
 daily_agg = daily_sig.groupby(['code', 'week_id']).agg(
     ds_mean=('score', 'mean'), ds_std=('score', 'std'),
@@ -75,36 +75,36 @@ def compute_features(g):
     for i in range(52, n - 13):
         if closes[i] <= 0.01: continue
 
-        # 周线动量
+        # Weekly momentum
         ret_1w = (closes[i] - closes[i-1]) / max(closes[i-1], 0.01) if i >= 1 else 0
         ret_4w = (closes[i] - closes[i-4]) / max(closes[i-4], 0.01) if i >= 4 else 0
         ret_13w = (closes[i] - closes[i-13]) / max(closes[i-13], 0.01) if i >= 13 else 0
         ret_26w = (closes[i] - closes[i-26]) / max(closes[i-26], 0.01) if i >= 26 else 0
         ret_52w = (closes[i] - closes[i-52]) / max(closes[i-52], 0.01) if i >= 52 else 0
 
-        # 52周位置
+        # 52-week position
         h52 = np.max(highs[max(0,i-52):i+1]); l52 = np.min(lows[max(0,i-52):i+1])
         pos_52w = (closes[i] - l52) / max(h52 - l52, 0.01)
         dist_52h = (h52 - closes[i]) / max(h52, 0.01)
 
-        # 波动率
+        # Volatility
         rets_13 = np.diff(closes[max(0,i-13):i+1]) / np.maximum(closes[max(0,i-13):i], 0.01)
         vol_13w = np.std(rets_13) if len(rets_13) >= 3 else 0
         rets_52 = np.diff(closes[max(0,i-52):i+1]) / np.maximum(closes[max(0,i-52):i], 0.01)
         vol_52w = np.std(rets_52) if len(rets_52) >= 10 else 0.001
         vol_ratio = vol_13w / max(vol_52w, 0.001)
 
-        # 量比
+        # Volume ratio
         vol_4w_avg = np.mean(vols[max(0,i-4):i+1])
         vol_ratio_q = vols[i] / max(vol_4w_avg, 1)
 
-        # MA位置
+        # MA position
         ma20 = np.mean(closes[max(0,i-20):i+1])
         ma60 = np.mean(closes[max(0,i-60):i+1]) if i >= 60 else ma20
         ma_pos_20 = (closes[i] - ma20) / max(closes[i], 0.01)
         ma_pos_60 = (closes[i] - ma60) / max(closes[i], 0.01)
 
-        # MA排列
+        # MA alignment
         if i >= 60:
             ma5 = np.mean(closes[max(0,i-5):i+1]); ma10 = np.mean(closes[max(0,i-10):i+1])
             ma_align = 1.0 if ma5 > ma10 > ma20 > ma60 else (-1.0 if ma5 < ma10 < ma20 < ma60 else 0.0)
@@ -117,10 +117,10 @@ def compute_features(g):
         e26 = close_series.ewm(span=26).mean().iloc[-1]
         macd_line = e12 - e26
 
-        # 周振幅
+        # Weekly range
         week_range = (highs[i] - lows[i]) / max(closes[i], 0.01)
 
-        # 日线聚合
+        # Daily aggregates
         ds_mean = g['ds_mean'].iloc[i]; ds_std = g['ds_std'].iloc[i]
         ds_last = g['ds_last'].iloc[i]; ds_pos = g['ds_pos'].iloc[i]
         ds_mean = 0.0 if pd.isna(ds_mean) else ds_mean
@@ -128,11 +128,11 @@ def compute_features(g):
         ds_last = 0.0 if pd.isna(ds_last) else ds_last
         ds_pos = 0.5 if pd.isna(ds_pos) else ds_pos
 
-        # 目标：原始13周收益 + 折扣多月收益（γ=0.9, 3个月=13周）
+        # Target: raw 13-week return + discounted multi-horizon return (gamma=0.9, 3 months=13 weeks)
         fwd_raw = (closes[i+13] - closes[i]) / max(closes[i], 0.01)
         fwd_raw = np.clip(fwd_raw, -2, 2)
 
-        # 折扣多月目标（13w + γ*26w + γ²*39w + γ³*52w）
+        # Discounted multi-horizon target (13w + gamma*26w + gamma^2*39w + gamma^3*52w)
         fwd_disc = fwd_raw
         for k, horizon in enumerate([26, 39, 52], 1):
             if i + horizon < n:
@@ -164,20 +164,20 @@ FEATURES = ['ret_1w', 'ret_4w', 'ret_13w', 'ret_26w', 'ret_52w',
             'pos_52w', 'dist_52h', 'vol_13w', 'vol_ratio', 'vol_ratio_q',
             'ma_pos_20', 'ma_pos_60', 'ma_align', 'macd_line', 'week_range',
             'ds_mean', 'ds_std', 'ds_last', 'ds_pos']
-# 不含日线信号的基础特征（安全特征集）
+# Baseline features without daily signal (safe feature set)
 SAFE_FEATURES = [f for f in FEATURES if not f.startswith('ds_')]
 
 for col in FEATURES:
     if col in df.columns:
         df[col] = df[col].fillna(0.0)
-# 将 contaminated 日线信号清零（仅保留 out-of-sample）
+# Zero out contaminated daily signals (keep only out-of-sample)
 if 'ds_is_clean' in df.columns:
     for col in ['ds_mean', 'ds_std', 'ds_last', 'ds_pos']:
         if col in df.columns:
             df.loc[~df['ds_is_clean'], col] = 0.0
     print(f"  Zeroed ds_* for {((~df['ds_is_clean']).sum())} contaminated weeks")
 
-# 严格去NaN（目标列 + 特征列）
+# Strict NaN removal (target cols + feature cols)
 df = df.dropna(subset=['fwd_raw', 'fwd_disc'])
 for col in FEATURES:
     df = df[np.isfinite(df[col])]
@@ -186,16 +186,16 @@ print(f"  Rows: {len(df)}, Stocks: {df.code.nunique()}, Dates: {df.date.min()}~{
 print(f"  fwd_raw NaN: {df['fwd_raw'].isna().sum()}, Inf: {(~np.isfinite(df['fwd_raw'])).sum()}")
 print(f"  fwd_disc NaN: {df['fwd_disc'].isna().sum()}, Inf: {(~np.isfinite(df['fwd_disc'])).sum()}")
 
-# ======== 1. 噪声诊断 ========
+# ======== 1. Noise diagnosis ========
 print("\n" + "="*70)
-print("1. 噪声诊断")
+print("1. Noise Diagnosis")
 print("="*70)
 
-# 1a. 目标噪声：市场β vs 个股α
-print("\n1a. 目标噪声分解（13周前向收益的截面方差）")
+# 1a. Target noise: market beta vs stock alpha
+print("\n1a. Target noise decomposition (cross-sectional variance of 13-week forward returns)")
 dates_sorted = sorted(df['date'].unique())
 total_var, mkt_var, idio_var = [], [], []
-for dt in dates_sorted[::4]:  # 每4周采样
+for dt in dates_sorted[::4]:  # sample every 4 weeks
     te = df[df['date'] == dt]
     if len(te) < 50: continue
     fwd = te['fwd_raw'].values
@@ -207,16 +207,16 @@ for dt in dates_sorted[::4]:  # 每4周采样
     idio_var.append(np.var(fwd - mkt_ret))
 
 if total_var:
-    print(f"  总方差:        mean={np.mean(total_var):.4f}")
-    print(f"  市场β方差:     mean={np.mean(mkt_var):.4f} ({100*np.mean(mkt_var)/np.mean(total_var):.1f}%)")
-    print(f"  个股α方差:     mean={np.mean(idio_var):.4f} ({100*np.mean(idio_var)/np.mean(total_var):.1f}%)")
+    print(f"  Total variance:      mean={np.mean(total_var):.4f}")
+    print(f"  Market beta variance:    mean={np.mean(mkt_var):.4f} ({100*np.mean(mkt_var)/np.mean(total_var):.1f}%)")
+    print(f"  Stock alpha variance:    mean={np.mean(idio_var):.4f} ({100*np.mean(idio_var)/np.mean(total_var):.1f}%)")
 else:
-    print("  方差分解: 无有效数据")
-print(f"  → 个股α方差占比高=截面可预测空间大；市场β占比高=截面信号被淹没问题")
+    print("  Variance decomposition: no valid data")
+print(f"  -> High stock-alpha variance share = large cross-sectional predictability space; high market-beta share = cross-sectional signal submerged by market")
 
-# 1b. 特征自相关（信号持续性）
-print("\n1b. 特征自相关衰减（信号持续性诊断）")
-# 取一只典型股票，看特征的自相关
+# 1b. Feature autocorrelation (signal persistence)
+print("\n1b. Feature autocorrelation decay (signal persistence diagnosis)")
+# Take a representative stock, check feature autocorrelation
 for code in ['000001', '600519']:
     g = df[df['code'] == code].sort_values('date')
     if len(g) < 100: continue
@@ -229,23 +229,23 @@ for code in ['000001', '600519']:
         ac13 = np.corrcoef(vals[:-13], vals[13:])[0,1] if len(vals) > 14 else 0
         print(f"    {feat:15s}: AC(1)={ac1:+.3f}  AC(4)={ac4:+.3f}  AC(13)={ac13:+.3f}")
 
-# 1c. 有效样本量估算
-print("\n1c. 有效样本量 vs 模型复杂度")
+# 1c. Effective sample size estimation
+print("\n1c. Effective sample size vs model complexity")
 n_stocks = df.code.nunique()
 n_weeks_total = len(df)
-n_independent = n_stocks * (len(dates_sorted) / 13)  # 每13周≈独立样本
-print(f"  总样本数:     {n_weeks_total:,}")
-print(f"  独立样本估算: {n_independent:.0f} (每13周一次独立观测)")
-print(f"  每周期股票数: {n_stocks}")
-print(f"  → LSTM-7Parameters量: ~2M, 有效样本: ~{n_independent:.0f} — 严重过Parameters化")
+n_independent = n_stocks * (len(dates_sorted) / 13)  # every 13 weeks ~ independent sample
+print(f"  Total samples:     {n_weeks_total:,}")
+print(f"  Est. independent:  {n_independent:.0f} (one independent observation per 13 weeks)")
+print(f"  Stocks per period: {n_stocks}")
+print(f"  -> LSTM-7 params: ~2M, effective samples: ~{n_independent:.0f} -- severe over-parameterization")
 
-# ======== 2. 降噪方案A：截面rank归一化 ========
+# ======== 2. Denoising A: cross-sectional rank normalization ========
 print("\n" + "="*70)
-print("2. 降噪方案 A：截面rank归一化")
+print("2. Denoising A: Cross-Sectional Rank Normalization")
 print("="*70)
 
 def cross_sectional_rank(df_in, feats, target_col='fwd_raw'):
-    """每周期内将特征和目标转为 [0,1] rank分位"""
+    """Convert features and target to [0,1] rank percentiles per period"""
     df_out = df_in.copy()
     for col in feats + [target_col]:
         df_out[col + '_rank'] = np.nan
@@ -261,21 +261,21 @@ def cross_sectional_rank(df_in, feats, target_col='fwd_raw'):
 df_rank = cross_sectional_rank(df, FEATURES, 'fwd_raw')
 RANK_FEATS = [f + '_rank' for f in FEATURES]
 
-# ======== 3. 降噪方案B：折扣多月目标 ========
-print("\n3. 降噪方案 B：折扣多月目标")
+# ======== 3. Denoising B: discounted multi-horizon target ========
+print("\n3. Denoising B: Discounted Multi-Horizon Target")
 print(f"  fwd_raw:  mean={df['fwd_raw'].mean():.4f}, std={df['fwd_raw'].std():.4f}")
 print(f"  fwd_disc: mean={df['fwd_disc'].mean():.4f}, std={df['fwd_disc'].std():.4f}")
-# 相关性
+# Correlation
 valid = df['fwd_raw'].notna() & df['fwd_disc'].notna()
 r = pearsonr(df.loc[valid, 'fwd_raw'], df.loc[valid, 'fwd_disc'])[0]
 print(f"  Pearson r(raw, disc) = {r:.4f}")
 
-# ======== 4. 综合 Walk-Forward 对比 ========
+# ======== 4. Comprehensive Walk-Forward Comparison ========
 print("\n" + "="*70)
-print("4. Walk-Forward: 各降噪方案对比")
+print("4. Walk-Forward: Denoising Approach Comparison")
 print("="*70)
 
-# 方案矩阵
+# Approach matrix
 configs = {
     'raw_target+raw_feat':   ('fwd_raw', FEATURES, df),
     'raw_target+rank_feat':  ('fwd_raw', RANK_FEATS, df_rank),
@@ -283,10 +283,10 @@ configs = {
     'disc_target+rank_feat': ('fwd_disc', RANK_FEATS, df_rank),
 }
 
-# Ridge Parameters扫小 → 大
+# Ridge alpha sweep small -> large
 ridge_alphas = [0.01, 0.1, 1.0, 10.0, 100.0]
 
-# LGB Parameters扫小 → 大
+# LGB config sweep small -> large
 lgb_configs = {
     'tiny':  dict(n_estimators=30, max_depth=2, learning_rate=0.02, min_child_samples=50),
     'small': dict(n_estimators=50, max_depth=3, learning_rate=0.03, min_child_samples=30),
@@ -296,7 +296,7 @@ lgb_configs = {
 
 months = sorted(df['date'].unique())
 
-# 只测几个代表性配置
+# Test representative configs only
 test_configs = [
     # (target_key, feat_list, df_source, model_type, model_params, label)
     ('fwd_raw', SAFE_FEATURES, df, 'ridge', {'alpha': 1.0}, 'B0: raw+safe Ridge (no ds)'),
@@ -314,7 +314,7 @@ test_configs = [
 ]
 
 all_results = {}
-f1_results = {}  # label → {f1:[], prec:[], rec:[], ic:[], n:[]}
+f1_results = {}  # label -> {f1:[], prec:[], rec:[], ic:[], n:[]}
 for target_key, feats, df_src, model, params, label in test_configs:
     results = []
     fold_metrics = {'f1': [], 'precision': [], 'recall': [], 'ic': []}
@@ -345,7 +345,7 @@ for target_key, feats, df_src, model, params, label in test_configs:
             if len(p) > 10:
                 ic = spearmanr(p, y_te)[0]
                 if not np.isnan(ic): results.append(ic)
-                # F1: 预测方向 vs 实际方向
+                # F1: predicted direction vs actual direction
                 pred_dir = (p > 0).astype(int)
                 true_dir = (y_te > 0).astype(int)
                 if len(np.unique(pred_dir)) > 1 and len(np.unique(true_dir)) > 1:
@@ -359,9 +359,9 @@ for target_key, feats, df_src, model, params, label in test_configs:
     all_results[label] = results
     f1_results[label] = fold_metrics
     if results:
-        print(f"  {label:35s} IC={np.mean(results):.4f} ± {np.std(results):.4f} n={len(results)}")
+        print(f"  {label:35s} IC={np.mean(results):.4f} +- {np.std(results):.4f} n={len(results)}")
 
-# ======== 基准模型（无需训练） ========
+# ======== Baselines (no training needed) ========
 print(f"\n  --- Baselines (no training) ---")
 
 for bl_name, bl_predictor in [
@@ -392,9 +392,9 @@ for bl_name, bl_predictor in [
     if bl_ic:
         print(f"  {bl_name:35s} IC={np.mean(bl_ic):.4f} +- {np.std(bl_ic):.4f} n={len(bl_ic)}")
 
-# ======== 5. 最终报告 ========
+# ======== 5. Final report ========
 print(f"\n{'='*70}")
-print("FINAL: 降噪方案效果排名")
+print("FINAL: Denoising Approach Effectiveness Ranking")
 print(f"{'='*70}")
 print(f"{'Rank':<6} {'Method':<35} {'IC Mean':>10} {'IC Std':>10} {'N':>6} {'Win Rate':>10}")
 print(f"{'-'*6} {'-'*35} {'-'*10} {'-'*10} {'-'*6} {'-'*10}")
@@ -406,18 +406,18 @@ for rank, (label, vals) in enumerate(ranked, 1):
     wr = np.mean([1 if v > 0 else 0 for v in vals])
     print(f"  {rank:<6} {label:<35} {m:10.4f} {s:10.4f} {len(vals):6} {wr:10.2%}")
 
-# 与 baseline 对比
+# Compare to baseline
 print(f"\n  Baseline LSTM-7:     IC=0.0074")
 print(f"  Baseline LightGBM:   IC=0.0447")
 if ranked:
     best_name, best_vals = ranked[0]
-    print(f"  Best (降噪后):       IC={np.mean(best_vals):.4f} ({best_name})")
+    print(f"  Best (denoised):    IC={np.mean(best_vals):.4f} ({best_name})")
     gain = np.mean(best_vals) / 0.0074
-    print(f"  vs LSTM-7 baseline:  {gain:.0f}x")
+    print(f"  vs LSTM-7 baseline: {gain:.0f}x")
 
-# ======== F1 Score 汇总 ========
+# ======== F1 Score summary ========
 print(f"\n{'='*70}")
-print("F1 Score: 方向预测精度 (预测涨跌 vs 实际涨跌)")
+print("F1 Score: Directional Prediction Accuracy (predicted up/down vs actual up/down)")
 print(f"{'='*70}")
 print(f"{'Rank':<6} {'Method':<35} {'F1':>8} {'Precision':>10} {'Recall':>8} {'IC':>8} {'N Folds':>8}")
 print(f"{'-'*6} {'-'*35} {'-'*8} {'-'*10} {'-'*8} {'-'*8} {'-'*8}")
@@ -429,9 +429,6 @@ for rank, (label, m) in enumerate(f1_ranked, 1):
     p_m = np.mean(m['precision'])
     r_m = np.mean(m['recall'])
     ic_m = np.mean(m['ic'])
-    # 从 precision/recall/F1 反推 accuracy
-    # F1 = 2*P*R/(P+R), but F1=0 when P+R=0
-    # accuracy ≈ F1 for balanced classes
     print(f"  {rank:<6} {label:<35} {f1_m:8.4f} {p_m:10.4f} {r_m:8.4f} {ic_m:8.4f} {len(m['f1']):8}")
 
 print(f"\n{'='*70}")

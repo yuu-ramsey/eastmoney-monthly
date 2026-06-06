@@ -1,4 +1,4 @@
-"""Step 1 核实: walk-forward split / skipped stocks / y pre-clip distribution"""
+"""Step 1 Verification: walk-forward split / skipped stocks / y pre-clip distribution"""
 import sqlite3
 from pathlib import Path
 import numpy as np
@@ -27,7 +27,7 @@ conn.close()
 # Problem 1: Walk-forward date ranges
 # ============================================================
 print("\n" + "=" * 60)
-print("问题 1: Walk-forward split date验证")
+print("Problem 1: Walk-forward split date verification")
 print("=" * 60)
 
 # Simulate the same sequence generation logic
@@ -81,7 +81,7 @@ train_val_overlap = train_dates & val_dates
 val_test_overlap = val_dates & test_dates
 train_test_overlap = train_dates & test_dates
 
-print(f"\ndate重叠检查:")
+print(f"\nDate overlap check:")
 print(f"  Train ∩ Val: {len(train_val_overlap)} dates")
 if train_val_overlap:
     print(f"    {sorted(train_val_overlap)[:5]}...")
@@ -99,12 +99,12 @@ val_max = val_seqs['cutoff'].max()
 test_min = test_seqs['cutoff'].min()
 
 overlap = (train_max >= val_min) or (val_max >= test_min) or (train_max >= test_min)
-print(f"\n训练期约束: Train max cutoff={train_max}")
-print(f"验证期约束: Val cutoff=[{val_min}, {val_max}]")
-print(f"测试期约束: Test min cutoff={test_min}")
+print(f"\nTraining period: Train max cutoff={train_max}")
+print(f"Validation period: Val cutoff=[{val_min}, {val_max}]")
+print(f"Test period: Test min cutoff={test_min}")
 
 if train_max >= '2022-01':
-    print("⚠ 数据穿越风险: Train 包含 2022+ 数据!")
+    print("⚠ Data leakage risk: Train contains 2022+ data!")
 else:
     print("✓ Train cutoff ≤ 2021-12")
 
@@ -112,7 +112,7 @@ else:
 # Problem 2: skipped stocks
 # ============================================================
 print("\n" + "=" * 60)
-print("问题 2: 42 skipped stocks")
+print("Problem 2: 42 skipped stocks")
 print("=" * 60)
 
 skipped = []
@@ -137,18 +137,18 @@ if skipped:
         print(f"  {r['code']}: {r['n_months']} months, {r['date_range']}")
 
     # Survivorship bias check
-    print("\n上市时间分布 (skipped stocks):")
+    print("\nListing time distribution (skipped stocks):")
     if len(df_skipped) > 0 and 'date_range' in df_skipped.columns:
         start_years = df_skipped['date_range'].str.extract(r'^(\d{4})')[0]
         print(f"  Start years: {start_years.value_counts().sort_index().to_dict()}")
 
-print(f"\nCovering率: {len(stocks_all) - len(skipped)}/{len(stocks_all)} = {(len(stocks_all) - len(skipped)) / len(stocks_all) * 100:.1f}%")
+print(f"\nCoverage: {len(stocks_all) - len(skipped)}/{len(stocks_all)} = {(len(stocks_all) - len(skipped)) / len(stocks_all) * 100:.1f}%")
 
 # ============================================================
 # Problem 3: y pre-clip distribution
 # ============================================================
 print("\n" + "=" * 60)
-print("问题 3: y 标签 clip 前分布")
+print("Problem 3: y label pre-clip distribution")
 print("=" * 60)
 
 y3_all = []
@@ -192,7 +192,7 @@ for name, arr in [('y3 (3m fwd)', y3_clean), ('y6 (6m fwd)', y6_clean)]:
     print(f"  > +2.0 (clip): {clip_pos} ({clip_pos/len(arr)*100:.2f}%)")
     print(f"  total clipped: {total_clip} ({pct_clip:.2f}%)")
     if pct_clip > 5:
-        print(f"  ⚠ 超过 5% 阈值!")
+        print(f"  ⚠ Exceeds 5% threshold!")
 
     # Extreme samples (pre-clip)
     extremes = arr[np.abs(arr) > 5.0]

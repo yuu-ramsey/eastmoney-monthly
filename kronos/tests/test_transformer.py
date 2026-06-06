@@ -16,12 +16,12 @@ _model_weights_dir = (
 )
 requires_weights = pytest.mark.skipif(
     not _model_weights_dir.exists(),
-    reason="未download权重，Please run first download_weights.py"
+    reason="Weights not downloaded. Please run download_weights.py first"
 )
 
 
 class TestKronosInit:
-    """初始化参数测试"""
+    """Initialization parameter test"""
 
     def test_default_init(self):
         model = Kronos(
@@ -45,7 +45,7 @@ class TestKronosInit:
 
 
 class TestKronosForward:
-    """前向传播测试（随机权重）"""
+    """Forward pass test (random weights)"""
 
     @pytest.fixture
     def model(self):
@@ -77,7 +77,7 @@ class TestKronosForward:
         B, T = 2, 20
         s1_ids = torch.randint(0, 15, (B, T))
         s2_ids = torch.randint(0, 15, (B, T))
-        # 分钟/小时/星期/日/月 各自有效范围
+        # minute/hour/weekday/day/month valid ranges
         stamp_minute = torch.randint(0, 60, (B, T, 1))
         stamp_hour = torch.randint(0, 24, (B, T, 1))
         stamp_wday = torch.randint(0, 7, (B, T, 1))
@@ -113,7 +113,7 @@ class TestKronosForward:
         s2_logits = model.decode_s2(context, s1_ids)
         assert s2_logits.shape == (B, T, 16)
 
-    @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA 不可用")
+    @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA unavailable")
     def test_cuda(self, model):
         model = model.cuda()
         s1_ids = torch.randint(0, 15, (2, 10)).cuda()
@@ -123,9 +123,9 @@ class TestKronosForward:
 
 
 class TestKronosPretrained:
-    """预训练权重Loaded测试（需先运行 download_weights.py）"""
+    """Pretrained weights loaded test (must run download_weights.py first)"""
 
-    @pytest.mark.skip(reason="需要 HF Hub 在线Loaded")
+    @pytest.mark.skip(reason="Requires HF Hub online loading")
     def test_from_pretrained_hub(self):
         model = Kronos.from_pretrained("NeoQuasar/Kronos-base")
         assert model.d_model == 832

@@ -1,8 +1,9 @@
+
 """
 Phase 5: Four-version final comparison
-61d(baseline) / 52d(删G1+G5+G4部分) / 41d(FFT振幅10维) / 32d(合并精简)
-统一5-Fold CV, IC + ICIR + IC>0
-修复: IC>0 = 月份正IC占比 (非个股方向正确率)
+61d(baseline) / 52d(drop G1+G5+G4 partial) / 41d(FFT amplitude 10d) / 32d(merged pruned)
+Unified 5-Fold CV, IC + ICIR + IC>0
+Fix: IC>0 = fraction of months with positive IC (not individual stock direction accuracy)
 """
 import warnings; warnings.filterwarnings('ignore')
 import numpy as np, pandas as pd, sqlite3, time, json
@@ -25,7 +26,7 @@ def ts():
 
 
 def cs_ic_full(pred, true, dates):
-    """Returns IC均值, ICIR, IC_std, IC>0(月份正IC占比), 月度ICs"""
+    """Returns IC mean, ICIR, IC_std, IC>0 (fraction of months with positive IC), monthly ICs"""
     ics = []
     for m in np.unique(dates):
         mask = dates == m
@@ -79,25 +80,25 @@ def cross_sectional_neutralize(features, dates, neutralizer, ntype='categorical'
     return neutralized
 
 
-# 索引映射
-# 61维 → 52维: 删 G1(0-3) + G4部分(10,11,14) + G5(15-16) = 9维
+# Index mapping
+# 61d -> 52d: drop G1(0-3) + G4 partial(10,11,14) + G5(15-16) = 9d
 DROP_61 = {0, 1, 2, 3, 10, 11, 14, 15, 16}
 KEEP_52 = [i for i in range(61) if i not in DROP_61]
 
-# 41维 → 32维: 删同样的组 (G1:0-3, G4:10,11,14, G5:15-16)
-# 41维中G7起始位置是27(非61维的47), 但G1/G4/G5位置不变
+# 41d -> 32d: drop same groups (G1:0-3, G4:10,11,14, G5:15-16)
+# In 41d, G7 starts at 27 (not 47 as in 61d), but G1/G4/G5 positions unchanged
 KEEP_32 = [i for i in range(41) if i not in DROP_61]
 
 VERSION_NAMES = {
-    '61d': '61维 baseline (FFT 30d)',
-    '52d': '52维 精简 (删G1+G5+G4×3, FFT 30d)',
-    '41d': '41维 FFT振幅10维',
-    '32d': '32维 合并精简 (删G1+G5+G4×3, FFT振幅10维)',
+    '61d': '61d baseline (FFT 30d)',
+    '52d': '52d pruned (drop G1+G5+G4x3, FFT 30d)',
+    '41d': '41d FFT amplitude 10d',
+    '32d': '32d merged pruned (drop G1+G5+G4x3, FFT amplitude 10d)',
 }
 
 
 def build_features():
-    print(f"[{ts()}] Loaded数据...", flush=True)
+    print(f"[{ts()}] Loading data...", flush=True)
     conn = sqlite3.connect(str(DB))
     codes = [r[0] for r in conn.execute(
         'SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
@@ -115,7 +116,7 @@ def build_features():
     print(f"[{ts()}] {len(codes_used)} stocks, {len(df)} rows", flush=True)
 
     df['month'] = df['date'].str[:7]
-    print(f"[{ts()}] 构建特征 (61d + 41d)...", flush=True); t0 = time.time()
+    print(f"[{ts()}] Building features (61d + 41d)...", flush=True); t0 = time.time()
     flat61_list, flat41_list, y_list, dates_list, inds_list = [], [], [], [], []
 
     for code in codes_used:
@@ -154,7 +155,7 @@ def build_features():
             if i + 3 >= n: continue
             fwd_ret = np.clip((c[i + 3] - c[i + 2]) / np.maximum(abs(c[i + 2]), 0.01), -2, 2)
 
-            # 共通部分 (G1+G2+G3+G4+G5)
+            # Shared part (G1+G2+G3+G4+G5)
             common = []
             common.extend([(c[i] - c[i - j]) / max(abs(c[i - j]), 0.01) if i >= j else 0 for j in [1, 3, 6, 12]])
             for ma in [ma5, ma20, ma60]:
@@ -171,7 +172,7 @@ def build_features():
             common.append(1.0 if c[i] > ma20[i] else 0.0)
             common.append(1.0 if c[i] > ma60[i] else 0.0)
 
-            # G7 量价
+            # G7 volume/price features
             g7 = [v[i] / max(vol_ma12[i], 1) - 1 if i >= 12 and vol_ma12[i] > 0 else 0,
                   tr[i] if not np.isnan(tr[i]) else 0,
                   tr[i] / max(np.mean(tr[max(0, i - 12):i + 1]), 0.001) - 1 if i >= 12 and not np.isnan(tr[i]) else 0,
@@ -202,12 +203,12 @@ def build_features():
     flat61 = flat61[v]; flat41 = flat41[v]
     y = y[v]; dates_arr = dates_arr[v]; inds_arr = inds_arr[v]
 
-    print(f"[{ts()}] {len(y):,} 样本, 61d={flat61.shape[1]}d 41d={flat41.shape[1]}d ({time.time() - t0:.0f}s)", flush=True)
+    print(f"[{ts()}] {len(y):,} samples, 61d={flat61.shape[1]}d 41d={flat41.shape[1]}d ({time.time() - t0:.0f}s)", flush=True)
     return flat61, flat41, y, dates_arr, inds_arr
 
 
 def train_and_eval_cv(X_train, y_train, X_test, y_test, dates_test, label, n_folds=5):
-    """训练 LGB+XGB+Ridge 集成, Returns全期 + 5-Fold CV 指标"""
+    """Train LGB+XGB+Ridge ensemble, return full-period + 5-Fold CV metrics"""
     sc = StandardScaler()
     Xt = sc.fit_transform(X_train); Xte = sc.transform(X_test)
 
@@ -231,10 +232,10 @@ def train_and_eval_cv(X_train, y_train, X_test, y_test, dates_test, label, n_fol
     if w_sum <= 0: ics_m, w_sum = {'LGB': 1.0, 'XGB': 1.0, 'Ridge': 1.0}, 3.0
     p_ens = sum(ics_m[n] * p for n, p in [('LGB', p_lgb), ('XGB', p_xgb), ('Ridge', p_ridge)]) / w_sum
 
-    # 全期
+    # Full period
     ic_full, icir_full, ic_std, ic_pos, _ = cs_ic_full(p_ens, y_test, dates_test)
 
-    # 5-Fold CV (时间序)
+    # 5-Fold CV (time-ordered)
     all_months = np.unique(dates_test)
     fold_size = len(all_months) // n_folds
     cv_ics = []
@@ -269,7 +270,7 @@ def train_and_eval_cv(X_train, y_train, X_test, y_test, dates_test, label, n_fol
 if __name__ == '__main__':
     flat61, flat41, y, dates_arr, inds_arr = build_features()
 
-    print(f"[{ts()}] 行业中性化...", flush=True); t0 = time.time()
+    print(f"[{ts()}] Industry neutralizing...", flush=True); t0 = time.time()
     flat61_ind = cross_sectional_neutralize(flat61.copy(), dates_arr, inds_arr, 'categorical')
     flat41_ind = cross_sectional_neutralize(flat41.copy(), dates_arr, inds_arr, 'categorical')
     print(f"[{ts()}] done ({time.time() - t0:.0f}s)", flush=True)
@@ -277,7 +278,7 @@ if __name__ == '__main__':
     tr_m = (dates_arr >= '2010-01') & (dates_arr <= '2014-12')
     te_m = (dates_arr >= '2015-01')
 
-    # 4个版本的特征矩阵
+    # 4 versions' feature matrices
     versions = {
         '61d': (flat61_ind[tr_m], flat61_ind[te_m], 61),
         '52d': (flat61_ind[tr_m][:, KEEP_52], flat61_ind[te_m][:, KEEP_52], 52),
@@ -289,8 +290,8 @@ if __name__ == '__main__':
 
     results = {}
     print(f"\n{'=' * 75}")
-    print("四版本对比 (LGB+XGB+Ridge Ensemble, 行业中性化, T+3单月收益)")
-    print(f"Train: 2010-2014, Test: 2015-01~2025-11, {len(np.unique(dates_te))} 测试月")
+    print("Four-Version Comparison (LGB+XGB+Ridge Ensemble, Industry-Neutralized, T+3 single-month return)")
+    print(f"Train: 2010-2014, Test: 2015-01~2025-11, {len(np.unique(dates_te))} test months")
     print(f"{'=' * 75}")
 
     for vname, (X_tr, X_te, ndim) in versions.items():
@@ -302,9 +303,9 @@ if __name__ == '__main__':
         print(f"  CV: mean_IC={r['cv_mean_IC']:+.4f}  range=[{r['cv_IC_range'][0]:+.4f}, {r['cv_IC_range'][1]:+.4f}]  "
               f"all_pos={r['cv_all_pos']}")
 
-    # ====== 汇总表 ======
+    # ====== Summary table ======
     print(f"\n{'=' * 100}")
-    print("四方对比汇总")
+    print("Four-Way Comparison Summary")
     print(f"{'=' * 100}")
     print(f"{'Version':<8s} {'Dim':>4s} {'IC':>8s} {'ICIR':>8s} {'IC_std':>8s} {'IC>0':>8s} "
           f"{'CV_mean':>8s} {'CV_min':>8s} {'CV_max':>8s} {'CV_all+':>8s}")
@@ -319,8 +320,8 @@ if __name__ == '__main__':
               f"{r['cv_mean_IC']:+8.4f} {cv_min:+8.4f} {cv_max:+8.4f} "
               f"{str(r['cv_all_pos']):>8s}")
 
-    # Δ vs baseline
-    print(f"\n{'Version':<8s} {'ΔIC':>8s} {'ΔIC%':>8s} {'ΔICIR':>8s} {'ΔIC>0':>8s} {'ΔCV_mean':>8s}")
+    # Delta vs baseline
+    print(f"\n{'Version':<8s} {'delta_IC':>8s} {'delta_IC%':>8s} {'delta_ICIR':>8s} {'delta_IC>0':>8s} {'delta_CV_mean':>8s}")
     print('-' * 50)
     for vname in ['52d', '41d', '32d']:
         r = results[vname]
@@ -331,9 +332,9 @@ if __name__ == '__main__':
         dcv = r['cv_mean_IC'] - results['61d']['cv_mean_IC']
         print(f"{vname:<8s} {dic:+8.4f} {dic_pct:+7.1f}% {dir_:+8.3f} {dp:+7.1%} {dcv:+8.4f}")
 
-    # 按Fold展开
+    # Per-Fold breakdown
     print(f"\n{'=' * 80}")
-    print("5-Fold CV 展开")
+    print("5-Fold CV Breakdown")
     print(f"{'=' * 80}")
     for i in range(5):
         fold_info = results['61d']['cv_details'][i]
@@ -372,4 +373,4 @@ if __name__ == '__main__':
     with open(OUT / 'final_4way_summary.json', 'w') as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
 
-    print(f"\n[{ts()}] 四方对比done. 结果: {OUT}")
+    print(f"\n[{ts()}] Four-way comparison done. Results: {OUT}")

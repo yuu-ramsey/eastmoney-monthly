@@ -62,8 +62,8 @@ for code in codes:
     vol_ma3=pd.Series(v).rolling(3).mean().values; vol_ma12=pd.Series(v).rolling(12).mean().values
     # Candle body features
     body_pct = np.abs(c-o)/np.maximum(h-l, 0.01)  # body ratio
-    upper_shadow = (np.maximum(o,c)-h)/np.maximum(h-l, 0.01)  # 上影线比
-    lower_shadow = (l-np.minimum(o,c))/np.maximum(h-l, 0.01)  # 下影线比
+    upper_shadow = (np.maximum(o,c)-h)/np.maximum(h-l, 0.01)  # upper shadow ratio
+    lower_shadow = (l-np.minimum(o,c))/np.maximum(h-l, 0.01)  # lower shadow ratio
     # Consecutive up/down months
     up_streak = np.zeros(n); dn_streak = np.zeros(n)
     for i in range(1,n):
@@ -114,12 +114,12 @@ for code in codes:
         flat.append(1.0 if c[i]>ma5[i] else 0.0)  # above MA5
         flat.append(1.0 if c[i]>ma10[i] else 0.0)  # above MA10
         flat.append(body_pct[i] if not np.isnan(body_pct[i]) else 0)  # body ratio
-        flat.append(upper_shadow[i] if not np.isnan(upper_shadow[i]) else 0)  # 上影线
-        flat.append(lower_shadow[i] if not np.isnan(lower_shadow[i]) else 0)  # 下影线
-        flat.append(up_streak[i] / 12.0)  # 连涨月数(归一化)
-        flat.append(dn_streak[i] / 12.0)  # 连跌月数(归一化)
+        flat.append(upper_shadow[i] if not np.isnan(upper_shadow[i]) else 0)  # upper shadow
+        flat.append(lower_shadow[i] if not np.isnan(lower_shadow[i]) else 0)  # lower shadow
+        flat.append(up_streak[i] / 12.0)  # consecutive up months (normalized)
+        flat.append(dn_streak[i] / 12.0)  # consecutive down months (normalized)
         # Previous month's range change
-        flat.append((h[i]-l[i])/max(h[i-1]-l[i-1],0.01)-1 if i>=1 else 0)  # 振幅变化
+        flat.append((h[i]-l[i])/max(h[i-1]-l[i-1],0.01)-1 if i>=1 else 0)  # range change
         flat_list.append(flat); ys_list.append(fwd)
         dates_list.append(g['date'].iloc[i])
 

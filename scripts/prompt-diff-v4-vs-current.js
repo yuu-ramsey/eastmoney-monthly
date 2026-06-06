@@ -1,4 +1,4 @@
-// Step 1: v4 promptUsed vs 当前 buildPromptByTemplate 的 diff
+// Step 1: v4 promptUsed vs current buildPromptByTemplate diff
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,22 +10,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_DIR = path.resolve(__dirname, '..');
 const RUNS_DIR = path.join(PROJECT_DIR, '.eastmoney-ai', 'eval', 'runs');
 
-// 1. 提取 v4 第一条 promptUsed
+// 1. Extract v4 first promptUsed
 const v4Path = path.join(RUNS_DIR, 'v4-signals-2026-05-17-00-41.jsonl');
 const v4Lines = fs.readFileSync(v4Path, 'utf-8').trim().split('\n').filter(Boolean);
 const firstRecord = JSON.parse(v4Lines[0]);
 const v4Prompt = firstRecord.promptUsed;
 
-console.log('=== v4 第一条元数据 ===');
+console.log('=== v4 First Record Metadata ===');
 console.log(`code: ${firstRecord.code}`);
 console.log(`cutoffDate: ${firstRecord.cutoffDate}`);
 console.log(`template: ${firstRecord.template}`);
-console.log(`prompt 长度: ${v4Prompt.length} chars`);
+console.log(`prompt length: ${v4Prompt.length} chars`);
 
-// 2. 用当前代码生成 prompt（需要 K 线数据）
-// 从 promptUsed 中提取 K 线表格（重建 klines 数组）
+// 2. Generate prompt with current code (needs K-line data)
+// Extract K-line table from promptUsed (rebuild klines array)
 function extractKlinesFromPrompt(prompt) {
-  // prompt 格式: "日期\t开盘\t收盘\t最高\t最低\t成交量\t涨跌幅\tMA5\t..."
+  // prompt format: "Date\tOpen\tClose\tHigh\tLow\tVolume\tChange%\tMA5\t..."
   const lines = prompt.split('\n');
   const tableStart = lines.findIndex(l => l.startsWith('日期\t'));
   if (tableStart < 0) return null;
@@ -65,17 +65,17 @@ function extractKlinesFromPrompt(prompt) {
 
 const klines = extractKlinesFromPrompt(v4Prompt);
 if (!klines || klines.length === 0) {
-  console.log('FATAL: 无法从 v4 prompt 中提取 K 线数据');
+  console.log('FATAL: Cannot extract K-line data from v4 prompt');
   process.exit(1);
 }
-console.log(`提取 K 线: ${klines.length} 根`);
+console.log(`Extracted K-lines: ${klines.length} bars`);
 
-// 从 v4 prompt 提取股票名
+// Extract stock name from v4 prompt
 const nameMatch = v4Prompt.match(/以下是\s*(\S+?)\(/);
 const stockName = nameMatch ? nameMatch[1] : '000001';
-console.log(`股票名: ${stockName}`);
+console.log(`Stock name: ${stockName}`);
 
-// 3. 用当前 buildPromptByTemplate 重新生成
+// 3. Regenerate with current buildPromptByTemplate
 const currentPrompt = await buildPromptByTemplate({
   templateKey: firstRecord.template || 'trend',
   name: stockName,
@@ -86,38 +86,38 @@ const currentPrompt = await buildPromptByTemplate({
   decisionMode: false,
 });
 
-console.log(`当前 prompt 长度: ${currentPrompt.length} chars`);
-console.log(`长度差异: ${currentPrompt.length - v4Prompt.length} chars`);
+console.log(`Current prompt length: ${currentPrompt.length} chars`);
+console.log(`Length difference: ${currentPrompt.length - v4Prompt.length} chars`);
 
-// 4. 逐段 diff
+// 4. Section-by-section diff
 function extractHARDConstraints(prompt) {
   const match = prompt.match(/## 硬约束\s*\n([\s\S]*?)(?=\n## |\n---\s*\n|$)/);
-  return match ? match[1].trim() : '(未找到硬约束段落)';
+  return match ? match[1].trim() : '(HARD_CONSTRAINTS section not found)';
 }
 
 function extractTemplateTasks(prompt) {
   const match = prompt.match(/## 分析任务\s*\n([\s\S]*?)(?=\n## 综合结论|\n## 硬约束|$)/);
-  return match ? match[1].trim() : '(未找到分析任务段落)';
+  return match ? match[1].trim() : '(Analysis tasks section not found)';
 }
 
 function extractStructuredOutput(prompt) {
   const match = prompt.match(/## 结构化数据输出\s*\n([\s\S]*?)(?=\n## |\n---|$)/);
-  return match ? match[1].trim() : '(未找到结构化输出段落)';
+  return match ? match[1].trim() : '(Structured output section not found)';
 }
 
 function extractPersonalDecision(prompt) {
   const match = prompt.match(/## 个人决策视角[\s\S]*/);
-  return match ? match[0].substring(0, 200) + '...' : '(无个人决策段落)';
+  return match ? match[0].substring(0, 200) + '...' : '(No personal decision section)';
 }
 
 function extractSignalBlock(prompt) {
   const match = prompt.match(/## 已触发的结构化信号[\s\S]*?(?=\n## 综合结论|\n## 极端标签|\n## 硬约束|$)/);
-  return match ? match[0].substring(0, 500) : '(无信号段落)';
+  return match ? match[0].substring(0, 500) : '(No signal section)';
 }
 
 function extractExtremeLabel(prompt) {
   const match = prompt.match(/## 极端标签指引[\s\S]*?(?=\n## |\n---|$)/);
-  return match ? match[0].substring(0, 500) : '(无极端标签段落)';
+  return match ? match[0].substring(0, 500) : '(No extreme label section)';
 }
 
 const v4HC = extractHARDConstraints(v4Prompt);
@@ -138,19 +138,19 @@ const curSignals = extractSignalBlock(currentPrompt);
 const v4Extreme = extractExtremeLabel(v4Prompt);
 const curExtreme = extractExtremeLabel(currentPrompt);
 
-// 打印关键段落对比
+// Print key section comparison
 console.log('\n' + '='.repeat(70));
-console.log('=== 段落级 diff ===');
+console.log('=== Section-level diff ===');
 console.log('='.repeat(70));
 
 // HARD_CONSTRAINTS
 console.log('\n--- HARD_CONSTRAINTS ---');
 const v4HCLines = v4HC.split('\n');
 const curHCLines = curHC.split('\n');
-console.log(`v4: ${v4HCLines.length} 行`);
-console.log(`cur: ${curHCLines.length} 行`);
+console.log(`v4: ${v4HCLines.length} lines`);
+console.log(`cur: ${curHCLines.length} lines`);
 
-// 检查特定约束是否存在
+// Check if specific constraints exist
 const checks = [
   { pattern: /收盘.*K线.*含.*MA/, label: '#1 收盘K线含MA/MACD' },
   { pattern: /数字依据|反方.*观点/, label: '#2 数字依据+反方观点' },
@@ -166,11 +166,11 @@ const checks = [
   { pattern: /sector.*alpha|行业.*alpha|行业内.*排名|申万/, label: '#12 sector alpha' },
 ];
 
-console.log('\nHARD_CONSTRAINTS 存在性检查:');
+console.log('\nHARD_CONSTRAINTS existence check:');
 for (const check of checks) {
   const inV4 = check.pattern.test(v4HC);
   const inCur = check.pattern.test(curHC);
-  const status = (inV4 && inCur) ? '✓ 两边都有' : (!inV4 && !inCur) ? '- 两边都无' : inCur ? '▶ cur新增' : '◀ v4有但cur无';
+  const status = (inV4 && inCur) ? '✓ both have' : (!inV4 && !inCur) ? '- neither has' : inCur ? '▶ cur added' : '◀ v4 has, cur missing';
   if (inV4 !== inCur) {
     console.log(`  **${check.label}**: ${status} **`);
   } else {
@@ -178,41 +178,41 @@ for (const check of checks) {
   }
 }
 
-// 分析任务段落
-console.log('\n--- 分析任务段落 ---');
+// Analysis tasks section
+console.log('\n--- Analysis Tasks Section ---');
 const v4TaskLen = v4Tasks.length;
 const curTaskLen = curTasks.length;
 console.log(`v4: ${v4TaskLen} chars`);
 console.log(`cur: ${curTaskLen} chars`);
 console.log(`Δ: ${curTaskLen - v4TaskLen} chars`);
 
-// 结构化输出
-console.log('\n--- 结构化输出段落 ---');
-console.log(`v4 有: ${v4Structured !== '(未找到结构化输出段落)'}`);
-console.log(`cur 有: ${curStructured !== '(未找到结构化输出段落)'}`);
+// Structured output
+console.log('\n--- Structured Output Section ---');
+console.log(`v4 has: ${v4Structured !== '(Structured output section not found)'}`);
+console.log(`cur has: ${curStructured !== '(Structured output section not found)'}`);
 if (v4Structured !== curStructured) {
-  console.log('v4 前200字:', v4Structured.substring(0, 200));
-  console.log('cur 前200字:', curStructured.substring(0, 200));
+  console.log('v4 first 200 chars:', v4Structured.substring(0, 200));
+  console.log('cur first 200 chars:', curStructured.substring(0, 200));
 }
 
-// 个人决策
-console.log('\n--- 个人决策段落 ---');
-console.log(`v4 有: ${v4Decision !== '(无个人决策段落)'}`);
-console.log(`cur 有: ${curDecision !== '(无个人决策段落)'}`);
+// Personal decision
+console.log('\n--- Personal Decision Section ---');
+console.log(`v4 has: ${v4Decision !== '(No personal decision section)'}`);
+console.log(`cur has: ${curDecision !== '(No personal decision section)'}`);
 
-// 信号块
-console.log('\n--- 结构化信号段落 ---');
-console.log(`v4 有: ${v4Signals !== '(无信号段落)'}`);
-console.log(`cur 有: ${curSignals !== '(无信号段落)'}`);
+// Signal block
+console.log('\n--- Structured Signal Section ---');
+console.log(`v4 has: ${v4Signals !== '(No signal section)'}`);
+console.log(`cur has: ${curSignals !== '(No signal section)'}`);
 
-// 极端标签
-console.log('\n--- 极端标签段落 ---');
-console.log(`v4 有: ${v4Extreme !== '(无极端标签段落)'}`);
-console.log(`cur 有: ${curExtreme !== '(无极端标签段落)'}`);
+// Extreme labels
+console.log('\n--- Extreme Labels Section ---');
+console.log(`v4 has: ${v4Extreme !== '(No extreme label section)'}`);
+console.log(`cur has: ${curExtreme !== '(No extreme label section)'}`);
 
-// 5. 逐行文本 diff（前 30 处差异）
+// 5. Line-by-line text diff (first 30 differences)
 console.log('\n' + '='.repeat(70));
-console.log('=== 文本级 diff (前 30 处差异) ===');
+console.log('=== Text-level diff (first 30 differences) ===');
 console.log('='.repeat(70));
 
 function simpleDiff(oldText, newText) {
@@ -233,31 +233,31 @@ function simpleDiff(oldText, newText) {
 
 const diffs = simpleDiff(v4Prompt, currentPrompt);
 if (diffs.length === 0) {
-  console.log('完全一致! (可能是提取问题,跳过)');
+  console.log('Identical! (may be extraction issue, skipping)');
 } else {
-  console.log(`共 ${diffs.length} 处差异 (显示前 30):`);
+  console.log(`Total ${diffs.length} differences (showing first 30):`);
   for (const d of diffs.slice(0, 30)) {
-    console.log(`\n[行${d.line}]`);
+    console.log(`\n[Line ${d.line}]`);
     if (d.old) console.log(`  - ${d.old}`);
     if (d.new) console.log(`  + ${d.new}`);
   }
 }
 
-// 最终判定
+// Final verdict
 console.log('\n' + '='.repeat(70));
-console.log('=== 最终判定 ===');
+console.log('=== Final Verdict ===');
 console.log('='.repeat(70));
 
 const hcChanges = checks.filter(c => c.pattern.test(v4HC) !== c.pattern.test(curHC));
 if (hcChanges.length === 0) {
-  console.log('HARD_CONSTRAINTS: 完全一致');
+  console.log('HARD_CONSTRAINTS: identical');
 } else {
   hcChanges.forEach(c => {
     const inV4 = c.pattern.test(v4HC);
     const inCur = c.pattern.test(curHC);
-    console.log(`HARD_CONSTRAINTS 变化: ${c.label} — v4=${inV4} cur=${inCur}`);
+    console.log(`HARD_CONSTRAINTS change: ${c.label} — v4=${inV4} cur=${inCur}`);
   });
 }
 
-console.log(`\n总文本差异: ${diffs.length} 行`);
-console.log(`v4 长度: ${v4Prompt.length} cur 长度: ${currentPrompt.length} Δ: ${currentPrompt.length - v4Prompt.length} chars`);
+console.log(`\nTotal text differences: ${diffs.length} lines`);
+console.log(`v4 length: ${v4Prompt.length} cur length: ${currentPrompt.length} Δ: ${currentPrompt.length - v4Prompt.length} chars`);

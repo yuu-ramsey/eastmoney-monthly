@@ -8,14 +8,14 @@ const REG_KEY = `HKEY_CURRENT_USER\\Software\\Google\\Chrome\\NativeMessagingHos
 
 try {
   execSync(`${REG_EXE} delete "${REG_KEY}" /f`, { stdio: 'pipe' });
-  console.log(`已从注册表删除: ${REG_KEY}`);
+  console.log(`Removed from registry: ${REG_KEY}`);
   console.log('');
-  console.log('请重启 Chrome 使更改生效。');
+  console.log('Please restart Chrome for changes to take effect.');
 } catch (err) {
   if (err.message.includes('unable to find') || err.message.includes('not found')) {
-    console.log('注册表项不存在，无需卸载。');
+    console.log('Registry key does not exist, nothing to uninstall.');
   } else {
-    console.error('卸载失败:', err.message);
+    console.error('Uninstall failed:', err.message);
     process.exit(1);
   }
 }

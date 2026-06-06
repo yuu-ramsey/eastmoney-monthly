@@ -1,4 +1,4 @@
-"""Phase 17 LSTM: 训练脚本 — 10-epoch dry-run or full training"""
+"""Phase 17 LSTM: Training script — 10-epoch dry-run or full training"""
 import torch
 import torch.nn as nn
 import numpy as np

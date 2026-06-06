@@ -1,6 +1,6 @@
 // One-click install Native Messaging Host
-// Usage: node native-host/install.js <扩展ID>
-// 如未提供扩展ID，脚本会提示如何获取
+// Usage: node native-host/install.js <extension-id>
+// If no extension ID provided, script will show how to obtain one
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -20,64 +20,64 @@ const REG_KEY = `HKEY_CURRENT_USER\\Software\\Google\\Chrome\\NativeMessagingHos
 const extensionId = process.argv[2];
 
 if (!extensionId) {
-  console.log('Usage: node native-host/install.js <扩展ID>');
+  console.log('Usage: node native-host/install.js <extension-id>');
   console.log('');
-  console.log('获取扩展ID:');
-  console.log('  1. 打开 chrome://extensions');
-  console.log('  2. 右上角开启"开发者模式"');
-  console.log('  3. 找到"东方财富月线 AI 分析"扩展');
-  console.log('  4. 复制"ID"字段（32 位小写字母）');
+  console.log('How to find your extension ID:');
+  console.log('  1. Open chrome://extensions');
+  console.log('  2. Enable "Developer mode" (top right)');
+  console.log('  3. Find "Eastmoney Monthly AI Analysis" extension');
+  console.log('  4. Copy the "ID" field (32 lowercase letters)');
   console.log('');
-  console.log('例如: node native-host/install.js abcdefghijklmnopqrstuvwxyz123456');
+  console.log('Example: node native-host/install.js abcdefghijklmnopqrstuvwxyz123456');
   process.exit(1);
 }
 
-// 验证扩展ID格式
+// Validate extension ID format
 if (!/^[a-z]{32}$/.test(extensionId)) {
-  console.error('错误: 扩展ID 格式不正确，应为 32 位小写字母');
+  console.error('Error: Invalid extension ID format, should be 32 lowercase letters');
   process.exit(1);
 }
 
-// 1. 写入 manifest（替换占位符）
+// 1. Write manifest (replace placeholders)
 const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf-8'));
 manifest.path = LAUNCHER_PATH;
 manifest.allowed_origins = [`chrome-extension://${extensionId}/`];
 
 const installedManifestPath = path.join(__dirname, 'manifest', 'eastmoney-ai-sync-installed.json');
 fs.writeFileSync(installedManifestPath, JSON.stringify(manifest, null, 2), 'utf-8');
-console.log(`[1/3] manifest 已生成: ${installedManifestPath}`);
+console.log(`[1/3] manifest generated: ${installedManifestPath}`);
 
-// 2. 写注册表
+// 2. Write registry
 try {
   execSync(`${REG_EXE} add "${REG_KEY}" /ve /t REG_SZ /d "${installedManifestPath}" /f`, {
     stdio: 'pipe',
   });
-  console.log(`[2/3] 注册表已写入: ${REG_KEY}`);
+  console.log(`[2/3] registry entry written: ${REG_KEY}`);
 } catch (err) {
   if (err.message.includes('access denied') || err.message.includes('Access is denied')) {
-    console.error('[2/3] 错误: 注册表写入权限不足，请以管理员身份运行此脚本');
-    console.error('  右键 PowerShell → 以管理员身份运行 → cd 到项目目录 → 重试');
+    console.error('[2/3] Error: Insufficient permission to write registry. Run this script as Administrator');
+    console.error('  Right-click PowerShell → Run as Administrator → cd to project dir → retry');
     process.exit(1);
   }
   throw err;
 }
 
-// 3. 验证
+// 3. Verify
 try {
   const result = execSync(`${REG_EXE} query "${REG_KEY}" /ve`, { stdio: 'pipe' }).toString();
-  console.log(`[3/3] 验证通过: ${result.trim()}`);
+  console.log(`[3/3] verification passed: ${result.trim()}`);
 } catch (err) {
-  console.error('[3/3] 验证失败:', err.message);
+  console.error('[3/3] verification failed:', err.message);
   process.exit(1);
 }
 
 console.log('');
-console.log('=== 安装完成 ===');
+console.log('=== Installation complete ===');
 console.log('');
-console.log('下一步:');
-console.log('  1. 重启 Chrome（完全关闭后重新打开）');
-console.log('  2. 在 chrome://extensions 里重新加载扩展');
-console.log('  3. 在东方财富页面做一次分析');
-console.log('  4. 检查 .eastmoney-ai/storage/ 是否有文件生成');
+console.log('Next steps:');
+console.log('  1. Restart Chrome (close completely then reopen)');
+console.log('  2. Reload the extension in chrome://extensions');
+console.log('  3. Run one analysis on an Eastmoney stock page');
+console.log('  4. Check if files are generated under .eastmoney-ai/storage/');
 console.log('');
-console.log('卸载: node native-host/uninstall.js');
+console.log('Uninstall: node native-host/uninstall.js');

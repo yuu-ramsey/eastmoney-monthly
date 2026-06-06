@@ -17,11 +17,11 @@ N_FFT = 10
 DATE_FMT = '%Y-%m-%d %H:%M:%S'
 
 # Filter Parameters
-MIN_DAILY_AMOUNT = 5_000_000   # 日均成交额 > 500万
-LIMIT_UP_DOWN = 0.10           # 涨跌停 ±10%
+MIN_DAILY_AMOUNT = 5_000_000   # average daily turnover > 5M
+LIMIT_UP_DOWN = 0.10           # price limit ±10%
 TOP_QUINTILE = 0.20            # Q5 = top 20%
-SLIPPAGE = 0.003               # 滑点
-COMMISSION = 0.00025            # 手续费 (万2.5)
+SLIPPAGE = 0.003               # slippage
+COMMISSION = 0.00025            # commission (0.025%)
 
 
 def ts():
@@ -71,8 +71,8 @@ def cross_sectional_neutralize(features, dates, neutralizer):
 
 
 def load_daily_filters():
-    """Loaded每日涨跌停和成交额数据, 按月聚合为筛选标记"""
-    print(f"[{ts()}] Loaded日线数据用于筛选...", flush=True); t0 = time.time()
+    """Load daily price limit and turnover data, aggregate by month into filter flags"""
+    print(f"[{ts()}] Loading daily data for filtering...", flush=True); t0 = time.time()
     conn = sqlite3.connect(str(DB))
     df = pd.read_sql_query("""
         SELECT code, date, amount, change_percent
@@ -84,7 +84,7 @@ def load_daily_filters():
 
     df['month'] = df['date'].str[:7]
 
-    # 按月+股票聚合
+    # Aggregate by month+stock
     monthly_flags = df.groupby(['code', 'month']).agg(
         avg_amount=('amount', 'mean'),
         hit_limit_up=('change_percent', lambda x: (x >= 9.9).any()),
@@ -96,13 +96,13 @@ def load_daily_filters():
     monthly_flags['not_limit'] = ~(monthly_flags['hit_limit_up'] | monthly_flags['hit_limit_down'])
     monthly_flags['pass_filter'] = monthly_flags['liquid'] & monthly_flags['not_limit']
 
-    print(f"[{ts()}] 日线筛选就绪: {len(monthly_flags):,} 条月记录 ({time.time()-t0:.0f}s)", flush=True)
+    print(f"[{ts()}] Daily filter ready: {len(monthly_flags):,} month-records ({time.time()-t0:.0f}s)", flush=True)
     return monthly_flags
 
 
 def build_32d_features():
-    """构建32维特征, Returns特征矩阵 + 元数据"""
-    print(f"[{ts()}] Loaded月线数据...", flush=True)
+    """Build 32-dim features, returns feature matrix + metadata"""
+    print(f"[{ts()}] Loading monthly data...", flush=True)
     conn = sqlite3.connect(str(DB))
     codes = [r[0] for r in conn.execute(
         'SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
@@ -120,7 +120,7 @@ def build_32d_features():
     print(f"[{ts()}] {len(codes_used)} stocks, {len(df)} rows", flush=True)
 
     df['month'] = df['date'].str[:7]
-    print(f"[{ts()}] 构建32维特征...", flush=True); t0 = time.time()
+    print(f"[{ts()}] Building 32-dim features...", flush=True); t0 = time.time()
     X_list, y_list, meta_list = [], [], []
 
     for code in codes_used:
@@ -185,17 +185,17 @@ def build_32d_features():
     v = ~np.isnan(X).any(axis=1) & ~np.isnan(y)
     X = X[v]; y = y[v]; meta = meta.iloc[v].reset_index(drop=True)
 
-    print(f"[{ts()}] {len(y):,} 样本, {X.shape[1]}d ({time.time()-t0:.0f}s)", flush=True)
+    print(f"[{ts()}] {len(y):,} samples, {X.shape[1]}d ({time.time()-t0:.0f}s)", flush=True)
     return X, y, meta
 
 
 # ====== Main ======
 if __name__ == '__main__':
-    # ---- 1. 构建特征 ----
+    # ---- 1. Build features ----
     X, y, meta = build_32d_features()
 
-    # ---- 2. 行业中性化 ----
-    print(f"[{ts()}] 行业中性化...", flush=True); t0 = time.time()
+    # ---- 2. Industry neutralization ----
+    print(f"[{ts()}] Industry neutralization...", flush=True); t0 = time.time()
     X_ind = cross_sectional_neutralize(X.copy(), meta['month'].values, meta['industry'].values)
     print(f"[{ts()}] done ({time.time()-t0:.0f}s)", flush=True)
 
@@ -207,10 +207,10 @@ if __name__ == '__main__':
     y_tr = y[tr_m]; y_te = y[te_m]
     meta_te = meta[te_m].reset_index(drop=True)
 
-    # ---- 4. 训练集成模型 ----
+    # ---- 4. Train ensemble model ----
     print(f"\n{'='*60}")
-    print("训练 LGB+XGB+Ridge Ensemble (32维)")
-    print(f"Train: {X_tr.shape[0]:,} 样本, Test: {X_te.shape[0]:,} 样本")
+    print("Training LGB+XGB+Ridge Ensemble (32-dim)")
+    print(f"Train: {X_tr.shape[0]:,} samples, Test: {X_te.shape[0]:,} samples")
     print(f"{'='*60}")
 
     sc = StandardScaler()
@@ -238,20 +238,20 @@ if __name__ == '__main__':
 
     ic_ens, icir_ens, _, ic_pos, _ = cs_ic_full(p_ens, y_te, meta_te['month'].values)
     print(f"\nEnsemble: IC={ic_ens:+.4f}  ICIR={icir_ens:+.3f}  IC>0={ic_pos:.1%}")
-    print(f"集成权重: LGB={ics_m['LGB']:.3f}  XGB={ics_m['XGB']:.3f}  Ridge={ics_m['Ridge']:.3f}")
+    print(f"Ensemble weights: LGB={ics_m['LGB']:.3f}  XGB={ics_m['XGB']:.3f}  Ridge={ics_m['Ridge']:.3f}")
 
-    # ---- 5. Loaded日线筛选数据 ----
+    # ---- 5. Load daily filter data ----
     daily_flags = load_daily_filters()
 
-    # ---- 6. 构建预测表 ----
+    # ---- 6. Build prediction table ----
     meta_te['pred'] = p_ens
     pred_table = meta_te[['code', 'month', 'close', 'pred']].copy()
 
-    # ---- 7. 逐月回测 ----
+    # ---- 7. Monthly backtest ----
     print(f"\n{'='*60}")
-    print(f"Q5 多头回测 (top {int(TOP_QUINTILE*100)}%, 等权, 月度调仓)")
-    print(f"筛选: 日均成交额>{MIN_DAILY_AMOUNT/1e6:.0f}万, 无涨跌停")
-    print(f"成本: 滑点{SLIPPAGE:.1%}, 手续费{COMMISSION:.4%}")
+    print(f"Q5 Long-Only Backtest (top {int(TOP_QUINTILE*100)}%, equal-weight, monthly rebalance)")
+    print(f"Filters: avg daily turnover>{MIN_DAILY_AMOUNT/1e6:.0f}M, no price limit")
+    print(f"Costs: slippage {SLIPPAGE:.1%}, commission {COMMISSION:.4%}")
     print(f"{'='*60}")
 
     test_months = sorted(meta_te['month'].unique())
@@ -262,16 +262,16 @@ if __name__ == '__main__':
     for t, cur_month in enumerate(test_months[:-1]):
         next_month = test_months[t + 1]
 
-        # 当月预测
+        # Current month predictions
         cur_preds = pred_table[pred_table['month'] == cur_month].copy()
         if len(cur_preds) < 50: continue
 
-        # 合并筛选标记
+        # Merge filter flags
         cur_flags = daily_flags[daily_flags['month'] == cur_month][['code', 'pass_filter', 'avg_amount']]
         cur_preds = cur_preds.merge(cur_flags, on='code', how='left')
         cur_preds['pass_filter'] = cur_preds['pass_filter'].fillna(False)
 
-        # 筛选: 流动性 + 无涨跌停
+        # Filter: liquidity + no price limit
         filtered = cur_preds[cur_preds['pass_filter']].copy()
         if len(filtered) < 20: continue
 
@@ -279,14 +279,14 @@ if __name__ == '__main__':
         top_n = max(int(len(filtered) * TOP_QUINTILE), 5)
         q5 = filtered.nlargest(top_n, 'pred')
 
-        # 下月实际收益
+        # Next month realized returns
         next_preds = pred_table[pred_table['month'] == next_month][['code', 'close']]
         q5 = q5.merge(next_preds, on='code', how='inner', suffixes=('_cur', '_next'))
         if len(q5) < 5: continue
 
         q5['ret'] = (q5['close_next'] - q5['close_cur']) / q5['close_cur']
 
-        # 等权收益 (扣成本)
+        # Equal-weight return (net of costs)
         gross_ret = q5['ret'].mean()
         if t > 0 and prev_holdings:
             cur_codes = set(q5['code'].values)
@@ -308,9 +308,9 @@ if __name__ == '__main__':
         if (t + 1) % 24 == 0:
             print(f"  [{cur_month}] n={len(q5):>3d}  net={net_ret:+.3%}  equity={equity_curve[-1]:.3f}")
 
-    # ---- 8. 绩效统计 ----
+    # ---- 8. Performance statistics ----
     if not portfolio_returns:
-        print("ERROR: 无有效回测月份")
+        print("ERROR: No valid backtest months")
         exit(1)
 
     rets = pd.Series([r['net_ret'] for r in portfolio_returns])
@@ -329,22 +329,22 @@ if __name__ == '__main__':
     avg_n = np.mean([r['n_stocks'] for r in portfolio_returns])
 
     print(f"\n{'='*60}")
-    print("回测绩效 (纯多头 Q5)")
+    print("Backtest Performance (Long-Only Q5)")
     print(f"{'='*60}")
-    print(f"  回测期: {portfolio_returns[0]['month']} ~ {portfolio_returns[-1]['next_month']}")
-    print(f"  总月份: {n_months}")
-    print(f"  accumulated净收益: {cum_ret:+.2%}")
-    print(f"  年化收益:   {ann_ret:+.2%}")
-    print(f"  年化波动:   {ann_vol:.2%}")
-    print(f"  Sharpe:     {sharpe:.3f}")
-    print(f"  最大回撤:   {max_dd:.2%}")
-    print(f"  Calmar:     {calmar:.3f}")
-    print(f"  月胜率:     {win_rate:.1%}")
-    print(f"  平均持仓:   {avg_n:.0f} 只")
+    print(f"  Period:      {portfolio_returns[0]['month']} ~ {portfolio_returns[-1]['next_month']}")
+    print(f"  Total Months: {n_months}")
+    print(f"  Cumulative Net Return: {cum_ret:+.2%}")
+    print(f"  Annualized Return:    {ann_ret:+.2%}")
+    print(f"  Annualized Volatility: {ann_vol:.2%}")
+    print(f"  Sharpe:               {sharpe:.3f}")
+    print(f"  Max Drawdown:         {max_dd:.2%}")
+    print(f"  Calmar:               {calmar:.3f}")
+    print(f"  Monthly Win Rate:     {win_rate:.1%}")
+    print(f"  Avg Holdings:         {avg_n:.0f} stocks")
 
-    # ---- 9. 逐年统计 ----
+    # ---- 9. Annual statistics ----
     print(f"\n{'='*60}")
-    print("逐年统计")
+    print("Annual Statistics")
     print(f"{'='*60}")
     print(f"{'Year':<6s} {'Months':>6s} {'Ann_Ret':>8s} {'Vol':>8s} {'Sharpe':>8s} {'MaxDD':>8s} {'Win':>8s}")
     print('-'*56)
@@ -364,7 +364,7 @@ if __name__ == '__main__':
         wr = (yr > 0).mean()
         print(f"{year:<6s} {len(yr):>6d} {ann_r:>+7.1%} {ann_v:>7.1%} {sr:>+7.2f} {dd_y:>7.1%} {wr:>7.1%}")
 
-    # ---- 10. 保存 ----
+    # ---- 10. Save ----
     pd.DataFrame(portfolio_returns).to_csv(OUT / 'v32_backtest_monthly.csv', index=False, encoding='utf-8-sig')
     pd.DataFrame({'equity': equity_curve}).to_csv(OUT / 'v32_backtest_equity.csv', index=False, encoding='utf-8-sig')
 
@@ -384,4 +384,4 @@ if __name__ == '__main__':
     with open(OUT / 'v32_backtest_summary.json', 'w') as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
 
-    print(f"\n[{ts()}] 回测done. 结果: {OUT}")
+    print(f"\n[{ts()}] Backtest complete. Results: {OUT}")

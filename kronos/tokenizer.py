@@ -3,11 +3,11 @@ Kronos Tokenizer - K-line data -> BSQ hierarchical discrete tokens
 
 Core pipeline:
 1. Linear embedding: OHLCV(6-dim) -> d_model
-2. Encoder Transformer → 压缩到 codebook_dim
-3. BSQuantizer：L2归一化 → sign量化 → s1(粗粒度)+s2(细粒度) token
-4. Decoder Transformer → 重建 OHLCV
+2. Encoder Transformer -> compress to codebook_dim
+3. BSQuantizer: L2 normalization -> sign quantization -> s1 (coarse) + s2 (fine) tokens
+4. Decoder Transformer -> reconstruct OHLCV
 
-s1_bits=10, s2_bits=10 → 码本维度=20 → 总词汇量=2^20≈1M token
+s1_bits=10, s2_bits=10 -> codebook dim=20 -> total vocab=2^20≈1M tokens
 """
 
 # Reproduced from Kronos (https://github.com/shiyu-coder/Kronos)
@@ -26,23 +26,23 @@ from .module import BSQuantizer, TransformerBlock
 
 class KronosTokenizer(nn.Module, PyTorchModelHubMixin):
     """
-    K线分词器：混合量化编码-解码架构
+    K-line tokenizer: hybrid quantization encode-decode architecture
 
-    将连续 OHLCV 数据压缩为离散 token 序列。
-    s1 (前 s1_bits 位) 捕获粗粒度趋势，
-    s2 (后 s2_bits 位) 捕获细粒度波动。
+    Compresses continuous OHLCV data into discrete token sequences.
+    s1 (first s1_bits bits) captures coarse-grained trend,
+    s2 (last s2_bits bits) captures fine-grained fluctuation.
 
     Args:
-        d_in: 输入维度（默认 6: open/high/low/close/volume/amount）
-        d_model: 隐藏维度
-        n_heads: 注意力头数
-        ff_dim: FFN 隐藏维度
-        n_enc_layers: Encoder 层数
-        n_dec_layers: Decoder 层数
-        s1_bits: 粗粒度 token 比特数
-        s2_bits: 细粒度 token 比特数
-        beta/gamma0/gamma/zeta: BSQ 损失权重
-        group_size: BSQ 分组大小
+        d_in: input dimension (default 6: open/high/low/close/volume/amount)
+        d_model: hidden dimension
+        n_heads: number of attention heads
+        ff_dim: FFN hidden dimension
+        n_enc_layers: number of encoder layers
+        n_dec_layers: number of decoder layers
+        s1_bits: coarse token bit count
+        s2_bits: fine token bit count
+        beta/gamma0/gamma/zeta: BSQ loss weights
+        group_size: BSQ group size
     """
 
     def __init__(
@@ -76,45 +76,45 @@ class KronosTokenizer(nn.Module, PyTorchModelHubMixin):
         self.resid_dropout_p = resid_dropout_p
         self.s1_bits = s1_bits
         self.s2_bits = s2_bits
-        self.codebook_dim = s1_bits + s2_bits  # 总码本维度
+        self.codebook_dim = s1_bits + s2_bits  # Total codebook dimension
 
-        # 嵌入层
+        # Embedding layer
         self.embed = nn.Linear(self.d_in, self.d_model)
         self.head = nn.Linear(self.d_model, self.d_in)
 
-        # Encoder: 压缩输入到量化空间
+        # Encoder: compress input to quantization space
         self.encoder = nn.ModuleList([
             TransformerBlock(self.d_model, self.n_heads, self.ff_dim,
                              self.ffn_dropout_p, self.attn_dropout_p, self.resid_dropout_p)
             for _ in range(self.enc_layers - 1)
         ])
 
-        # Decoder: 从量化码重建数据（共享权重用于 pre 和 full）
+        # Decoder: reconstruct data from quantized codes (shared weights for pre and full)
         self.decoder = nn.ModuleList([
             TransformerBlock(self.d_model, self.n_heads, self.ff_dim,
                              self.ffn_dropout_p, self.attn_dropout_p, self.resid_dropout_p)
             for _ in range(self.dec_layers - 1)
         ])
 
-        # 量化前后的投影层
+        # Projection layers before and after quantization
         self.quant_embed = nn.Linear(self.d_model, self.codebook_dim)
         self.post_quant_embed_pre = nn.Linear(self.s1_bits, self.d_model)
         self.post_quant_embed = nn.Linear(self.codebook_dim, self.d_model)
 
-        # BSQ 量化器
+        # BSQ quantizer
         self.tokenizer = BSQuantizer(
             self.s1_bits, self.s2_bits, beta, gamma0, gamma, zeta, group_size,
         )
 
     def forward(self, x: torch.Tensor):
         """
-        训练用前向传播（含重建损失）。
+        Forward pass for training (includes reconstruction loss).
 
         Returns:
-            (z_pre, z): (仅用 s1 重建, 用完整码本重建) 两个输出
-            bsq_loss: 量化损失
-            quantized: 量化后的码字
-            z_indices: token 索引
+            (z_pre, z): two outputs (s1-only reconstruction, full-codebook reconstruction)
+            bsq_loss: quantization loss
+            quantized: quantized codewords
+            z_indices: token indices
         """
         z = self.embed(x)
 
@@ -125,14 +125,14 @@ class KronosTokenizer(nn.Module, PyTorchModelHubMixin):
 
         bsq_loss, quantized, z_indices = self.tokenizer(z)
 
-        # 仅用 s1_bits 重建（粗粒度）
+        # Reconstruct using only s1_bits (coarse-grained)
         quantized_pre = quantized[:, :, :self.s1_bits]
         z_pre = self.post_quant_embed_pre(quantized_pre)
         for layer in self.decoder:
             z_pre = layer(z_pre)
         z_pre = self.head(z_pre)
 
-        # 用完整码本重建（粗+细）
+        # Reconstruct using full codebook (coarse + fine)
         z = self.post_quant_embed(quantized)
         for layer in self.decoder:
             z = layer(z)
@@ -142,11 +142,11 @@ class KronosTokenizer(nn.Module, PyTorchModelHubMixin):
 
     def indices_to_bits(self, x: torch.Tensor, half: bool = False) -> torch.Tensor:
         """
-        整数索引 → 二元码 {-1, +1}^D 并缩放
+        Integer indices -> binary codes {-1, +1}^D with scaling
 
         Args:
-            x: 整数索引 或 (s1_idx, s2_idx) 当 half=True
-            half: 是否使用分离的 s1/s2 索引
+            x: integer indices, or (s1_idx, s2_idx) when half=True
+            half: whether to use separated s1/s2 indices
         """
         if half:
             x1, x2 = x[0], x[1]
@@ -166,14 +166,14 @@ class KronosTokenizer(nn.Module, PyTorchModelHubMixin):
     @torch.no_grad()
     def encode(self, x: torch.Tensor, half: bool = False) -> torch.Tensor:
         """
-        编码：连续数据 → 离散 token 索引
+        Encode: continuous data -> discrete token indices
 
         Args:
-            x: [B, T, d_in] 输入数据
-            half: True 返回 (s1_indices, s2_indices)
+            x: [B, T, d_in] input data
+            half: if True, return (s1_indices, s2_indices)
 
         Returns:
-            整数 token 索引（或双索引元组）
+            integer token indices (or dual-index tuple)
         """
         z = self.embed(x)
         for layer in self.encoder:
@@ -185,14 +185,14 @@ class KronosTokenizer(nn.Module, PyTorchModelHubMixin):
     @torch.no_grad()
     def decode(self, x: torch.Tensor, half: bool = False) -> torch.Tensor:
         """
-        解码：token 索引 → 重建 OHLCV 数据
+        Decode: token indices -> reconstructed OHLCV data
 
         Args:
-            x: token 索引（或双索引元组）
-            half: 输入是否为分离的 s1/s2 索引
+            x: token indices (or dual-index tuple)
+            half: whether input uses separated s1/s2 indices
 
         Returns:
-            [B, T, d_in] 重建数据
+            [B, T, d_in] reconstructed data
         """
         quantized = self.indices_to_bits(x, half)
         z = self.post_quant_embed(quantized)

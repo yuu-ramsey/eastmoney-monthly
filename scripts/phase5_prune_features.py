@@ -1,8 +1,9 @@
+
 """
 Phase 5: Pruned feature validation
-砍掉: G5全部(2) + G1全部(4) + G4中rsi14/bb_pos/amplitude(3) = 9维
-保留: atr14, vol_6m (来自G4)
-对比 61维 vs 52维 的IC/ICIR
+Cut: G5 all(2) + G1 all(4) + G4 rsi14/bb_pos/amplitude(3) = 9 dims
+Keep: atr14, vol_6m (from G4)
+Compare 61d vs 52d IC/ICIR
 """
 import warnings; warnings.filterwarnings('ignore')
 import numpy as np, pandas as pd, sqlite3, time, json
@@ -19,17 +20,17 @@ OUT.mkdir(parents=True, exist_ok=True)
 N_FFT = 10
 DATE_FMT = '%Y-%m-%d %H:%M:%S'
 
-# 61维 → 52维: 砍掉9个特征
-# G1(0-3): mom_1m/mom_3m/mom_6m/mom_12m — 全部砍
-# G4(10-14): rsi14(10)/bb_pos(11)/amplitude(14) — 砍3个, 保留vol_6m(12)/atr14(13)
-# G5(15-16): above_ma20/above_ma60 — 全部砍
+# 61d -> 52d: cut 9 features
+# G1(0-3): mom_1m/mom_3m/mom_6m/mom_12m -- cut all
+# G4(10-14): rsi14(10)/bb_pos(11)/amplitude(14) -- cut 3, keep vol_6m(12)/atr14(13)
+# G5(15-16): above_ma20/above_ma60 -- cut all
 DROP_INDICES = {0, 1, 2, 3, 10, 11, 14, 15, 16}
 KEEP_INDICES = [i for i in range(61) if i not in DROP_INDICES]
 
 KEPT_NAMES = [
     'ma5_dev', 'ma20_dev', 'ma60_dev',                # G2
     'dif', 'dea', 'macd_hist',                         # G3
-    'vol_6m', 'atr14',                                 # G4 (精简)
+    'vol_6m', 'atr14',                                 # G4 (pruned)
 ] + [f'fft_{i}' for i in range(30)] + [                # G6
     'vol_ratio', 'turnover', 'turnover_dev',            # G7
     'vol_ma3_ratio', 'log_volume', 'log_turnover',
@@ -84,7 +85,7 @@ def cross_sectional_neutralize(features, dates, neutralizer, ntype='categorical'
 
 
 def build_features():
-    print(f"[{ts()}] Loaded数据...", flush=True)
+    print(f"[{ts()}] Loading data...", flush=True)
     conn = sqlite3.connect(str(DB))
     codes = [r[0] for r in conn.execute(
         'SELECT code FROM monthly_klines GROUP BY code HAVING COUNT(*)>=84').fetchall()]
@@ -102,7 +103,7 @@ def build_features():
     print(f"[{ts()}] {len(codes_used)} stocks, {len(df)} rows", flush=True)
 
     df['month'] = df['date'].str[:7]
-    print(f"[{ts()}] 构建特征...", flush=True); t0 = time.time()
+    print(f"[{ts()}] Building features...", flush=True); t0 = time.time()
     flat_list, y_list, dates_list, inds_list = [], [], [], []
 
     for code in codes_used:
@@ -145,7 +146,7 @@ def build_features():
             fwd_ret = (c[i + 3] - c[i + 2]) / max(abs(c[i + 2]), 0.01)
             if abs(fwd_ret) > 2: continue
 
-            # 构建全部61维特征
+            # Build full 61d features
             flat_full = []
             flat_full.extend([(c[i] - c[i - j]) / max(abs(c[i - j]), 0.01) if i >= j else 0 for j in [1, 3, 6, 12]])  # G1:0-3
             for ma in [ma5, ma20, ma60]:
@@ -186,7 +187,7 @@ def build_features():
 
     v = ~np.isnan(flat).any(axis=1) & ~np.isnan(y)
     flat = flat[v]; y = y[v]; dates_arr = dates_arr[v]; inds_arr = inds_arr[v]
-    print(f"[{ts()}] {len(flat):,} 样本, {flat.shape[1]}d ({time.time() - t0:.0f}s)", flush=True)
+    print(f"[{ts()}] {len(flat):,} samples, {flat.shape[1]}d ({time.time() - t0:.0f}s)", flush=True)
     return flat, y, dates_arr, inds_arr
 
 
@@ -224,7 +225,7 @@ def train_and_eval(X_train, y_train, X_test, y_test, dates_test, label="baseline
 if __name__ == '__main__':
     flat, y, dates_arr, inds_arr = build_features()
 
-    print(f"[{ts()}] 行业中性化...", flush=True); t0 = time.time()
+    print(f"[{ts()}] Industry neutralizing...", flush=True); t0 = time.time()
     flat_ind = cross_sectional_neutralize(flat.copy(), dates_arr, inds_arr, 'categorical')
     print(f"[{ts()}] done ({time.time() - t0:.0f}s)", flush=True)
 
@@ -234,31 +235,31 @@ if __name__ == '__main__':
     X_test_full = flat_ind[te_m]; y_test = y[te_m]
     dates_test = dates_arr[te_m]
 
-    # Baseline: 全61维
+    # Baseline: full 61d
     print(f"\n{'=' * 60}")
-    print("Comparison: 61维 vs 52维 (精简)")
+    print("Comparison: 61d vs 52d (pruned)")
     print(f"{'=' * 60}")
 
     r61 = train_and_eval(X_train_full, y_train_full, X_test_full, y_test, dates_test, "61d_baseline")
-    print(f"[61维] IC={r61['IC']:+.4f}  ICIR={r61['ICIR']:+.3f}  "
+    print(f"[61d] IC={r61['IC']:+.4f}  ICIR={r61['ICIR']:+.3f}  "
           f"w=({r61['w_lgb']:.3f}, {r61['w_xgb']:.3f}, {r61['w_ridge']:.3f})")
 
-    # 精简版: 52维
+    # Pruned: 52d
     X_train_52 = X_train_full[:, KEEP_INDICES]
     X_test_52 = X_test_full[:, KEEP_INDICES]
 
     r52 = train_and_eval(X_train_52, y_train_full, X_test_52, y_test, dates_test, "52d_pruned")
-    print(f"[52维] IC={r52['IC']:+.4f}  ICIR={r52['ICIR']:+.3f}  "
+    print(f"[52d] IC={r52['IC']:+.4f}  ICIR={r52['ICIR']:+.3f}  "
           f"w=({r52['w_lgb']:.3f}, {r52['w_xgb']:.3f}, {r52['w_ridge']:.3f})")
 
     delta_ic = r52['IC'] - r61['IC']
     delta_ir = r52['ICIR'] - r61['ICIR']
-    print(f"\nΔIC={delta_ic:+.4f} ({delta_ic / abs(r61['IC']) * 100:+.1f}%)  "
-          f"ΔICIR={delta_ir:+.3f}")
+    print(f"\nDIC={delta_ic:+.4f} ({delta_ic / abs(r61['IC']) * 100:+.1f}%)  "
+          f"DICIR={delta_ir:+.3f}")
 
-    # 按fold验证
+    # Fold-level validation
     print(f"\n{'=' * 60}")
-    print("5-Fold CV 对比 (按时间切分)")
+    print("5-Fold CV Comparison (time-ordered split)")
     print(f"{'=' * 60}")
     all_months = np.unique(dates_test)
     n_folds = 5
@@ -272,14 +273,13 @@ if __name__ == '__main__':
 
         if fold_mask.sum() < 100: continue
 
-        ic61, _ = cs_ic(np.zeros(fold_mask.sum()), y_test[fold_mask], dates_test[fold_mask])
-        # 用全量训练的模型预测fold内的样本
+        # Use full-trained model to predict within-fold samples
         sc61 = StandardScaler(); sc61.fit(X_train_full)
         X_fold_61 = sc61.transform(X_test_full[fold_mask])
         sc52 = StandardScaler(); sc52.fit(X_train_52)
         X_fold_52 = sc52.transform(X_test_52[fold_mask])
 
-        # 重新在fold内算IC (用已训好的模型pred)
+        # Recompute IC within fold (using pre-trained model preds)
         # LGB
         lgb61 = lgb.LGBMRegressor(objective='regression', num_leaves=63, learning_rate=0.03,
                                   n_estimators=300, min_child_samples=20, subsample=0.8,
@@ -299,7 +299,7 @@ if __name__ == '__main__':
         fold_start = fold_months[0]; fold_end = fold_months[-1]
         delta_fold = ic52_fold - ic61_fold
         print(f"  Fold {fold + 1} ({fold_start}~{fold_end}): "
-              f"61d IC={ic61_fold:+.4f}  52d IC={ic52_fold:+.4f}  Δ={delta_fold:+.4f}")
+              f"61d IC={ic61_fold:+.4f}  52d IC={ic52_fold:+.4f}  D={delta_fold:+.4f}")
 
     # Save
     summary = {
@@ -316,4 +316,4 @@ if __name__ == '__main__':
     with open(OUT / 'prune_validation.json', 'w') as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
 
-    print(f"\n[{ts()}] 精简验证done. 结果: {OUT / 'prune_validation.json'}")
+    print(f"\n[{ts()}] Prune validation done. Results: {OUT / 'prune_validation.json'}")

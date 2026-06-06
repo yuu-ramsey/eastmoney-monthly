@@ -38,12 +38,12 @@ function collectPageEvents(root) {
       if (hadDatePrefix && type && title.endsWith(type)) title = title.slice(0, -type.length).trim();
       if (!title) title = rawTitle;
       events.push({ date, type, title });
-    } catch (_) { /* 单行异常跳过 */ }
+    } catch (_) { /* skip single-row exception */ }
   }
   return events.slice(0, 10);
 }
 
-// -------- 辅助:构造 mock DOM --------
+// -------- Helper: construct mock DOM --------
 
 function mockEl(tag, classes, children, text) {
   const el = {
@@ -86,9 +86,9 @@ function mockRow(timeText, eventChildren, eventText) {
   return row;
 }
 
-// -------- 测试 --------
+// -------- Tests --------
 
-test('collectPageEvents: 正常解析', () => {
+test('collectPageEvents: normal parsing', () => {
   const rows = [
     mockRow('04-30\n2026', null, '研报 2026年04月30日发布《茅台业绩双降》研报'),
     mockRow('04-29', null, '公告 关于召开业绩说明会的公告'),
@@ -100,13 +100,13 @@ test('collectPageEvents: 正常解析', () => {
   assert.deepEqual(events[1], { date: '04-29', type: '公告', title: '关于召开业绩说明会的公告' });
 });
 
-test('collectPageEvents: 空容器返回 []', () => {
+test('collectPageEvents: empty container returns []', () => {
   const root = mockRoot([]);
   assert.deepEqual(collectPageEvents(root), []);
 });
 
-test('collectPageEvents: td.time 或 td.event 缺失时跳过', () => {
-  // 缺 event
+test('collectPageEvents: skips when td.time or td.event is missing', () => {
+  // missing event
   const rowNoEvent = {
     children: [mockEl('td', ['time'], [], '04-30')],
     querySelector: (sel) => sel === '.time' ? mockEl('td', ['time'], [], '04-30') : null,
@@ -116,7 +116,7 @@ test('collectPageEvents: td.time 或 td.event 缺失时跳过', () => {
   assert.equal(events.length, 0);
 });
 
-test('collectPageEvents: 截断到 10 条', () => {
+test('collectPageEvents: truncates to 10 entries', () => {
   const rows = [];
   for (let i = 0; i < 15; i++) {
     rows.push(mockRow(`04-${String(30 - i).padStart(2, '0')}`, null, `公告 测试公告${i + 1}`));
@@ -126,7 +126,7 @@ test('collectPageEvents: 截断到 10 条', () => {
   assert.equal(events.length, 10);
 });
 
-test('collectPageEvents: 有子元素时用 firstElementChild 提取 type', () => {
+test('collectPageEvents: extracts type via firstElementChild when children exist', () => {
   const typeChild = mockEl('span', ['type'], [], '分红');
   const descChild = mockEl('span', ['desc'], [], '2025年度分红方案实施');
   const row = mockRow('04-25', [typeChild, descChild]);
@@ -136,8 +136,8 @@ test('collectPageEvents: 有子元素时用 firstElementChild 提取 type', () =
   assert.equal(events[0].type, '分红');
 });
 
-test('collectPageEvents: 单行异常不中断整体', () => {
-  // 一个正常行 + 一个会抛异常的行（timeEl 为 null 时跳过）
+test('collectPageEvents: single-row exception does not interrupt overall processing', () => {
+  // one normal row + one row that will throw an exception (timeEl is null, so it skips)
   const badRow = {
     querySelector: () => { throw new Error('boom'); },
   };

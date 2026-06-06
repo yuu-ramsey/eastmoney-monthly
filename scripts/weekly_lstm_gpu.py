@@ -1,9 +1,9 @@
 """Weekly GPU deep learning v2: time-safe version
 Fixes:
-  - 日线信号 ds_* 特征已弃用（v5 比例分割泄漏，v6 仅在 2022+ 有效）
-  - 使用 16 维安全特征（动量 + MA + 波动率 + 成交量）
-  - 折扣多月目标 (γ=0.9)
-  - 容量控制 (27K 有效样本)
+  - ds_* daily signal features deprecated (v5 proportional split leakage, v6 only valid for 2022+)
+  - Uses 16 safe features (momentum + MA + volatility + volume)
+  - Discounted multi-horizon target (gamma=0.9)
+  - Capacity controlled (27K valid samples)
 """
 import torch, torch.nn as nn, numpy as np, pandas as pd, sqlite3, time
 from pathlib import Path
@@ -19,7 +19,7 @@ sys.path.insert(0, str(PROJECT / 'lib' / 'lstm'))
 DEV = torch.device('cuda')
 print(f"Device: {torch.cuda.get_device_name(0)}")
 
-# ======== 1. 构建安全特征 + 折扣目标 ========
+# ======== 1. Build safe features + discounted target ========
 print("\n1/3 Building 16-dim safe features with discounted target...")
 
 conn = sqlite3.connect(str(DB))
@@ -32,11 +32,11 @@ w_raw = pd.read_sql_query(f"""
 conn.close()
 w_raw['date'] = w_raw['date'].astype(str)
 
-FEATURE_DIM = 16  # 安全特征（不含 ds_*）
+FEATURE_DIM = 16  # safe features (no ds_*)
 LOOKBACK = 104  # 2 years
 
 def build_safe_sequences(df_merged):
-    """构建16维安全特征序列 + 折扣多月目标"""
+    """Build 16-dim safe feature sequences + discounted multi-horizon target"""
     all_seqs, all_targets, all_dates = [], [], []
 
     for code in sorted(df_merged['code'].unique()):
@@ -75,25 +75,25 @@ def build_safe_sequences(df_merged):
         al = pd.Series(loss).ewm(alpha=1/14).mean().values
         F[:, 8] = np.nan_to_num(100 - 100/(1 + ag/np.maximum(al, 1e-8)), 50)
 
-        # [9:13] 周线动量 (1w, 4w, 13w, 26w, 52w)
+        # [9:13] Weekly momentum (1w, 4w, 13w, 26w, 52w)
         for j, w in enumerate([1, 4, 13, 26, 52]):
             for i in range(n):
                 if i >= w and closes[i-w] > 0.01:
                     F[i, 9+j] = np.clip((closes[i] - closes[i-w]) / closes[i-w], -2, 2)
 
-        # [14] 52周位置
+        # [14] 52-week position
         for i in range(n):
             lo = max(0, i-52)
             h52 = highs[lo:i+1].max(); l52 = lows[lo:i+1].min()
             F[i, 14] = (closes[i] - l52) / max(h52 - l52, 0.01)
 
-        # [15] MA20 位置
+        # [15] MA20 position
         ma20 = pd.Series(closes).rolling(20).mean().values
         F[:, 15] = np.nan_to_num((closes - ma20) / np.maximum(closes, 0.01), 0)
 
         F = np.nan_to_num(F, 0.0)
 
-        # 构建序列 + 折扣目标 (γ=0.9, 13w/26w/39w/52w)
+        # Build sequences + discounted target (gamma=0.9, 13w/26w/39w/52w)
         for i in range(LOOKBACK-1, n - 52):
             if closes[i] <= 0.01:
                 continue
@@ -113,12 +113,12 @@ def build_safe_sequences(df_merged):
 X, Y, dates = build_safe_sequences(w_raw)
 print(f"  Sequences: {X.shape}, Target: {Y.shape}")
 
-# 先清理NaN再统计
+# Clean NaN first then compute stats
 mask_all = np.isfinite(Y) & ~np.isnan(X).any(axis=(1,2))
 X, Y, dates = X[mask_all], Y[mask_all], dates[mask_all]
 print(f"  Clean sequences: {X.shape}, Target: mean={Y.mean():.4f}, std={Y.std():.4f}")
 
-# 时间分割
+# Time split
 train_m = (dates >= '2015-01') & (dates <= '2021-12')
 val_m   = (dates >= '2022-01') & (dates <= '2023-12')
 test_m  = (dates >= '2024-01')
@@ -127,7 +127,7 @@ Xtr, Ytr = X[train_m], Y[train_m]
 Xva, Yva = X[val_m], Y[val_m]
 Xte, Yte = X[test_m], Y[test_m]
 
-# 标准化（训练集统计量）
+# Standardization (train set statistics)
 X_mean = Xtr.mean(axis=(0,1), keepdims=True)
 X_std = Xtr.std(axis=(0,1), keepdims=True) + 1e-8
 Xtr = (Xtr - X_mean) / X_std
@@ -141,7 +141,7 @@ Yte_n = (Yte - Y_mean_tr) / Y_std_tr
 
 print(f"  Train: {Xtr.shape}, Val: {Xva.shape}, Test: {Xte.shape}")
 
-# ======== 2. 模型 + 训练 ========
+# ======== 2. Models + training ========
 print("\n2/3 Training models (capacity-controlled, safe features)...")
 
 class WeeklyLSTM(nn.Module):
@@ -242,10 +242,10 @@ def train_and_eval(model, name, Xtr, Ytr, Xva, Yva, Xte, Yte, epochs=100):
     ls = yt[idx[-cut:]] - yt[idx[:cut]]
     sr = ls.mean() / ls.std() * np.sqrt(52/13) if ls.std() > 0 else 0
 
-    print(f" → Test IC={test_ic:.4f}, SR={sr:.3f}, val_best={best_val_ic:.4f}")
+    print(f" -> Test IC={test_ic:.4f}, SR={sr:.3f}, val_best={best_val_ic:.4f}")
     return {'name': name, 'params': n_params, 'test_ic': test_ic, 'sr': sr, 'best_val_ic': best_val_ic}
 
-# 模型候选（容量递增）
+# Model candidates (capacity increasing)
 model_configs = [
     ('LSTM-tiny',  WeeklyLSTM, dict(hidden=64,  num_layers=1, dropout=0.5)),
     ('LSTM-small', WeeklyLSTM, dict(hidden=128, num_layers=1, dropout=0.4)),
@@ -261,7 +261,7 @@ for name, cls, kwargs in model_configs:
     r['time_s'] = time.time() - t0
     results.append(r)
 
-# ======== 3. 最终报告 ========
+# ======== 3. Final report ========
 print(f"\n{'='*70}")
 print("FINAL: Weekly GPU DL Results (safe features, discounted target)")
 print(f"{'='*70}")
@@ -272,8 +272,8 @@ for r in sorted(results, key=lambda x: x['test_ic'], reverse=True):
     print(f"  {r['name']:<15} {r['params']:>8,} {r['test_ic']:10.4f} {r['sr']:8.3f} {r['best_val_ic']:10.4f} {r['time_s']:>7.0f}s")
 
 print(f"\n  --- Baselines (discounted target) ---")
-print(f"  Ridge (safe feats):       IC≈0.063  (walk-forward)")
-print(f"  LightGBM-small (safe):    IC≈0.070  (walk-forward)")
+print(f"  Ridge (safe feats):       IC~0.063  (walk-forward)")
+print(f"  LightGBM-small (safe):    IC~0.070  (walk-forward)")
 print(f"  Old LSTM-7 (raw target):  IC=0.007")
 print(f"  Old LGB (raw target):     IC=0.045")
 

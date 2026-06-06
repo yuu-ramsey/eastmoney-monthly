@@ -1,4 +1,5 @@
-# eastmoney-monthly-ai
+# eastmoney-monthly
+
 
 **A regime-adaptive analysis system for China A-share equities — designed to help you avoid losses, not chase profits.**
 

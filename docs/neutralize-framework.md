@@ -1,7 +1,7 @@
 # Neutralize Framework — Audit Document
 
 **Branch**: neutralize-framework  
-**Date**: 2026-06-08  
+**Date**: 2026-06-08 (A1/A2 rework: 2026-06-08)  
 **Files**: `lib/eval/neutralize.cjs`, `lib/eval/validate-signal.cjs`, `lib/eval/_selftest_reversal.cjs`
 
 ---
@@ -13,7 +13,8 @@
 Cross-sectional OLS per time-point (strict PIT):
 
 ```
-signal_i = α + β₁·rangePosition_i
+signal_i = α + β₁·logMarketCap_i              (if data available; DATA_PENDING = dropped)
+             + β₂·Amihud_i                     (if useLiquidity=true and data available)
              + Σ_{j=1}^{K-1} γⱼ·Industry1_j_dummy_i   (K = unique L1 industries in cross-section)
              + δ₂·Q2_i + δ₃·Q3_i + δ₄·Q4_i             (season dummies, Q1 baseline)
              + ε_i
@@ -23,9 +24,16 @@ residual_i = ε_i  ← neutralized signal
 
 | Control | Source | Notes |
 |---------|--------|-------|
-| `rangePosition` | Pool field (0–1) | Size proxy — small/distressed stocks tend toward 0 |
+| `logMarketCap` | Pool field `r.logMarketCap` | log(total market cap CNY). DATA_PENDING = term dropped. |
+| `amihud` / `bidAskSpread` | Pool field `r.amihud` or `r.bidAskSpread` | Optional liquidity control (`useLiquidity=true`). DATA_PENDING = term dropped. |
 | L1 Industry dummies | `data/industry-map.json` → `stockToIndustry`, 19 categories | Stripped "sh."/"sz." prefix for lookup |
 | Season dummies Q2/Q3/Q4 | Derived from `cutoffDate` month | Captures industry seasonal effects (e.g., bank Q4, consumer Q4) |
+
+**A1 Rework note (2026-06-08)**: `rangePosition` was the original size proxy and has been removed.
+- `rangePosition` measures price position in the trading range — collinear with momentum/reversal signals
+- In the 72tp pool, `rangePosition` had extreme outliers (P0=-2,469,569, P99=0.20) and near-zero correlation with reversal (r=0.0013)
+- Replaced with `logMarketCap`, which is DATA_PENDING for all current pool records
+- Effect on IC: none — IC stayed at -0.0407 (removing rangePosition changed nothing)
 
 **PIT guarantee**: Each time-point's OLS uses only records from that time-point's cross-section. No cross-time information enters the regression.
 
@@ -80,6 +88,8 @@ Gross and net alpha are returned separately. Gross serves as a sanity check; net
 | Reversal neutralized IC `\|IC\| < 0.01` | `\|IC\| = 0.0407` | 72tp pool is pre-filtered to "lowpos" (stocks near price range lows). In this filtered universe, reversal signal = prior losers tend to *continue* losing (momentum continuation in distress), not mean-revert. Industry neutralization does not eliminate a genuine stock-level effect. |
 | 5-gate `verdict = fail` for reversal | ✓ `verdict = fail` | G1 IC_IR = 0.295 < 0.3; G2 Q5 spread negative; G3 net alpha < 0; G5 p = 0.995 > 0.05. Gate fails correctly. |
 | Framework neutralization is correct | ✓ Verified via Test 2 | Synthetic pure-industry signal R² = 0.98, residual mean = 0.000000, assertNeutralized passed. IC reduced from 0.026 to 0.013. |
+| A1 rework: remove rangePosition → IC drops? | IC unchanged at -0.0407 | corr(reversal, rangePosition) = 0.0013 — rangePosition was making no contribution to OLS. Removing it has zero effect. IC of -0.04 is genuine pool-level effect, not a size artifact. |
+| A3: full-market pool validates lowpos-specific effect | PENDING | `data/frozen-eval-fullmarket.json` not yet built. Test 3 stub added to self-test; will run automatically when pool is available. |
 
 ### Test 1: Reversal (task-spec test)
 
@@ -123,22 +133,26 @@ IC reduced: 0.0259 → 0.0128 ✓
 const { neutralizeCrossSection, neutralizePanel, getL1Industry } = require('./neutralize.cjs');
 
 // Single cross-section
-const { residuals, r2, nDropped } = neutralizeCrossSection(
-  records,              // array of records for ONE time-point
-  r => sueFn(r),        // signal function
+const { residuals, r2, nDropped, sizeProxyUsed, liquidityUsed } = neutralizeCrossSection(
+  records,               // array of records for ONE time-point
+  r => sueFn(r),         // signal function
   {
-    useIndustry: true,  // L1 industry dummies (default: true)
-    useSizeProxy: true, // rangePosition as size proxy (default: true)
-    useSeason: true,    // Q2/Q3/Q4 dummies (default: true)
+    useIndustry: true,   // L1 industry dummies (default: true)
+    useSizeProxy: true,  // log(market cap) size control (default: true); DATA_PENDING = dropped
+    useLiquidity: false, // Amihud/bidAskSpread liquidity control (default: false); DATA_PENDING = dropped
+    useSeason: true,     // Q2/Q3/Q4 dummies (default: true)
     cutoffDate: 'YYYY-MM',  // REQUIRED when useSeason=true
   }
 );
 // residuals[i] = neutralized signal for records[i]
 // r2 = how much of signal variance was explained by style (diagnostic)
+// sizeProxyUsed = false when logMarketCap is null for all records (DATA_PENDING)
+// liquidityUsed = false when amihud/bidAskSpread is null for all records (DATA_PENDING)
 
 // Full panel
-const { byDate, meanR2 } = neutralizePanel(allRecords, signalFn, options);
-// byDate: Map<date, {residuals, r2, nDropped}>
+const { byDate, meanR2, sizeUsedCount, liquidityUsedCount } = neutralizePanel(allRecords, signalFn, options);
+// byDate: Map<date, {residuals, r2, nDropped, sizeProxyUsed, liquidityUsed}>
+// sizeUsedCount: number of time-points where size column was active
 ```
 
 ### `lib/eval/validate-signal.cjs`
@@ -202,10 +216,12 @@ for (const [gate, g] of Object.entries(result.gates)) {
 
 ## 5. Known Limitations
 
-1. **Volume data missing**: All kline volumes in the 72tp pool are 0. True size (market cap) not available. `rangePosition` is used as a size proxy — correlation with actual cap is moderate.
+1. **Size control DATA_PENDING**: `logMarketCap` is null for all 14,640 records in the current pool. The size term is silently dropped from all cross-section regressions. Status: `sizeProxyUsed = false` for all 78 time-points. Will activate automatically once pool records include `logMarketCap`.
 
-2. **Industry freshness**: `industry-map.json` reflects industry classification as of 2026-05-24. For historical records (2018–2022), some stocks may have changed industry. This is a static mapping.
+2. **Liquidity control DATA_PENDING**: `amihud` and `bidAskSpread` are null for all pool records. `useLiquidity` is available but currently inactive. Will activate when pool records include either field.
 
-3. **Cost model needs verification**: The 30 bps round-trip cost is an estimate. Actual rates vary by broker, stock type, and holding period.
+3. **Industry freshness**: `industry-map.json` reflects industry classification as of 2026-05-24. For historical records (2018–2022), some stocks may have changed industry. This is a static mapping.
 
-4. **Season dummies are at the quarter level**: Monthly precision for seasonal effects is not captured. Bank quarterly reporting seasonality (March/June/September/December) may need finer granularity for SUE signals.
+4. **Cost model needs verification**: The 30 bps round-trip cost is an estimate. Actual rates vary by broker, stock type, and holding period.
+
+5. **Season dummies are at the quarter level**: Monthly precision for seasonal effects is not captured. Bank quarterly reporting seasonality (March/June/September/December) may need finer granularity for SUE signals.

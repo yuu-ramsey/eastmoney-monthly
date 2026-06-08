@@ -11,6 +11,9 @@ native-host/manifest/eastmoney-ai-sync-installed.json
 .eastmoney-ai/
 data/frozen-eval-*.json
 
+# Generated control data (rebuild via scripts/fetch_neutralize_controls.py)
+data/neutralize-controls.json
+
 # Model weights (large files + potential license issues)
 kronos/*.pt
 kronos/*.safetensors

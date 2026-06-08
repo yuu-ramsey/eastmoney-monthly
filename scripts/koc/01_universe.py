@@ -21,8 +21,9 @@ Full sample filters (strict subset):
 
 PIT status per filter (dry-run mode):
   Filters 1, 2, 6 : PIT-correct (actual historical data)
-  Filter 3        : PROXY — current ST list, not historical (conservative approximation)
-  Filter 4        : PROXY — SZ only (float shares x current price); SH = unknown (pass)
+  Filter 3        : KNOWN LOOKAHEAD — current ST snapshot; no PIT source found (see B1 exploration)
+  Filter 4        : PROXY (SZ) / DATA_PENDING (SH) — SZ uses current float shares x price;
+                    SH stocks have size_missing=1 and are temporarily retained pending §10 data
   Filter 5        : DATA_PENDING — requires per-stock daily price history
 
 Usage:
@@ -74,7 +75,8 @@ def init_out_db(conn: sqlite3.Connection) -> None:
             pass_quarters   INTEGER NOT NULL,
             pass_pos_eps    INTEGER NOT NULL,
             pass_st         INTEGER NOT NULL,
-            pass_mktcap     INTEGER NOT NULL,  -- -1 = unknown (SH in dry-run)
+            pass_mktcap     INTEGER NOT NULL,  -- 1=pass, 0=fail, -1=DATA_PENDING (size_missing=1)
+            size_missing    INTEGER NOT NULL,  -- 1 = market cap unavailable at this obs (SH in dry-run)
             pass_turnover   INTEGER NOT NULL,  -- -1 = DATA_PENDING
             pass_listing    INTEGER NOT NULL,
             in_pool         INTEGER NOT NULL,
@@ -302,10 +304,15 @@ def build_pools(
     # Filter 3: not ST (current proxy)
     df["pass_st"] = (~df["code_6"].isin(st_set)).astype(int)
 
-    # Filter 4: market cap >= 5 billion (SZ proxy; SH = -1 unknown)
+    # Filter 4: market cap >= 5 billion (SZ proxy; SH = DATA_PENDING)
+    # size_missing=1 means no market cap data is available for this observation.
+    # These are NOT auto-passing — they are explicitly flagged and kept only because
+    # §10 data (PIT market cap) is not yet ready. Once §10 is complete, size_missing=1
+    # rows must be re-evaluated with actual market cap before including in the pool.
     mktcap_vals: pd.Series = df["code_6"].map(mktcap_map)
+    df["size_missing"] = mktcap_vals.isna().astype(int)
     df["pass_mktcap"] = np.where(
-        mktcap_vals.isna(), -1,
+        mktcap_vals.isna(), -1,       # DATA_PENDING — see size_missing flag
         (mktcap_vals >= MKTCAP_THRESHOLD).astype(int),
     )
 
@@ -357,7 +364,7 @@ def build_pools(
     df_liquid = df[[
         "code", "fiscal_year", "fiscal_quarter",
         "pass_quarters", "pass_pos_eps", "pass_st",
-        "pass_mktcap", "pass_turnover", "pass_listing", "in_liquid",
+        "pass_mktcap", "size_missing", "pass_turnover", "pass_listing", "in_liquid",
     ]].copy()
     df_liquid.insert(3, "pub_date", pub_str.values)
     df_liquid = df_liquid.rename(columns={"in_liquid": "in_pool"})
@@ -450,8 +457,11 @@ def generate_report(
     else:
         ts_table = "\n".join(ts_rows)
 
-    # SH stock count in liquid pool
-    sh_obs = int(df_liquid["code"].str.startswith("sh").sum())
+    # size_missing count (DATA_PENDING market cap observations)
+    size_missing_obs = int(df_liquid["size_missing"].sum())
+    size_missing_stocks = int(
+        df_liquid[df_liquid["size_missing"] == 1]["code"].nunique()
+    )
 
     return f"""# KoC Universe — Quality Report{smoke_note}
 
@@ -494,41 +504,78 @@ Values: Pass=1, Unknown/Pending=-1, Fail=0
 | >= 8 quarters | ✅ Yes | `trusted=1` in pead.sqlite uses only historical EPS through pub_date |
 | EPS >= 0 | ✅ Yes | `eps_single` anchored to pub_date; no future data |
 | Not ST | ⚠️ Proxy | Current exchange name list; stocks that recovered (or became) ST since are misclassified |
-| Market cap >= 5亿 | ⚠️ Proxy (SZ) | SZ: current float shares x current price; SH ({sh_obs:,} obs) = unknown = pass |
+| Market cap >= 5亿 | ⚠️ Proxy (SZ) / ❌ Missing (SH) | SZ: current float shares × current price; SH: `size_missing=1` ({size_missing_obs:,} obs, {size_missing_stocks:,} stocks) |
 | Avg turnover >= 5% | ❌ Pending | Requires daily price history per stock at each pub_date |
 | Listed >= 24 months | ✅ Yes | Exchange listing date is static; {pre_ipo_count:,} pre-IPO obs found and correctly excluded |
+
+## Size-Missing Stocks (DATA_PENDING Market Cap)
+
+`size_missing=1` obs: **{size_missing_obs:,}** across **{size_missing_stocks:,}** distinct stocks.
+
+These observations have NO market cap data available (SH stocks in dry-run mode).
+They are currently **not excluded** (pass_mktcap=-1 = DATA_PENDING) but are **explicitly flagged**.
+Once §10 market cap data is ready, all `size_missing=1` rows must be re-evaluated before
+including them in the final pool. They must NOT be treated as having passed the market cap filter.
+
+## ST Historical Data Exploration (B1)
+
+**Result**: PIT historical ST status is **not available** via simple API calls.
+
+Explored sources:
+- `akshare.stock_info_change_name(symbol)` — returns name history list **without dates**;
+  cannot determine when ST designation was applied or removed
+- `akshare.stock_info_sz_change_name(symbol='全称变更')` — connection failed (server reset)
+- `baostock.query_stock_basic` — returns current `code_name` only; no historical name timeline
+
+**Conclusion**: The current ST filter uses a snapshot of today's exchange name list.
+Stocks that were ST historically (e.g. during 2015-2016 restructuring wave) but have since
+recovered are incorrectly **included** in the pool. Stocks that became ST after this snapshot
+are incorrectly **included** as non-ST for recent periods.
+
+> ⚠️ **Known Lookahead**: ST filter is a present-day snapshot, not point-in-time.
+> This is a conservative approximation: currently-ST stocks are excluded even for
+> historical periods when they may have been clean. The opposite error (including
+> stocks that were ST during the test period) is harder to bound without historical data.
 
 ## Known Limitations (Dry-Run Mode)
 
 1. **Turnover filter not applied** — filter logic is implemented but uses DATA_PENDING (-1 = all pass).
    Liquid pool observation count will decrease once this filter is active.
-2. **Market cap for SH stocks** is unknown ({sh_obs:,} observations, treated as pass).
-   SH main board / STAR stocks tend to be large-cap, so over-inclusion is likely small.
-3. **ST status** uses current exchange name list. Stocks that were ST historically (e.g., during
-   2015 restructuring) but have since recovered will be incorrectly included.
-4. **Market cap** uses current float shares x current price, not values at each pub_date.
+2. **Market cap for SH stocks** is DATA_PENDING ({size_missing_obs:,} observations, {size_missing_stocks:,} stocks,
+   `size_missing=1`). These are flagged but temporarily retained pending §10 data. SH main board / STAR
+   stocks tend to be large-cap, so over-inclusion is likely small, but must be verified.
+3. **ST status** uses current exchange name list. See "ST Historical Data Exploration" section above.
+   *This is a known lookahead and must be disclosed in any published results.*
+4. **Market cap** uses current float shares × current price (SZ only), not values at each pub_date.
    Stocks that have grown significantly since early periods are incorrectly included for those periods.
 
 ## Schema
 
 ```sql
 universe_liquid(code, fiscal_year, fiscal_quarter, pub_date,
-    pass_quarters, pass_pos_eps, pass_st, pass_mktcap, pass_turnover, pass_listing,
+    pass_quarters, pass_pos_eps, pass_st,
+    pass_mktcap,   -- 1=pass, 0=fail, -1=DATA_PENDING
+    size_missing,  -- 1 = no market cap data; must re-evaluate when §10 data available
+    pass_turnover, -- -1=DATA_PENDING
+    pass_listing,
     in_pool)
 
 universe_full(code, fiscal_year, fiscal_quarter, pub_date,
     pass_quarters, pass_pos_eps, pass_st, in_pool)
 
--- pass values: 1=pass, 0=fail, -1=unknown/DATA_PENDING (treated as pass in dry-run)
+-- pass values: 1=pass, 0=fail, -1=DATA_PENDING
+-- size_missing=1 rows are in-pool (dry-run only) — must NOT be assumed to pass market cap filter
 ```
 
 ## Next Step (PIT Mode)
 
 After pead-baostock.sqlite §10 is complete, update data sources:
-- ST status: baostock historical stock name timeline
-- Market cap: `total_share` from baostock x closing price at pub_date
+- **Market cap**: `total_share` from baostock × closing price at pub_date
   (requires separate `query_history_k_data_plus` fetch per stock per period)
-- Turnover: rolling 20d average from daily close data at pub_date
+- **Turnover**: rolling 20d average from daily close data at pub_date
+- **ST status**: PIT source not found in B1 exploration (see section above).
+  Options: (a) accept known lookahead, disclose in paper; (b) reconstruct from
+  individual stock name histories if a dated source is identified later.
 """
 
 

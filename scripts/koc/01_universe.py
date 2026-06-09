@@ -21,11 +21,12 @@ Full sample filters (strict subset):
 
 PIT status per filter (dry-run mode):
   Filters 1, 2, 6 : PIT-correct (actual historical data)
-  Filter 3        : KNOWN LOOKAHEAD — current ST snapshot; no PIT source found (see B1 exploration)
-                    NOTE (2026-06-08): baostock daily isST field is NOT a reliable PIT source.
-                    sh.600070 was *ST in 2020 but k-data showed isST=0 for all 2020 dates.
-                    isST appears to reflect current status, not historical per-day status.
-                    tradestatus=0 (suspension) from daily_kline IS reliable for suspension filtering.
+  Filter 3        : PIT-CORRECT via §17 st_history table (once built)
+                    query_all_stock(date) returns historical stock names; 'ST' in name = ST on that date.
+                    §17 (17_st_history.py) polls monthly 2008-2024 (~204 queries) → st_history table.
+                    Until §17 runs: remains KNOWN LOOKAHEAD (current ST snapshot).
+                    Note: baostock daily k-data isST is NOT PIT-reliable (reflects current status).
+                    tradestatus=0 (suspension) from daily_kline IS reliable for per-day suspension.
   Filter 4        : NOW PIT-CORRECT via §15/§16 — market_cap_yi = close × total_share / 1e8 (亿元)
                     total_share unit confirmed = 股 (shares); see 16_pit_marketcap.py
   Filter 5        : DATA_PENDING → usable once §15 daily_kline table is built

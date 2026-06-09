@@ -22,9 +22,14 @@ Full sample filters (strict subset):
 PIT status per filter (dry-run mode):
   Filters 1, 2, 6 : PIT-correct (actual historical data)
   Filter 3        : KNOWN LOOKAHEAD — current ST snapshot; no PIT source found (see B1 exploration)
-  Filter 4        : PROXY (SZ) / DATA_PENDING (SH) — SZ uses current float shares x price;
-                    SH stocks have size_missing=1 and are temporarily retained pending §10 data
-  Filter 5        : DATA_PENDING — requires per-stock daily price history
+                    NOTE (2026-06-08): baostock daily isST field is NOT a reliable PIT source.
+                    sh.600070 was *ST in 2020 but k-data showed isST=0 for all 2020 dates.
+                    isST appears to reflect current status, not historical per-day status.
+                    tradestatus=0 (suspension) from daily_kline IS reliable for suspension filtering.
+  Filter 4        : NOW PIT-CORRECT via §15/§16 — market_cap_yi = close × total_share / 1e8 (亿元)
+                    total_share unit confirmed = 股 (shares); see 16_pit_marketcap.py
+  Filter 5        : DATA_PENDING → usable once §15 daily_kline table is built
+                    turn (換手率) from daily_kline enables 20-day avg turnover filter
 
 Usage:
   .venv/Scripts/python.exe scripts/koc/01_universe.py           # full dry-run

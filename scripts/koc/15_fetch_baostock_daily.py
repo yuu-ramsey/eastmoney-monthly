@@ -6,6 +6,17 @@ Output table: daily_kline in data/pead-baostock.sqlite
   code, date, close, turn, amount, pct_chg, tradestatus, is_st
   adjustflag='3' (unadjusted close — correct for market cap via close × total_share)
 
+Unit note (verified 2026-06-08):
+  total_share in eps_baostock_raw is in 股 (individual shares), NOT 万股.
+  market_cap_yi = close × total_share / 1e8  (亿元)
+
+isST reliability note (verified 2026-06-08):
+  baostock isST field in daily k-data is NOT a reliable PIT historical ST flag.
+  Test: sh.600070 was *ST in 2020 (confirmed via query_all_stock), but k-data shows isST=0
+  for the entire 2020-H1 period. isST appears to reflect CURRENT status, not historical.
+  → tradestatus=0 (suspension) IS reliable for PIT use.
+  → ST filter (§01 filter 3) remains KNOWN LOOKAHEAD until a better PIT source is found.
+
 liqa_share supplement:
   Adds liqa_share REAL column to eps_baostock_raw (once, idempotent).
   Probes up to 3 recent years per stock to get the most recent liqaShare value.

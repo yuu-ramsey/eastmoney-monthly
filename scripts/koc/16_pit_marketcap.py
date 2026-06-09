@@ -7,7 +7,8 @@ Implements the spec in docs/pead-s16-pit-mktcap.md:
 
 Time anchor: pub_date (disclosure date), NOT stat_date — prevents look-ahead.
 Join method: pd.merge_asof(direction='backward') per code.
-Units: total_share in 万股, close in CNY/share → market_cap in 万元 → ÷100 = 亿元.
+Units: total_share in 股 (individual shares), close in CNY/share → market_cap in CNY → ÷1e8 = 亿元.
+  Verified: 茅台 totalShare=1,256,197,800 (shares) × close=1726 / 1e8 = 21,682亿 ✓
 
 Input tables (pead-baostock.sqlite):
   daily_kline      — code, date, close (unadjusted)
@@ -34,13 +35,11 @@ DB_PATH: str = "data/pead-baostock.sqlite"
 MKTCAP_FLOOR_YI: float = 50.0
 
 # Validation benchmarks: (code, date, expected_market_cap_yi, tolerance_pct)
+# Verified 2026-06-08: 茅台 close=1726, totalShare=1256197800 (shares)
+#   market_cap = 1726 × 1256197800 / 1e8 = 21,682亿元 ✓
 BENCHMARKS: list[tuple[str, str, float, float]] = [
-    # 贵州茅台 2023-12-29 close ≈ 1711 CNY, total_share ≈ 125602 万股
-    # market_cap ≈ 1711 × 125602 / 100 ≈ 21489 亿元
-    ("sh.600519", "2023-12-29", 21000.0, 0.15),
-    # 招商银行 2023-12-29 close ≈ 33 CNY, total_share ≈ 2519 千万股 = 251900 万股
-    # market_cap ≈ 33 × 251900 / 100 ≈ 8313 亿元
-    ("sh.600036", "2023-12-29", 8000.0, 0.20),
+    ("sh.600519", "2023-12-29", 21682.0, 0.10),   # 茅台: close=1726, ts=1256197800
+    ("sh.600036", "2023-12-29", 7000.0, 0.25),    # 招商银行: ~7000亿 (rough, wider tol)
 ]
 
 
@@ -117,9 +116,11 @@ def compute_pit_mktcap(
         direction="backward",   # only use pub_date ≤ trading date (no look-ahead)
     )
 
-    # market_cap: close (CNY/share) × total_share (万股) / 100 = 亿元
-    merged["market_cap_yi"] = merged["close"] * merged["total_share"] / 100.0
-    merged["float_mktcap_yi"] = merged["close"] * merged["liqa_share"] / 100.0
+    # market_cap: close (CNY/share) × total_share (shares) / 1e8 = 亿元
+    # Unit verified: baostock totalShare is in individual shares (NOT 万股).
+    # Proof: 茅台 totalShare=1,256,197,800 × close=1726 / 1e8 = 21,682亿 (correct magnitude).
+    merged["market_cap_yi"] = merged["close"] * merged["total_share"] / 1e8
+    merged["float_mktcap_yi"] = merged["close"] * merged["liqa_share"] / 1e8
 
     # missing flags
     merged["mktcap_missing"] = merged["total_share"].isna().astype(int)

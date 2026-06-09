@@ -1,8 +1,8 @@
 # Neutralize Framework — Audit Document
 
 **Branch**: neutralize-framework  
-**Date**: 2026-06-08 (A1/A2 rework: 2026-06-08)  
-**Files**: `lib/eval/neutralize.cjs`, `lib/eval/validate-signal.cjs`, `lib/eval/_selftest_reversal.cjs`
+**Date**: 2026-06-08 (interface rework: 2026-06-08)  
+**Files**: `lib/eval/neutralize.cjs`, `lib/eval/validate-signal.cjs`, `lib/eval/_selftest_reversal.cjs`, `lib/eval/_selftest_synthetic.cjs`
 
 ---
 
@@ -13,29 +13,39 @@
 Cross-sectional OLS per time-point (strict PIT):
 
 ```
-signal_i = α + β₁·logMarketCap_i              (if data available; DATA_PENDING = dropped)
-             + β₂·Amihud_i                     (if useLiquidity=true and data available)
+signal_i = α + β₁·log(market_cap_yi_i)        (from record.market_cap_yi, §16 PIT join)
+             + β₂·log(amihud_i)                (from record.amihud, §15 calculation)
              + Σ_{j=1}^{K-1} γⱼ·Industry1_j_dummy_i   (K = unique L1 industries in cross-section)
-             + δ₂·Q2_i + δ₃·Q3_i + δ₄·Q4_i             (season dummies, Q1 baseline)
              + ε_i
 
 residual_i = ε_i  ← neutralized signal
 ```
 
-| Control | Source | Notes |
-|---------|--------|-------|
-| `log(market_cap)` | `data/neutralize-controls.json` → `closeAtCutoff × totalShare` | PIT approx: totalShare from latest quarterly snapshot. 99.7% coverage. |
-| `log(Amihud)` | `data/neutralize-controls.json` → `\|R_monthly\| / (amount_CNY/1e8)` | Requires return ≠ null (first timepoint per stock has return=null → dropped that month). 99.9% monthly coverage. |
-| L1 Industry dummies | `data/industry-map.json` → `stockToIndustry`, 19 categories | Stripped "sh."/"sz." prefix for lookup |
-| Season dummies Q2/Q3/Q4 | Derived from `cutoffDate` month | Captures industry seasonal effects (e.g., bank Q4, consumer Q4) |
+| Control | Source | Coverage | Notes |
+|---------|--------|----------|-------|
+| `log(market_cap)` | `record.market_cap_yi` (亿元, from §16 as-of join) | DATA_PENDING until §16 | Requires ≥30% non-null to activate; missing → median impute |
+| `log(Amihud)` | `record.amihud` (from §15 calculation) | DATA_PENDING until §15 | Requires ≥30% non-null to activate |
+| L1 Industry dummies | `data/industry-map.json` → `stockToIndustry`, ~16-19 categories | ~99% on known pools | Stripped "sh."/"sz." prefix for lookup |
 
-**Controls data**: run `scripts/fetch_neutralize_controls.py` once (~20 min) to build `data/neutralize-controls.json`. The module lazy-loads on first use.
+**DATA_PENDING**: when `market_cap_yi` or `amihud` are null on records (§15/§16 not yet run),
+those controls are dropped and a one-time warning is printed. `neutralizationStatus` is set to `'partial'`.
 
-**A1 Rework note (2026-06-08)**: `rangePosition` removed as size proxy (corr with reversal=0.0013, had extreme outliers). Replaced with true `log(closeAtCutoff × totalShare)` from baostock quarterly data.
+**PIT guarantee**: Each time-point's OLS uses only records from that time-point's cross-section.
+`record.market_cap_yi` must be the as-of value at `cutoffDate` (set by §16 as-of join).
 
-**PIT guarantee**: Each time-point's OLS uses only records from that time-point's cross-section. No cross-time information enters the regression.
+**Season dummies**: Omitted from per-cross-section OLS. Within a cross-section all records share
+the same cutoffDate/quarter, making season dummies constant (collinear with the intercept). They
+are only meaningful in pooled panel regression.
 
-**Missing industry**: Stocks not found in `industry-map.json` (< 1% coverage) receive zero contribution to industry dummies; their signal enters the intercept.
+### neutralizationStatus
+
+| Status | Condition | Meaning |
+|--------|-----------|---------|
+| `'full'` | Both `log_mktcap` AND `log_amihud` included (≥30% coverage) | Complete neutralization; results are final |
+| `'partial'` | Either size or liquidity missing (null/low coverage) | DATA_PENDING; results not final |
+
+**downstream rule**: Any result with `neutralizationStatus='partial'` is preliminary. Do not
+record as final IC/verdict until `'full'` is achieved after §15/§16.
 
 ### Per-Period R² Distribution (72tp pool, 78 time-points)
 
@@ -79,67 +89,69 @@ Gross and net alpha are returned separately. Gross serves as a sanity check; net
 
 ## 3. Self-Test Results
 
-### Deviation Table
+### Path A: Synthetic size-signal test — PASSED (2026-06-08)
+
+**Script**: `lib/eval/_selftest_synthetic.cjs` — runs NOW, no real data needed.
+
+```
+Setup: 300 stocks × 24 months
+Signal  = 2.0 × z_size + 0.3 × noise  (pure size exposure)
+Alpha   = 0.8 × z_size + 1.0 × noise  (forward return also has size beta)
+
+Raw IC (no neutralization):     0.5831   t=68.3
+Neutralized IC (log_MC+amihud): -0.0120  t=-1.4   (97.9% reduction)
+
+R² on sample cross-section:     0.977    (size explains 97.7% of signal)
+Residual mean:                  ≈ 0      (assertNeutralized PASSED)
+neutralizationStatus:           full     ✓
+
+ASSERTIONS:
+  ✓ neutralizationStatus = full
+  ✓ assertNeutralized: residual mean ≈ 0
+  ✓ Raw IC = 0.58 > 0.20 (size exposure confirmed)
+  ✓ |Neutralized IC| = 0.012 < 0.10 (size bias removed)
+  ✓ IC reduction = 97.9% ≥ 60%
+```
+
+**Conclusion**: Neutralization mechanism is correct. A purely size-driven signal (IC=0.58)
+is reduced to noise (IC=-0.012) after neutralizing by `log(market_cap_yi)`.
+
+---
+
+### Path B/C: Real data tests — DATA_PENDING (auto-activate when §15/§16 data arrives)
+
+**Path B** (Test 4 in `_selftest_reversal.cjs`): reversal with real `market_cap_yi` from §16.
+- Currently SKIP (0% market_cap_yi coverage on pool)
+- Will auto-run when pool records have §16 fields
+- Question: does reversal IC=-0.04 drop to ≈0 with full neutralization?
+
+**Path C** (Test 3 in `_selftest_reversal.cjs`): full-market pool reversal.
+- Currently SKIP (`data/frozen-eval-fullmarket.json` not yet built)
+- Will auto-run when full-market pool is available
+
+---
+
+### Deviation Table (current partial-neutralization state)
 
 | Requirement | Actual | Reason |
 |-------------|--------|--------|
-| Reversal neutralized IC `\|IC\| < 0.01` | `\|IC\| = 0.0407` | 72tp pool is pre-filtered to "lowpos" (stocks near price range lows). In this filtered universe, reversal signal = prior losers tend to *continue* losing (momentum continuation in distress), not mean-revert. Industry neutralization does not eliminate a genuine stock-level effect. |
-| 5-gate `verdict = fail` for reversal | ✓ `verdict = fail` | G1 IC_IR = 0.295 < 0.3; G2 Q5 spread negative; G3 net alpha < 0; G5 p = 0.995 > 0.05. Gate fails correctly. |
-| Framework neutralization is correct | ✓ Verified via Test 2 | Synthetic pure-industry signal R² = 0.98, residual mean = 0.000000, assertNeutralized passed. IC reduced from 0.026 to 0.013. |
-| A1 rework: replace rangePosition with true log(MC) → IC drops? | IC unchanged at -0.0407 | controls loaded (99.7% MC, 99.9% monthly). Per-timepoint R²≈0. log(MC)+log(Amihud)+industry+season explain zero variance of reversal signal. IC of -0.04 is genuine A-share momentum continuation, not a size/liquidity artifact. |
-| A3: full-market pool validates lowpos-specific effect | PENDING | `data/frozen-eval-fullmarket.json` not yet built. Pool B (2010plus 2998 stocks) also shows IC=-0.059 unchanged after neutralization, R²≈0. Consistent finding across both pools. |
-
-### Test 1: Reversal — with true log(MC) + log(Amihud) active
-
-Run on 2026-06-08 with `data/neutralize-controls.json` (2002/2009 totalShare, 2006/2009 monthly).
-
-**Pool A (72tp lowpos, 78 tps, ~188 stocks/tp)**
-
-```
-controlsUsed: ['log_mktcap', 'log_amihud', 'industry_L1', 'season']
-Per-timepoint R²: ≈ 0.0000
-
-IC mean:    -0.0407
-IC std:     0.1380
-IC_IR:      -0.295
-t-stat:     -2.60
-IC reduction (vs no neutralization): 0%
-Verdict:    fail ✓
-
-Gate1 FAIL — IC_IR=-0.295 < 0.3 threshold
-Gate2 FAIL — Q5-Q1 spread=-1.35%, monotone=1/4
-Gate3 FAIL — netAlpha=-1.51%, t=-1.32
-Gate4 PASS — walk-forward 3/3 windows consistent, BH-FDR pass
-Gate5 FAIL — one-sided p=0.9954, CI=[-0.07,-0.01]
-```
-
-**Pool B (2010plus, 166 tps, ~174 stocks/tp)**
-
-```
-controlsUsed (2021-06 sample): ['log_mktcap', 'log_amihud', 'industry_L1(14)', 'season']
-Per-timepoint R²: ≈ 0.0000
-
-Raw IC:         -0.0586, t=-5.12
-Neutralized IC: -0.0586, t=-5.12, IC_IR=-0.406
-IC reduction:   0%
-Verdict:        fail ✓
-```
-
-**Interpretation**: All four controls are confirmed active (`controlsUsed` verified). R²≈0 in every cross-section means size, liquidity, industry, and season explain zero variance of the reversal signal. The IC=-0.04/-0.06 is orthogonal to all style factors — genuine A-share momentum continuation (prior losers continue losing). This is consistent with academic literature showing strong momentum and weak reversal in China's equity market.
-
-The `|IC| < 0.01` spec criterion does not hold; this is a pool-specific finding, not a framework bug. The 5-gate correctly returns `verdict=fail`.
+| Reversal neutralized IC `\|IC\| < 0.01` | `\|IC\| = 0.0336` (partial) | neutralizationStatus='partial'; size/liquidity DATA_PENDING. Result is preliminary. |
+| 5-gate `verdict = fail` for reversal | ✓ `verdict = fail` | G1 IC_IR=-0.266 < 0.3; G2/G3/G5 fail. Gate fails correctly. |
+| Framework neutralization is correct | ✓ Verified via Path A | Synthetic size signal IC=0.58 → 0.012 after log(MC) neutralization (97.9% reduction). |
+| Full neutralization (§15/§16) result | DATA_PENDING | Path B auto-activates when records have market_cap_yi. |
 
 ### Test 2: Synthetic pure-industry signal (framework verification)
 
 ```
 Raw IC: mean=-0.0259, t=-1.93
-Neutralized IC: mean=-0.0185, t=-1.14 (28% reduction)
-Residual check (2019-09): mean≈0, std=0.006, R²=0.98
+Neutralized IC: mean=-0.0128, t=-0.87 (50% reduction)
+Residual check (2019-09): mean≈0, std=0.006, R²=0.980
 assertNeutralized: PASSED ✓
 5-gate verdict=fail ✓
 ```
 
-**Conclusion**: When the signal IS style-driven (pure industry mean), neutralization correctly absorbs it: R²=0.98, residuals zero-mean, IC drops 28%. This confirms the framework is mechanically correct. The zero reduction on reversal is a data property, not a code bug.
+**Conclusion**: When the signal IS industry-driven, neutralization absorbs it (R²=0.98, IC drops 50%).
+Framework is mechanically correct.
 
 ---
 
@@ -148,32 +160,35 @@ assertNeutralized: PASSED ✓
 ### `lib/eval/neutralize.cjs`
 
 ```javascript
-// Prerequisites: run once
-//   .venv/Scripts/python.exe scripts/fetch_neutralize_controls.py
-// Produces data/neutralize-controls.json (~20 min, baostock single-session)
-
 const { neutralizeCrossSection, neutralizePanel,
         getLogMarketCap, getLogAmihud, getL1Industry } = require('./neutralize.cjs');
 
 // Single cross-section
-const { residuals, r2, nDropped, controlsUsed } = neutralizeCrossSection(
-  records,               // array of records for ONE time-point
-  r => sueFn(r),         // signal function (return null for missing)
+const {
+  residuals,              // neutralized signal per record (same order)
+  r2,                     // R² of style regression (0 = signal is pure alpha)
+  nDropped,               // records with null signal
+  controlsUsed,           // e.g. ['log_mktcap', 'log_amihud', 'industry_L1(16)']
+  missingControls,        // e.g. ['size', 'liquidity'] when DATA_PENDING
+  neutralizationStatus,   // 'full' | 'partial'
+  beta,
+} = neutralizeCrossSection(
+  records,               // records for ONE time-point
+  r => sueFn(r),         // signal function
   {
     useIndustry: true,   // L1 industry dummies (default: true)
-    useMarketCap: true,  // log(closeAtCutoff × totalShare) from controls file (default: true)
-    useAmihud: true,     // log(Amihud) from controls file (default: true)
-    useSeason: true,     // Q2/Q3/Q4 dummies (default: true)
-    cutoffDate: 'YYYY-MM',  // REQUIRED for season + Amihud
+    useMarketCap: true,  // log(record.market_cap_yi) from §16 (default: true)
+    useAmihud: true,     // log(record.amihud) from §15 (default: true)
+    cutoffDate: 'YYYY-MM',
   }
 );
-// controlsUsed: string[] — e.g. ['log_mktcap', 'log_amihud', 'industry_L1(16)', 'season']
-// r2: per-timepoint R² (how much signal variance is style; 0 = signal is pure alpha)
-// If controls file absent: log_mktcap/log_amihud silently dropped (warning printed once)
+// DATA_PENDING: if record.market_cap_yi / record.amihud are null → silently dropped,
+//   one-time warning printed, neutralizationStatus='partial'
 
 // Full panel
-const { byDate, meanR2 } = neutralizePanel(allRecords, signalFn, options);
-// byDate: Map<cutoffDate, {residuals, r2, controlsUsed, nDropped}>
+const { byDate, meanR2, neutralizationStatus, controlsUsed } =
+  neutralizePanel(allRecords, signalFn, options);
+// neutralizationStatus: 'full' only if ALL cross-sections were full
 ```
 
 ### `lib/eval/validate-signal.cjs`
@@ -182,29 +197,21 @@ const { byDate, meanR2 } = neutralizePanel(allRecords, signalFn, options);
 const { validateSignal } = require('./validate-signal.cjs');
 
 const result = validateSignal(
-  allRecords,             // all records, multiple time-points
-  r => sueSignal(r),      // signal function (return null for missing)
+  allRecords,
+  r => sueSignal(r),
   {
-    neutralize: true,     // apply neutralization (default: true)
-    alphaKey: 'alpha',    // forward return field name
-    neutralizeOptions: {  // passed to neutralizeCrossSection
-      useIndustry: true,
-      useMarketCap: true,
-      useAmihud: true,
-      useSeason: true,
-    },
-    costOptions: {
-      commissionBps: 5,   // [NEEDS VERIFICATION]
-      stampDutyBps: 10,   // [NEEDS VERIFICATION]
-      spreadBps: 10,      // [NEEDS VERIFICATION]
-    },
+    neutralize: true,
+    alphaKey: 'alpha',
+    neutralizeOptions: { useIndustry: true, useMarketCap: true, useAmihud: true },
+    costOptions: { commissionBps: 5, stampDutyBps: 10, spreadBps: 10 }, // [NEEDS VERIFICATION]
   }
 );
 
 // result.verdict: 'pass' | 'fail'
-// result.gates: { gate1, gate2, gate3, gate4, gate5 } — each has .pass, .reason, .metrics
-// result.metrics: { icMean, icStd, icir, tStat, nTimepoints, icSeries }
-// result.sanityWarnings: string[] — empty if no suspicious values
+// result.gates: { gate1, gate2, gate3, gate4, gate5 }
+// result.metrics.neutralizationStatus: 'full'|'partial'|'none'
+// result.metrics.controlsUsed: string[]
+// WARN printed if neutralizationStatus='partial' — result is not final
 ```
 
 ### Usage pattern for KoC §3
@@ -238,14 +245,14 @@ for (const [gate, g] of Object.entries(result.gates)) {
 
 ## 5. Known Limitations
 
-1. **totalShare is a snapshot** (latest quarterly, not PIT per cutoff). Corporate-action stocks (splits, rights issues) have inaccurate historical market cap. Affects <5% of records. Acceptable for cross-sectional size neutralization.
+1. **market_cap_yi is DATA_PENDING** until §16 (PIT as-of join) completes. Until then, `neutralizationStatus='partial'` and IC results are preliminary.
 
-2. **Amihud unavailable for first timepoint per stock**: Monthly return=null for the first month in each stock's data range (no prior month to compute return). Those cross-sections drop log_amihud. Subsequent timepoints have Amihud active.
+2. **amihud is DATA_PENDING** until §15 (daily kline fetch + Amihud calc) completes. Until then, liquidity neutralization is skipped.
 
-3. **2010plus pool has 67% controls coverage** (2001/2998 stocks in controls, which covers the 72tp pool). For the remaining 33% of 2010plus stocks, log_mktcap is imputed with cross-section median. This is acceptable for neutralization but reduces precision.
+3. **Coverage threshold**: ≥30% non-null required to activate a control. Below threshold, cross-section median is NOT imputed — the control is dropped entirely. This avoids imputation bias when data is genuinely missing.
 
-4. **Cost model needs verification**: 30 bps round-trip is an estimate. Actual rates vary by broker and stock type.
+4. **Industry map is static** (2026-05-24 snapshot). Historical reclassifications not tracked.
 
-5. **Industry map is static** (2026-05-24 snapshot). Historical reclassifications not tracked.
+5. **Season dummies omitted**: Season is constant within a cross-section (all stocks share the same cutoffDate/quarter), making season dummies collinear with the intercept. Only meaningful in pooled panel regression.
 
-6. **Season dummies at quarter level**: Monthly seasonality (bank month-end) not captured.
+6. **Cost model needs verification**: 30 bps round-trip is an estimate. Actual rates vary by broker and stock type.

@@ -253,6 +253,26 @@ for (const [gate, g] of Object.entries(result.gates)) {
 
 4. **Industry map is static** (2026-05-24 snapshot). Historical reclassifications not tracked.
 
-5. **Season dummies omitted**: Season is constant within a cross-section (all stocks share the same cutoffDate/quarter), making season dummies collinear with the intercept. Only meaningful in pooled panel regression.
+5. **为何不显式加季节项：逐截面OLS隐式实现 industry×season 交互**
+
+   设计上要求控制行业季节效应（审稿人 Round 3 要求），但**不需要**也**不能**在回归里显式加季节哑变量，原因如下：
+
+   **为何不能加（奇异矩阵）**：每个截面的所有股票共享同一个 `cutoffDate`，即同一个季度。以 2022-Q2 截面为例：
+   ```
+   intercept = [1, 1, 1, ..., 1]
+   Q2_dummy  = [1, 1, 1, ..., 1]  ← 与截距完全相同，矩阵奇异
+   Q3_dummy  = [0, 0, 0, ..., 0]  ← 全零列，无贡献
+   ```
+   任何非 Q1 截面加入对应季度哑变量都会导致 XᵀX 奇异，OLS 无解。
+
+   **为何不需要加（已被架构隐式满足）**：审稿人要求的"行业系数随季节变化"等价于 `industry × season` 交互项。逐截面 OLS 对每个 `cutoffDate` 独立回归，每期各自估出该季度的行业斜率 β_industry：
+   - 2022-Q1 截面 → 估出 Q1 的所有行业系数
+   - 2022-Q2 截面 → 估出 Q2 的所有行业系数（与 Q1 完全独立，无共享假设）
+   - 依此类推
+
+   这等价于面板回归里的 `industry × time` 完全交互，比单纯 `industry × season`（4个季度）更细粒度（按月）。审稿人的担忧已被每期独立回归的架构隐式覆盖。
+
+   **对审稿人的答复**（备用）：
+   > "We adopt per-period cross-sectional OLS, which implicitly estimates period-specific industry loadings equivalent to a full industry×time interaction. Explicit season dummies are not added because they are constant within each cross-section and perfectly collinear with the intercept."
 
 6. **Cost model needs verification**: 30 bps round-trip is an estimate. Actual rates vary by broker and stock type.

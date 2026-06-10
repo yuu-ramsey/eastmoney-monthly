@@ -1,0 +1,19 @@
+# 依赖安全更新：npm（插件/CLI）、GitHub Actions、pip（LSTM 研究环境）
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: pip
+    directory: "/lib/lstm"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3

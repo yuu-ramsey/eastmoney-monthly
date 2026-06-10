@@ -23,7 +23,7 @@
 
 1. **token 从未进过 git 历史**：对 token 原值全历史 `git grep`（111 commits）零命中
 2. **HEAD 与全历史无密钥模式**：`sk-ant-` / `sk-<hex32>` / `set_token(<hex>)` / `Bearer` / `AKIA` / `ghp_` 仅命中 `.env.example` 的占位符 `sk-ant-your-key-here`
-3. **无个人信息泄漏**：跟踪文件中无 `C:\Users\18726`、无邮箱、无真实姓名；README 仅含仓库自身 URL
+3. **无个人信息泄漏**：跟踪文件中无本机用户目录路径、无邮箱、无真实姓名；README 仅含仓库自身 URL
 4. `.npmrc` 仅 `ignore-scripts=true`；`native-host/manifest/eastmoney-ai-sync.json` 全部是 PLACEHOLDER
 5. `.claude/` 无文件被跟踪，`settings.local.json` 已 ignore
 6. `.aris/` 仅 2 个 research-review trace 文件，密钥模式扫描零命中

@@ -19,9 +19,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      # .npmrc 的 ignore-scripts=true 会跳过 better-sqlite3 的预编译二进制下载，
-      # 显式 rebuild 这一个经过审计的包（其余依赖仍不执行任何安装脚本）
-      - run: npm rebuild better-sqlite3
+      # 标准测试套件不依赖任何原生模块（test/import-guard.test.js 锁定该不变量），
+      # 因此 .npmrc 的 ignore-scripts=true 下无需构建 better-sqlite3
       - run: node --test test/*.test.js test/agents/*.test.js
 
   python-syntax:

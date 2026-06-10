@@ -24,6 +24,19 @@ train 6 时点/test 6 时点，bootstrap 10k）。**全样本 0/7 通过；分 r
 | rsi | 月线 RSI 30/70 | 无信号产出 | insufficient_data（月线极少触发） | 排除：无收益序列可言 |
 | bollinger | 月线布林触轨 | 无信号产出 | insufficient_data（月线带宽过宽） | 排除：同上 |
 
+## 1b. 周频 regime 策略族（独立注册表，勿与 §1 混算）
+
+来源：`lib/decision-tree.cjs`（P4 Decision Tree v2，CSI300 regime，**周频**，2026-06-07 验证：
+跨频率 + p 值审计 + hold-out 回测）。与 §1 的月频 24tp 注册表是**不同频率、不同样本**的两套结果
+——同名信号（如 reversal）在两套中状态可以不同且不矛盾，论文中必须分开陈述。
+
+| Claim | spread | decay | wf | 终态 | WY 收益序列来源 |
+|-------|--------|-------|-----|------|----------------|
+| reversal\|bear（周频） | +9.2 | +1.05 | 0.57 | HIGH | 周收益聚合到月度网格后纳入 ✓ |
+| momentumF\|bear（周频） | +8.8 | +0.64 | 0.71 | HIGH | 同上 ✓ |
+| momentumF\|sideways（周频） | +7.1 | +1.02 | 0.54 | MEDIUM（5/5 gate） | 同上 ✓ |
+| reversal\|bull / momentumF\|bull | +13.7 / +14.2 | — | 0.50 | CANDIDATE（hold-out 失败，2023 系统性为负） | 纳入（失败 claim 也占族预算） |
+
 ## 2. ML 预测器族
 
 | 信号 | 实验规模 | 终态 | WY 映射 |
@@ -31,7 +44,7 @@ train 6 时点/test 6 时点，bootstrap 10k）。**全样本 0/7 通过；分 r
 | LSTM（月频 61d/31d 特征，6 条改进路径） | 7 配置 GPU sweep + v4 roadmap | 全部关闭（见 `docs/lstm_path_final_postmortem.md`） | 排除：预测器内部变体，无统一可交易组合序列；以决策树披露 |
 | GRU-WF (bear, daily) | Level-2 边界 | pending_validation，未达 verified | 排除（未形成 claim） |
 | LGB (bear/bull, daily) | bull −42.2% / bear +20.6% | train/test 系统性翻号，未 verified | 排除（同上） |
-| quant_32d（32 维树模型 ensemble） | 月频 CS_IC +0.177 | pending_validation | 可映射：月度多空收益序列存在于监测 jsonl，纳入 WY ✓ |
+| quant_32d（32 维树模型 ensemble） | 月频 CS_IC +0.177 | pending_validation | **可映射性待确认**：监测序列若可完整重建则纳入；否则降级为披露。该决定必须在跑 WY 之前以追加方式落档本文件 |
 | Kronos（K 线 transformer） | 24tp spread +9.7% CI[+5.1,+15.3] | verified (all, monthly) | 可映射 ✓ |
 
 ## 3. LLM 信号族
@@ -62,7 +75,7 @@ train 6 时点/test 6 时点，bootstrap 10k）。**全样本 0/7 通过；分 r
 
 ## 6. family 统计
 
-- 进入 WY 检验的收益序列：价量 5（rsi/bollinger 无信号排除）+ quant_32d + kronos + SUE 主 + 分母变体 2 = **约 10 条**
+- 进入 WY 检验的收益序列：月频价量 5（rsi/bollinger 无信号排除）+ 周频 regime 策略 5（§1b，含 2 个 CANDIDATE 失败 claim）+ kronos + SUE 主 + 分母变体 2 = **约 14 条**（quant_32d 待定，见 §2）
 - 以决策树披露但不可映射的尝试：LSTM 全路径、GRU、LGB、LLM 族（llm_strong/debate/sentiment 等）、money_flow —— 全部在 §2-§4 列明，**无任何已检验信号被隐藏**
 - 排除理由只有两类：(a) 该实验未产出可交易组合的时间序列（预测器内部变体/稀疏时点实验）；(b) 信号从未触发（insufficient_data）
 

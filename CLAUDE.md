@@ -10,14 +10,22 @@ analyzing stock trends via LLM API. Local personal use only, not published to Ch
 **Repo primary language is English** (comments, logs, docs, commit messages, README) **BUT
 functional strings MUST stay Chinese**:
 
+**Layer 1 — analysis content (MUST stay Chinese):**
 - LLM prompt templates and constraint text (`lib/build-prompt.js`, `lib/prompt-templates.js`,
   agent prompts) — tuned for Chinese financial corpora; Chan Theory terms have no standard
-  English translation
+  English translation. Optional English REPORT output goes through `outputLang='en'`
+  (appended instruction block), never by translating the templates themselves.
 - LLM output parsers' keywords and fallback labels (`lib/self-backtest.js`,
-  `lib/parse-structured-output.js`)
-- User-facing strings: error messages shown in popup, history markdown export headers,
-  capacity-trim reasons
+  `lib/parse-structured-output.js`), history markdown export headers, capacity-trim reasons
+- LLM provider error messages in `lib/llm/*.js` (currently Chinese, test-asserted contract)
 - Test fixtures and assertions that encode the above contracts
+
+**Layer 2 — UI chrome and system strings (English, current state):**
+- Extension panel chrome in `content.js` (buttons, status lines), popup labels,
+  `background.js` ERR constants, viewer UI. These are English by design (repo primary
+  language; international users). Known mixed point: panel can show Layer-1 Chinese LLM
+  errors next to Layer-2 English system errors — acceptable; unify only as a deliberate
+  change WITH its tests, never via blanket conversion.
 
 **Incident record**: commits `6665380`/`050d012` ("remove remaining Chinese") blanket-converted
 functional strings AND test fixture inputs → 64/252 tests failed, extension produced English

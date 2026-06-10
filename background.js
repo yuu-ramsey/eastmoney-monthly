@@ -171,7 +171,8 @@ async function handleAnalyze(pageUrl, opts = {}) {
 
   const latestDate = klines[klines.length - 1].date;
   const bucket = timeBucket(latestDate, period);
-  const key = cacheKey(market, code, period, bucket, style, mode, decision, outputLang);
+  // 辩论模式不支持 outputLang（agents 提示词保持中文），key 不加语言维度，避免同内容占两个缓存槽
+  const key = cacheKey(market, code, period, bucket, style, mode, decision, mode === 'single' ? outputLang : 'zh');
 
   // cache hit
   if (!force) {

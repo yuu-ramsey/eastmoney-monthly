@@ -26,8 +26,11 @@ N0 (2026-04) LLM 能不能做量化？—— 插件起点，LLM-as-predictor 假
  │   ├─ 门：CS_IC 超越树模型 baseline (+0.177) → 全部未达
  │   └─ 证据：docs/lstm_path_final_postmortem.md, CLAUDE.md 路径登记
  │
- ├─ N4 (2026-06-05~07) P4 注册表终态
- │   ├─ 13 信号源 30+ 实验 → 4 verified（kronos|all、momentum|bear、macd|bear、+1）
+ ├─ N4 (2026-06-05~07) P4 注册表终态（两套注册表，频率不同，分开陈述）
+ │   ├─ 月频 24tp 注册表（data/expert-registry.json）：momentum|bear、macd|bear verified；
+ │   │   kronos|all verified（独立 24tp 评测，+9.7% CI[+5.1,+15.3]）
+ │   ├─ 周频 decision-tree v2（lib/decision-tree.cjs，2026-06-07 验证）：reversal|bear、
+ │   │   momentumF|bear（HIGH）、momentumF|sideways（MEDIUM 5/5 gate）；bull 双信号 CANDIDATE（hold-out 失败）
  │   ├─ 结构裁定：LLM 移出信号链 → 仅解释层（regime-MoE 架构定型）
  │   └─ 证据：docs/p4-registry-assessment.md, docs/p4-expert-registry.md, lib/decision-tree.cjs
  │

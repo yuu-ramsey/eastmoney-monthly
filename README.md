@@ -8,7 +8,7 @@
 
 > ⚠️ **This is a personal research project, not a commercial product.**
 > Updates and bug fixes happen on my own schedule — there are no guarantees of timely patches, backward compatibility, or continued development.
-> **Use entirely at your own risk.**
+> **Use entirely at your own risk.** Not investment advice — see [DISCLAIMER.md](DISCLAIMER.md) (中文/English).
 
 ---
 

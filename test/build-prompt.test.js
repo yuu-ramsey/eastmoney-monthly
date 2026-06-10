@@ -330,3 +330,16 @@ test('buildPrompt: PERSONAL_DECISION_BLOCK 包含入场策略 5 选项', () => {
   assert.match(out, /等回调统一建仓/);
   assert.match(out, /不建仓/);
 });
+
+// ---- 输出语言开关（2026-06-10 新增：报告语言可切英文，分析约束与 JSON 契约不变）----
+
+test('buildPrompt: outputLang=en 追加英文输出指令', () => {
+  const out = buildPrompt({ name: '贵州茅台', code: '600519', klines: sampleKlines, outputLang: 'en' });
+  assert.match(out, /Write the final report in English/);
+  assert.match(out, /结构化 JSON 块不受本条影响/);
+});
+
+test('buildPrompt: 默认（中文）不含英文输出指令', () => {
+  const out = buildPrompt({ name: '贵州茅台', code: '600519', klines: sampleKlines });
+  assert.ok(!out.includes('Write the final report in English'));
+});

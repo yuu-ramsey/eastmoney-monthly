@@ -309,7 +309,7 @@ function updateMultiHint() {
 async function loadSettings() {
   const allItems = await chrome.storage.local.get([
     'provider', 'klineLimit', 'analysisStyle', 'period', 'debateMode', 'decisionMode',
-    'analysisDepth', 'template', 'enableSelfBacktest', 'enableThinking', 'enableDebugLog',
+    'analysisDepth', 'template', 'outputLang', 'enableSelfBacktest', 'enableThinking', 'enableDebugLog',
     'usagePreset',
     'apiKey:anthropic', 'apiKey:deepseek',
     'model:anthropic', 'model:deepseek',
@@ -333,6 +333,7 @@ async function loadSettings() {
   $('klineLimit').placeholder = String(DEFAULT_LIMIT);
   $('template').value = allItems.template || 'technical';
   $('analysisStyle').value = allItems.analysisStyle || 'technical';
+  $('outputLang').value = allItems.outputLang === 'en' ? 'en' : 'zh';
   $('period').value = allItems.period || 'monthly';
   $('debateMode').checked = allItems.debateMode || false;
   $('decisionMode').checked = allItems.decisionMode || false;
@@ -373,6 +374,7 @@ async function saveSettings() {
   updates['model:' + providerId] = model || def.defaultModel;
   updates.template = template || 'technical';
   updates.analysisStyle = analysisStyle || 'technical';
+  updates.outputLang = $('outputLang').value === 'en' ? 'en' : 'zh';
   updates.period = period || 'monthly';
   updates.analysisDepth = analysisDepth;
   updates.debateMode = !!$('debateMode').checked;

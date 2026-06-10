@@ -136,6 +136,7 @@ async function handleAnalyze(pageUrl, opts = {}) {
   const decisionMode = !!settings.decisionMode;
   const mode = debateMode ? 'debate' : 'single';
   const decision = decisionMode ? 'on' : 'off';
+  const outputLang = settings.outputLang === 'en' ? 'en' : 'zh'; // 仅单股分析路径生效；多周期/辩论暂保持中文
 
   const PERIOD_LABELS = { monthly: 'Monthly', weekly: 'Weekly', daily: 'Daily', multi: 'Multi-Period' };
   const periodLabel = PERIOD_LABELS[period] || 'Monthly';
@@ -170,7 +171,7 @@ async function handleAnalyze(pageUrl, opts = {}) {
 
   const latestDate = klines[klines.length - 1].date;
   const bucket = timeBucket(latestDate, period);
-  const key = cacheKey(market, code, period, bucket, style, mode, decision);
+  const key = cacheKey(market, code, period, bucket, style, mode, decision, outputLang);
 
   // cache hit
   if (!force) {
@@ -378,7 +379,7 @@ async function handleAnalyze(pageUrl, opts = {}) {
       }
     }
 
-    prompt = await buildPromptByTemplate({ templateKey: settings.template, name: eastmoney.name, code, market, klines: klinesWithMA, period, provider: settings.provider, extraContext, decisionMode, indexData: hs300IndexData, sectorAlphaData, lstmSignalData, kronosSignalData });
+    prompt = await buildPromptByTemplate({ templateKey: settings.template, name: eastmoney.name, code, market, klines: klinesWithMA, period, provider: settings.provider, extraContext, decisionMode, indexData: hs300IndexData, sectorAlphaData, lstmSignalData, kronosSignalData, outputLang });
     console.log(`[analyze] ${settings.provider}/${model} prompt length:${prompt.length}`);
 
     // enable tool_use only for Anthropic provider
@@ -572,8 +573,10 @@ async function handleFollowUp(msg) {
 
 // ---- cache key ----
 
-function cacheKey(market, code, period, bucket, style, mode = 'single', decision = 'off') {
-  return `analysis:${market}.${code}:${period}:${bucket}:${style}:${mode}:${decision}`;
+function cacheKey(market, code, period, bucket, style, mode = 'single', decision = 'off', lang = 'zh') {
+  // lang='zh'（默认）不加后缀——保持与历史 key 兼容，已有缓存不失效；仅 'en' 加 ':en' 维度
+  const langSuffix = lang === 'en' ? ':en' : '';
+  return `analysis:${market}.${code}:${period}:${bucket}:${style}:${mode}:${decision}${langSuffix}`;
 }
 
 // ---- time bucket ----
@@ -840,7 +843,7 @@ async function loadSettings() {
 
   const allItems = await chrome.storage.local.get([
     'provider', 'klineLimit', 'analysisStyle', 'period', 'debateMode', 'decisionMode',
-    'analysisDepth', 'template',
+    'analysisDepth', 'template', 'outputLang',
     'apiKey:anthropic', 'apiKey:deepseek',
     'model:anthropic', 'model:deepseek',
     'enableSelfBacktest', 'enableThinking', 'enableDebugLog',
@@ -868,6 +871,7 @@ async function loadSettings() {
     period: allItems.period || 'monthly',
     debateMode: allItems.debateMode || false,
     decisionMode: allItems.decisionMode || false,
+    outputLang: allItems.outputLang === 'en' ? 'en' : 'zh',
     enableSelfBacktest: allItems.enableSelfBacktest !== undefined ? !!allItems.enableSelfBacktest : true,
     enableThinking: !!allItems.enableThinking,
     enableDebugLog: !!allItems.enableDebugLog,

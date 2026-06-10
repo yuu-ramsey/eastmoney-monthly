@@ -7,8 +7,8 @@ const sampleKlines = [
   { date: '2024-02-29', open: 2, close: 2.5, high: 3.5, low: 1.5, volume: 200, changePercent: 25, ma5: 2.25, ma20: null, ma60: null, dif: -0.5, dea: null, hist: null, turnoverRate: 2.5 },
 ];
 
-test('buildPrompt: includes stock name, code, date, headers, end requirements', () => {
-  const out = buildPrompt({ name: 'Kweichow Moutai', code: '600519', klines: sampleKlines });
+test('buildPrompt: 包含股票名、代码、日期、表头、收尾要求', () => {
+  const out = buildPrompt({ name: '贵州茅台', code: '600519', klines: sampleKlines });
   assert.match(out, /贵州茅台/);
   assert.match(out, /600519/);
   assert.match(out, /2024-01-31/);
@@ -24,45 +24,45 @@ test('buildPrompt: includes stock name, code, date, headers, end requirements', 
   assert.match(out, /综合结论/);
 });
 
-test('buildPrompt: throws on empty klines', () => {
+test('buildPrompt: 空 klines 抛错', () => {
   assert.throws(() => buildPrompt({ name: 'X', code: '000001', klines: [] }));
   assert.throws(() => buildPrompt({ name: 'X', code: '000001', klines: null }));
 });
 
-test('buildPrompt: null MA is displayed as -', () => {
+test('buildPrompt: MA 为 null 显示为 -', () => {
   const out = buildPrompt({ name: 'X', code: '000001', klines: [sampleKlines[0]] });
   const dataLine = out.split('\n').find((l) => l.startsWith('2024-01-31'));
   assert.ok(dataLine);
   const dashCount = (dataLine.match(/\t-/g) || []).length;
-  assert.ok(dashCount >= 3, `expected at least 3 dashes, got ${dashCount}; line content: ${dataLine}`);
+  assert.ok(dashCount >= 3, `期望至少 3 个 - ,实际 ${dashCount} 个;行内容:${dataLine}`);
 });
 
-test('buildPrompt: numeric values keep 2 decimal places', () => {
+test('buildPrompt: 数字保留 2 位小数', () => {
   const out = buildPrompt({ name: 'X', code: '000001', klines: [sampleKlines[0]] });
   assert.match(out, /1\.00/);
   assert.match(out, /2\.00/);
 });
 
-test('buildPrompt: turnover rate appears in data row', () => {
+test('buildPrompt: 换手率出现在数据行', () => {
   const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines });
   assert.match(out, /1\.20/);
   assert.match(out, /2\.50/);
 });
 
-// ---- Analysis style ----
+// ---- 分析风格 ----
 
-test('buildPrompt: default style is technical', () => {
+test('buildPrompt: 默认风格为 technical', () => {
   const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines });
   assert.match(out, /均线系统状态/);
 });
 
-test('buildPrompt: 4 styles produce distinct analysis task paragraphs', () => {
+test('buildPrompt: 4 种 style 输出不同的分析任务段落', () => {
   const technical = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style: 'technical' });
   const chanlun = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style: 'chanlun' });
   const value = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style: 'value' });
   const comprehensive = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style: 'comprehensive' });
 
-  // "Analysis task" paragraphs of the 4 outputs should differ from each other
+  // 4 种输出的"分析任务"段落彼此不同
   assert.notEqual(technical, chanlun);
   assert.notEqual(technical, value);
   assert.notEqual(technical, comprehensive);
@@ -71,7 +71,7 @@ test('buildPrompt: 4 styles produce distinct analysis task paragraphs', () => {
   assert.notEqual(value, comprehensive);
 });
 
-test('buildPrompt: chanlun style contains Chan Theory keywords, prohibits non-Chan terminology', () => {
+test('buildPrompt: chanlun 风格包含缠论体系关键词,禁止非缠论术语', () => {
   const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style: 'chanlun' });
   assert.match(out, /中枢/);
   assert.match(out, /背驰/);
@@ -80,27 +80,27 @@ test('buildPrompt: chanlun style contains Chan Theory keywords, prohibits non-Ch
   assert.match(out, /ZD/);
   assert.match(out, /暂无.*买卖点|暂无.*类买卖点/);
   assert.match(out, /MACD.*红.*绿.*柱.*面积/i);
-  // Prohibit non-Chan terminology -- but the prohibition text itself mentions these terms, strip it before checking
+  // 禁止非缠论术语——但 prompt 禁止声明本身会提及这些术语名，扣除后再检查
   const afterHeader = out.replace(/禁止使用.*?术语[。.]?\n*/gs, '');
-  assert.ok(!/金叉/.test(afterHeader), 'chanlun style should not contain "金叉" in analysis task');
-  assert.ok(!/死叉/.test(afterHeader), 'chanlun style should not contain "死叉" in analysis task');
-  assert.ok(!/超买/.test(afterHeader), 'chanlun style should not contain "超买" in analysis task');
-  assert.ok(!/超卖/.test(afterHeader), 'chanlun style should not contain "超卖" in analysis task');
-  // Should not have "操作建议"
-  assert.ok(!/操作建议/.test(out), 'chanlun style should not contain "操作建议"');
+  assert.ok(!/金叉/.test(afterHeader), 'chanlun 风格分析任务中不应出现"金叉"');
+  assert.ok(!/死叉/.test(afterHeader), 'chanlun 风格分析任务中不应出现"死叉"');
+  assert.ok(!/超买/.test(afterHeader), 'chanlun 风格分析任务中不应出现"超买"');
+  assert.ok(!/超卖/.test(afterHeader), 'chanlun 风格分析任务中不应出现"超卖"');
+  // 不应有"操作建议"
+  assert.ok(!/操作建议/.test(out), 'chanlun 风格不应有"操作建议"');
 });
 
-test('buildPrompt: chanlun strictness constraints include 3%/3-segment overlap/honest labeling', () => {
+test('buildPrompt: chanlun 风格严格性约束包含 3%/3 段重叠/诚实标注', () => {
   const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style: 'chanlun' });
 
   assert.match(out, /二次探底.*同一笔|二次探底.*次级别波动/);
-  assert.match(out, /3%.*以上/, 'should include 3rd buy 3%+ constraint');
-  assert.match(out, /3 段.*重叠/, 'should include 3-segment overlap constraint');
+  assert.match(out, /3%.*以上/, '应包含三买 3% 以上约束');
+  assert.match(out, /3 段.*重叠/, '应包含 3 段重叠约束');
   assert.match(out, /诚实标注不确定性/);
   assert.match(out, /无法严格判定.*粗略推测/);
 });
 
-test('buildPrompt: chanlun + any provider produces same output', () => {
+test('buildPrompt: chanlun + 任意 provider 输出一致', () => {
   const outDefault = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style: 'chanlun' });
   const outAnthropic = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style: 'chanlun', provider: 'anthropic' });
   const outDeepseek = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style: 'chanlun', provider: 'deepseek' });
@@ -108,7 +108,7 @@ test('buildPrompt: chanlun + any provider produces same output', () => {
   assert.equal(outDefault, outDeepseek);
 });
 
-test('buildPrompt: value style includes negative prompts (not/single unit), period-adaptive', () => {
+test('buildPrompt: value 风格包含否定提示(不要/单月),适配周期', () => {
   const outMonthly = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style: 'value', period: 'monthly' });
   assert.match(outMonthly, /不要.*单月/);
   assert.match(outMonthly, /单月涨跌幅/);
@@ -122,32 +122,32 @@ test('buildPrompt: value style includes negative prompts (not/single unit), peri
   assert.match(outWeekly, /单周涨跌幅/);
 });
 
-test('buildPrompt: comprehensive style includes both technical and valuation perspectives', () => {
+test('buildPrompt: comprehensive 风格包含技术和估值两个视角', () => {
   const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style: 'comprehensive' });
   assert.match(out, /技术面/);
   assert.match(out, /估值/);
 });
 
-test('buildPrompt: unknown style falls back to technical', () => {
+test('buildPrompt: 未知 style 回退到 technical', () => {
   const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style: 'unknown' });
   assert.match(out, /均线系统状态/);
 });
 
 // ---- extraContext ----
 
-test('buildPrompt: extraContext undefined is backward-compatible', () => {
+test('buildPrompt: extraContext 为 undefined 时向后兼容', () => {
   const without = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines });
   const withEmpty = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, extraContext: {} });
   assert.equal(without, withEmpty);
 });
 
-test('buildPrompt: extraContext.events empty does not output additional section', () => {
+test('buildPrompt: extraContext.events 为空时不输出附加段落', () => {
   const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, extraContext: { events: [] } });
-  assert.ok(!/附加上下文/.test(out), 'should not include extra context heading');
-  assert.ok(!/大事提醒/.test(out), 'should not include events section');
+  assert.ok(!/附加上下文/.test(out), '不应出现附加上下文标题');
+  assert.ok(!/大事提醒/.test(out), '不应出现大事提醒');
 });
 
-test('buildPrompt: extraContext.events with data is formatted correctly', () => {
+test('buildPrompt: extraContext.events 有数据时正确格式化', () => {
   const events = [
     { date: '04-30', type: '研报', title: '测试研报标题' },
     { date: '04-29', type: '公告', title: '测试公告标题' },
@@ -161,9 +161,9 @@ test('buildPrompt: extraContext.events with data is formatted correctly', () => 
   assert.match(out, /最近 2 条/);
 });
 
-// ---- Multi-period ----
+// ---- 多周期 ----
 
-test('buildPrompt: three period headers correctly switch wording', () => {
+test('buildPrompt: 三种 period 表头措辞正确切换', () => {
   const monthly = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, period: 'monthly' });
   assert.match(monthly, /个月的月线数据/);
 
@@ -174,7 +174,7 @@ test('buildPrompt: three period headers correctly switch wording', () => {
   assert.match(daily, /日的日线数据/);
 });
 
-test('buildPrompt: chanlun central zone level correctly switches for three periods', () => {
+test('buildPrompt: chanlun 三种周期的中枢级别正确切换', () => {
   const monthly = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style: 'chanlun', period: 'monthly' });
   assert.match(monthly, /月线.*K 线图/);
   assert.match(monthly, /月线级别中枢/);
@@ -188,7 +188,7 @@ test('buildPrompt: chanlun central zone level correctly switches for three perio
   assert.match(daily, /日线级别中枢/);
 });
 
-test('buildPrompt: comprehensive volatility terms correctly switch for three periods', () => {
+test('buildPrompt: comprehensive 三种周期的波动词汇正确切换', () => {
   const monthly = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style: 'comprehensive', period: 'monthly' });
   assert.match(monthly, /单月波动/);
 
@@ -196,29 +196,29 @@ test('buildPrompt: comprehensive volatility terms correctly switch for three per
   assert.match(daily, /单日波动/);
 });
 
-test('buildPrompt: all styles and periods have no leftover {PERIOD} or {UNIT} placeholders', () => {
+test('buildPrompt: 各风格各周期均不残留 {PERIOD} 或 {UNIT} 占位符', () => {
   const styles = ['technical', 'chanlun', 'value', 'comprehensive'];
   const periods = ['monthly', 'weekly', 'daily'];
   for (const style of styles) {
     for (const period of periods) {
       const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style, period });
-      assert.ok(!/\{PERIOD\}/.test(out), `${style}/${period} should not have leftover {PERIOD}`);
-      assert.ok(!/\{UNIT\}/.test(out), `${style}/${period} should not have leftover {UNIT}`);
+      assert.ok(!/\{PERIOD\}/.test(out), `${style}/${period} 不应残留 {PERIOD}`);
+      assert.ok(!/\{UNIT\}/.test(out), `${style}/${period} 不应残留 {UNIT}`);
     }
   }
 });
 
-// ---- Comprehensive conclusion + disclaimer ----
+// ---- 综合结论 + 风险声明 ----
 
-test('buildPrompt: all 4 styles include comprehensive conclusion section', () => {
+test('buildPrompt: 4 种风格均包含综合结论小节', () => {
   const styles = ['technical', 'chanlun', 'value', 'comprehensive'];
   for (const style of styles) {
     const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style });
-    assert.match(out, /综合结论/, `${style} should include "综合结论"`);
+    assert.match(out, /综合结论/, `${style} 应包含"综合结论"`);
   }
 });
 
-test('buildPrompt: all 4 styles include risk disclaimer', () => {
+test('buildPrompt: 4 种风格均包含风险声明', () => {
   const styles = ['technical', 'chanlun', 'value', 'comprehensive'];
   for (const style of styles) {
     const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style });
@@ -227,34 +227,34 @@ test('buildPrompt: all 4 styles include risk disclaimer', () => {
   }
 });
 
-test('buildPrompt: all 4 styles prohibit direct buy/sell advice', () => {
+test('buildPrompt: 4 种风格均禁止直接给买入/卖出建议', () => {
   const styles = ['technical', 'chanlun', 'value', 'comprehensive'];
   for (const style of styles) {
     const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style });
     assert.ok(
       /不要.*建议买入.*卖出/.test(out),
-      `${style} should contain "do not give buy/sell advice" directive`,
+      `${style} 应包含"不要给建议买入/卖出"类指令`,
     );
   }
 });
 
-// ---- Output weight requirements ----
+// ---- 输出权重要求 ----
 
-test('buildPrompt: all 4 styles include output weight requirements paragraph', () => {
+test('buildPrompt: 4 种风格均包含输出权重要求段落', () => {
   const styles = ['technical', 'chanlun', 'value', 'comprehensive'];
   for (const style of styles) {
     const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style });
-    assert.match(out, /输出权重要求/, `${style} should include "输出权重要求"`);
-    assert.match(out, /当前位置.*下一步关键观察点/, `${style} should include current position + next observation points`);
-    assert.match(out, /综合结论.*小节.*放在报告末尾/, `${style} should include conclusion position requirement`);
-    assert.match(out, /小节开头.*点明/, `${style} should include conclusion-first requirement`);
-    assert.match(out, /严格禁止.*为了凑数/, `${style} should include anti-padding requirement`);
+    assert.match(out, /输出权重要求/, `${style} 应包含"输出权重要求"`);
+    assert.match(out, /当前位置.*下一步关键观察点/, `${style} 应包含当前位置+下一步指引`);
+    assert.match(out, /综合结论.*小节.*放在报告末尾/, `${style} 应包含综合结论位置要求`);
+    assert.match(out, /小节开头.*点明/, `${style} 应包含结论先行要求`);
+    assert.match(out, /严格禁止.*为了凑数/, `${style} 应包含禁止凑数要求`);
   }
 });
 
 // ---- decisionMode ----
 
-test('buildPrompt: decisionMode=true includes personal decision perspective', () => {
+test('buildPrompt: decisionMode=true 时包含个人决策视角', () => {
   const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, decisionMode: true });
   assert.match(out, /个人决策视角/);
   assert.match(out, /关键止损位/);
@@ -263,23 +263,23 @@ test('buildPrompt: decisionMode=true includes personal decision perspective', ()
   assert.match(out, /仅供持有者本人/);
 });
 
-test('buildPrompt: decisionMode=false (default) excludes decision section', () => {
+test('buildPrompt: decisionMode=false（默认）时不包含决策段', () => {
   const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines });
   assert.ok(!/个人决策视角/.test(out));
   assert.ok(!/关键止损位/.test(out));
   assert.ok(!/持有时间预期/.test(out));
 });
 
-test('buildPrompt: decisionMode + all styles assemble correctly', () => {
+test('buildPrompt: decisionMode + 各风格均正常拼装', () => {
   const styles = ['technical', 'chanlun', 'value', 'comprehensive'];
   for (const style of styles) {
     const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, style, decisionMode: true });
     assert.match(out, /个人决策视角/);
-    assert.match(out, /不构成投资建议/); // DISCLAIMER also present
+    assert.match(out, /不构成投资建议/); // DISCLAIMER 也在
   }
 });
 
-test('buildPrompt: PERSONAL_DECISION_BLOCK differentiates holding period by cycle', () => {
+test('buildPrompt: PERSONAL_DECISION_BLOCK 按周期区分持有时间约束', () => {
   const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, decisionMode: true });
   assert.match(out, /严格匹配当前分析周期/);
   assert.match(out, /月线分析.*3-6 个月.*6-12 个月.*1 年以上/);
@@ -288,21 +288,21 @@ test('buildPrompt: PERSONAL_DECISION_BLOCK differentiates holding period by cycl
   assert.match(out, /多周期共振分析.*3-6 个月.*6-12 个月/);
 });
 
-// ---- Price precision + valuation allocation ----
+// ---- 价位精确化 + 估值仓位 ----
 
-test('buildPrompt: PERSONAL_DECISION_BLOCK requires price levels to 2 decimal places', () => {
+test('buildPrompt: PERSONAL_DECISION_BLOCK 要求价位精确到 2 位小数', () => {
   const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, decisionMode: true });
   assert.match(out, /精确到 2 位小数/);
   assert.match(out, /不允许给区间/);
 });
 
-test('buildPrompt: PERSONAL_DECISION_BLOCK prohibits academic model application', () => {
+test('buildPrompt: PERSONAL_DECISION_BLOCK 禁止套用学术模型', () => {
   const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, decisionMode: true });
   assert.match(out, /严禁套用 CAPM、DDM/);
   assert.match(out, /严禁套用凯利公式/);
 });
 
-test('buildPrompt: PERSONAL_DECISION_BLOCK includes valuation dimension', () => {
+test('buildPrompt: PERSONAL_DECISION_BLOCK 包含估值维度', () => {
   const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, decisionMode: true });
   assert.match(out, /相对估值判断/);
   assert.match(out, /明显低估/);
@@ -310,7 +310,7 @@ test('buildPrompt: PERSONAL_DECISION_BLOCK includes valuation dimension', () => 
   assert.match(out, /基本面信息不足无法判断/);
 });
 
-test('buildPrompt: PERSONAL_DECISION_BLOCK includes suggested allocation 6 options', () => {
+test('buildPrompt: PERSONAL_DECISION_BLOCK 包含建议仓位 6 选项', () => {
   const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, decisionMode: true });
   assert.match(out, /建议仓位/);
   assert.match(out, /空仓观望/);
@@ -321,7 +321,7 @@ test('buildPrompt: PERSONAL_DECISION_BLOCK includes suggested allocation 6 optio
   assert.match(out, /满仓 75-100%/);
 });
 
-test('buildPrompt: PERSONAL_DECISION_BLOCK includes entry strategy 5 options', () => {
+test('buildPrompt: PERSONAL_DECISION_BLOCK 包含入场策略 5 选项', () => {
   const out = buildPrompt({ name: 'X', code: '000001', klines: sampleKlines, decisionMode: true });
   assert.match(out, /入场策略/);
   assert.match(out, /一次性入场/);

@@ -11,9 +11,9 @@ import {
   checkCapacity,
 } from '../lib/history.js';
 
-// ---- Constants ----
+// ---- 常量 ----
 
-test('HISTORY_KEY is correct', () => {
+test('HISTORY_KEY 正确', () => {
   assert.equal(HISTORY_KEY, 'history');
 });
 
@@ -27,39 +27,39 @@ test('MAX_HISTORY_BYTES = 9MB', () => {
 
 // ---- generateHistoryId ----
 
-test('generateHistoryId: format h_<timestamp>_<random>', () => {
+test('generateHistoryId: 格式 h_<timestamp>_<random>', () => {
   const id = generateHistoryId();
-  assert.ok(/^h_\d{13}_[a-z0-9]{6}$/.test(id), `actual: ${id}`);
+  assert.ok(/^h_\d{13}_[a-z0-9]{6}$/.test(id), `实际: ${id}`);
 });
 
-test('generateHistoryId: no duplicates in consecutive calls', () => {
+test('generateHistoryId: 连续两次不重复', () => {
   const ids = new Set(Array.from({ length: 20 }, () => generateHistoryId()));
   assert.equal(ids.size, 20);
 });
 
 // ---- trimHistory ----
 
-test('trimHistory: does not modify content when under limit', () => {
+test('trimHistory: 不超限时不改变原数组内容', () => {
   const list = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
   const result = trimHistory([...list]);
   assert.equal(result.length, 3);
   assert.deepEqual(result[0], { id: 'a' });
 });
 
-test('trimHistory: removes oldest (head) when over limit', () => {
+test('trimHistory: 超过上限时删最旧（头部）', () => {
   const list = Array.from({ length: 105 }, (_, i) => ({ id: String(i) }));
   const result = trimHistory(list);
   assert.equal(result.length, 100);
-  // removed first 5 entries
+  // 删了前 5 条
   assert.equal(result[0].id, '5');
   assert.equal(result[99].id, '104');
 });
 
-test('trimHistory: empty array unchanged', () => {
+test('trimHistory: 空数组不变', () => {
   assert.equal(trimHistory([]).length, 0);
 });
 
-test('trimHistory: custom maxItems', () => {
+test('trimHistory: 自定义 maxItems', () => {
   const list = [{ id: '1' }, { id: '2' }, { id: '3' }];
   const result = trimHistory(list, 2);
   assert.equal(result.length, 2);
@@ -68,22 +68,22 @@ test('trimHistory: custom maxItems', () => {
 
 // ---- formatHistoryDate ----
 
-test('formatHistoryDate: normal formatting', () => {
+test('formatHistoryDate: 正常格式化', () => {
   const result = formatHistoryDate(Date.UTC(2026, 4, 10, 12, 0, 0));
   assert.equal(result, '2026-05-10');
 });
 
-test('formatHistoryDate: zero-pads single-digit month', () => {
-  // Use noon UTC to avoid any timezone offset date changes
+test('formatHistoryDate: 单数月份补零', () => {
+  // 用中午 12 点 UTC 避免任何时区偏移导致的日期变化
   const result = formatHistoryDate(Date.UTC(2026, 0, 5, 12, 0, 0));
   assert.equal(result, '2026-01-05');
 });
 
 // ---- historyToMarkdown ----
 
-test('historyToMarkdown: basic fields are correct', () => {
+test('historyToMarkdown: 基本字段正确', () => {
   const entry = {
-    name: 'Kweichow Moutai',
+    name: '贵州茅台',
     code: '600519',
     provider: 'anthropic',
     model: 'claude-sonnet-4-6',
@@ -99,11 +99,11 @@ test('historyToMarkdown: basic fields are correct', () => {
   assert.ok(md.includes('- 分析维度: 技术面'));
   assert.ok(md.includes('## 分析结果'));
   assert.ok(md.includes('## 趋势判断'));
-  // no follow-up
+  // 无追问
   assert.ok(!md.includes('追问记录'));
 });
 
-test('historyToMarkdown: DeepSeek provider correctly labeled', () => {
+test('historyToMarkdown: DeepSeek provider 正确标注', () => {
   const entry = {
     name: '测试',
     code: '000001',
@@ -119,7 +119,7 @@ test('historyToMarkdown: DeepSeek provider correctly labeled', () => {
   assert.ok(md.includes('- 分析维度: 趋势判断'));
 });
 
-test('historyToMarkdown: includes follow-up section when conversationHistory has follow-ups', () => {
+test('historyToMarkdown: conversationHistory 有追问时包含追问段', () => {
   const entry = {
     name: '测试',
     code: '000001',
@@ -143,7 +143,7 @@ test('historyToMarkdown: includes follow-up section when conversationHistory has
   assert.ok(md.includes('无背离信号'));
 });
 
-test('historyToMarkdown: does not output follow-up section when conversationHistory has only 2 entries', () => {
+test('historyToMarkdown: conversationHistory 仅 2 条时不输出追问段', () => {
   const entry = {
     name: '测试',
     code: '000001',
@@ -161,13 +161,13 @@ test('historyToMarkdown: does not output follow-up section when conversationHist
   assert.ok(!md.includes('追问记录'));
 });
 
-test('historyToMarkdown: missing fields do not throw error', () => {
+test('historyToMarkdown: 缺失字段不抛错', () => {
   const md = historyToMarkdown({});
   assert.ok(md.includes('# ?'));
   assert.ok(md.includes('?'));
 });
 
-test('historyToMarkdown: unknown template displays original value', () => {
+test('historyToMarkdown: 未知 template 显示原值', () => {
   const entry = {
     name: '测试',
     code: '000001',
@@ -184,20 +184,20 @@ test('historyToMarkdown: unknown template displays original value', () => {
 
 // ---- checkCapacity ----
 
-test('checkCapacity: item count not over limit', () => {
+test('checkCapacity: 条数不超限', () => {
   const list = Array.from({ length: 50 }, (_, i) => ({ id: String(i), analysis: 'x'.repeat(100) }));
   const result = checkCapacity(list);
   assert.equal(result.trimmed, false);
 });
 
-test('checkCapacity: item count over limit', () => {
+test('checkCapacity: 条数超限', () => {
   const list = Array.from({ length: 105 }, (_, i) => ({ id: String(i) }));
   const result = checkCapacity(list);
   assert.equal(result.trimmed, true);
   assert.ok(result.reason.includes('条数超限'));
 });
 
-test('checkCapacity: size over limit', () => {
+test('checkCapacity: 体积超限', () => {
   const list = Array.from({ length: 5 }, (_, i) => ({
     id: String(i),
     analysis: 'x'.repeat(2 * 1024 * 1024), // 2MB each
@@ -207,7 +207,7 @@ test('checkCapacity: size over limit', () => {
   assert.ok(result.reason.includes('体积超限'));
 });
 
-test('checkCapacity: custom params', () => {
+test('checkCapacity: 自定义参数', () => {
   const list = [{ id: '1' }, { id: '2' }, { id: '3' }];
   const result = checkCapacity(list, 2, 999999);
   assert.equal(result.trimmed, true);

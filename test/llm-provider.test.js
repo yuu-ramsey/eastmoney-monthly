@@ -1,12 +1,12 @@
-// LLM provider layer + pricing test
+// LLM provider 层 + 定价测试
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { getProvider, listProviders } from '../lib/llm/index.js';
 import { estimateCost, PRICING } from '../lib/llm/pricing.js';
 
-// ---- provider registration ----
+// ---- provider 注册 ----
 
-test('getProvider: returns correct instance', () => {
+test('getProvider: 返回正确实例', () => {
   const ap = getProvider('anthropic');
   assert.equal(ap.id, 'anthropic');
   assert.equal(ap.displayName, 'Anthropic Claude');
@@ -18,19 +18,19 @@ test('getProvider: returns correct instance', () => {
   assert.equal(typeof dp.call, 'function');
 });
 
-test('getProvider: throws on unknown id', () => {
+test('getProvider: 未知 id 抛错', () => {
   assert.throws(() => getProvider('openai'), /未知的 LLM 提供商/);
   assert.throws(() => getProvider(''), /未知的 LLM 提供商/);
 });
 
-test('listProviders: returns array of length 2', () => {
+test('listProviders: 返回数组长度为 2', () => {
   const list = listProviders();
   assert.equal(list.length, 2);
   const ids = list.map((p) => p.id).sort();
   assert.deepEqual(ids, ['anthropic', 'deepseek']);
 });
 
-// ---- mock fetch helpers ----
+// ---- mock fetch 工具 ----
 
 const originalFetch = globalThis.fetch;
 let mockResponse = null;
@@ -50,7 +50,7 @@ afterEach(() => {
 
 // ---- Anthropic call ----
 
-test('anthropic.call: normal response returns text + usage', async () => {
+test('anthropic.call: 正常响应返回 text + usage', async () => {
   mockFetch(200, {
     content: [{ type: 'text', text: '这是一份技术分析报告' }],
     usage: { input_tokens: 5000, output_tokens: 1500 },
@@ -66,7 +66,7 @@ test('anthropic.call: normal response returns text + usage', async () => {
   assert.equal(result.usage.outputTokens, 1500);
 });
 
-test('anthropic.call: 401 throws invalid key', async () => {
+test('anthropic.call: 401 抛 key 无效', async () => {
   mockFetch(401, { error: { message: 'invalid' } });
   const provider = getProvider('anthropic');
   await assert.rejects(
@@ -75,7 +75,7 @@ test('anthropic.call: 401 throws invalid key', async () => {
   );
 });
 
-test('anthropic.call: 429 throws rate limit', async () => {
+test('anthropic.call: 429 抛限流', async () => {
   mockFetch(429, {});
   const provider = getProvider('anthropic');
   await assert.rejects(
@@ -84,7 +84,7 @@ test('anthropic.call: 429 throws rate limit', async () => {
   );
 });
 
-test('anthropic.call: 500 throws service overload', async () => {
+test('anthropic.call: 500 抛服务过载', async () => {
   mockFetch(500, {});
   const provider = getProvider('anthropic');
   await assert.rejects(
@@ -93,7 +93,7 @@ test('anthropic.call: 500 throws service overload', async () => {
   );
 });
 
-test('anthropic.call: fetch throws returns network error', async () => {
+test('anthropic.call: fetch 抛错时返回网络错误', async () => {
   mockFetchThrow();
   const provider = getProvider('anthropic');
   await assert.rejects(
@@ -102,7 +102,7 @@ test('anthropic.call: fetch throws returns network error', async () => {
   );
 });
 
-test('anthropic.call: response without usage field returns 0', async () => {
+test('anthropic.call: 响应无 usage 字段返回 0', async () => {
   mockFetch(200, {
     content: [{ type: 'text', text: 'OK' }],
     usage: { input_tokens: 0, output_tokens: 0 },
@@ -113,7 +113,7 @@ test('anthropic.call: response without usage field returns 0', async () => {
   assert.equal(result.usage.outputTokens, 0);
 });
 
-test('anthropic.call: invalid type throws TypeError', async () => {
+test('anthropic.call: 非法类型抛 TypeError', async () => {
   const provider = getProvider('anthropic');
   await assert.rejects(
     () => provider.call(123, { model: 'm', apiKey: 'k', maxTokens: 100 }),
@@ -129,7 +129,7 @@ test('anthropic.call: invalid type throws TypeError', async () => {
   );
 });
 
-test('anthropic.call: messages array mode', async () => {
+test('anthropic.call: messages 数组模式', async () => {
   mockFetch(200, {
     content: [{ type: 'text', text: '多轮回复' }],
     usage: { input_tokens: 6000, output_tokens: 2000 },
@@ -146,7 +146,7 @@ test('anthropic.call: messages array mode', async () => {
 
 // ---- DeepSeek call ----
 
-test('deepseek.call: normal response returns text + usage', async () => {
+test('deepseek.call: 正常响应返回 text + usage', async () => {
   mockFetch(200, {
     choices: [{ message: { content: 'DeepSeek 分析结果' } }],
     usage: { prompt_tokens: 3000, completion_tokens: 800 },
@@ -162,7 +162,7 @@ test('deepseek.call: normal response returns text + usage', async () => {
   assert.equal(result.usage.outputTokens, 800);
 });
 
-test('deepseek.call: 401 throws invalid key', async () => {
+test('deepseek.call: 401 抛 key 无效', async () => {
   mockFetch(401, { error: { message: 'invalid api key' } });
   const provider = getProvider('deepseek');
   await assert.rejects(
@@ -171,7 +171,7 @@ test('deepseek.call: 401 throws invalid key', async () => {
   );
 });
 
-test('deepseek.call: 429 throws rate limit', async () => {
+test('deepseek.call: 429 抛限流', async () => {
   mockFetch(429, {});
   const provider = getProvider('deepseek');
   await assert.rejects(
@@ -180,7 +180,7 @@ test('deepseek.call: 429 throws rate limit', async () => {
   );
 });
 
-test('deepseek.call: 500 throws service overload', async () => {
+test('deepseek.call: 500 抛服务过载', async () => {
   mockFetch(500, {});
   const provider = getProvider('deepseek');
   await assert.rejects(
@@ -189,7 +189,7 @@ test('deepseek.call: 500 throws service overload', async () => {
   );
 });
 
-test('deepseek.call: fetch throws returns network error', async () => {
+test('deepseek.call: fetch 抛错时返回网络错误', async () => {
   mockFetchThrow();
   const provider = getProvider('deepseek');
   await assert.rejects(
@@ -198,7 +198,7 @@ test('deepseek.call: fetch throws returns network error', async () => {
   );
 });
 
-test('deepseek.call: response without usage returns 0', async () => {
+test('deepseek.call: 响应无 usage 返回 0', async () => {
   mockFetch(200, {
     choices: [{ message: { content: 'OK' } }],
   });
@@ -208,7 +208,7 @@ test('deepseek.call: response without usage returns 0', async () => {
   assert.equal(result.usage.outputTokens, 0);
 });
 
-test('deepseek.call: invalid type throws TypeError', async () => {
+test('deepseek.call: 非法类型抛 TypeError', async () => {
   const provider = getProvider('deepseek');
   await assert.rejects(
     () => provider.call(456, { model: 'm', apiKey: 'k', maxTokens: 100 }),
@@ -224,7 +224,7 @@ test('deepseek.call: invalid type throws TypeError', async () => {
   );
 });
 
-test('deepseek.call: messages array mode', async () => {
+test('deepseek.call: messages 数组模式', async () => {
   mockFetch(200, {
     choices: [{ message: { content: 'DeepSeek 多轮回复' } }],
     usage: { prompt_tokens: 4000, completion_tokens: 1000 },
@@ -239,9 +239,9 @@ test('deepseek.call: messages array mode', async () => {
   assert.equal(result.usage.inputTokens, 4000);
 });
 
-// ---- Both providers have consistent usage structure ----
+// ---- 两家 usage 结构一致 ----
 
-test('usage.inputTokens / outputTokens fields consistent across both providers', async () => {
+test('两家 provider 返回的 usage.inputTokens / outputTokens 字段一致', async () => {
   mockFetch(200, {
     content: [{ type: 'text', text: 'A' }],
     usage: { input_tokens: 100, output_tokens: 200 },
@@ -274,7 +274,7 @@ function makeMockTool(name, handler) {
   };
 }
 
-// Helper: construct fetch to return tool_use once + final text once
+// 辅助：构造一次 fetch 返回 tool_use + 一次返回最终文本
 function mockToolUseThenText(toolName, toolInput, toolId, finalText) {
   let callCount = 0;
   globalThis.fetch = () => {
@@ -304,7 +304,7 @@ function mockToolUseThenText(toolName, toolInput, toolId, finalText) {
   };
 }
 
-test('anthropic tool_use: single tool call returns final text', async () => {
+test('anthropic tool_use: 单轮工具调用后返回最终文本', async () => {
   mockToolUseThenText('my_tool', { query: 'hello' }, 'toolu_001', '最终分析结果');
   const tool = makeMockTool('my_tool');
 
@@ -316,13 +316,13 @@ test('anthropic tool_use: single tool call returns final text', async () => {
   });
 
   assert.equal(result.text, '最终分析结果');
-  // usage accumulates across two calls
+  // usage 累加两次调用
   assert.equal(result.usage.inputTokens, 300);
   assert.equal(result.usage.outputTokens, 150);
 });
 
-test('anthropic tool_use: ignores stop_reason=tool_use when no tools param', async () => {
-  // No tools param passed, even if stop_reason is tool_use, treat as normal response
+test('anthropic tool_use: 无 tools 参数时忽略 stop_reason=tool_use', async () => {
+  // 不传 tools 参数，即使 stop_reason 是 tool_use 也按普通响应处理
   mockFetch(200, {
     stop_reason: 'tool_use',
     content: [
@@ -336,11 +336,11 @@ test('anthropic tool_use: ignores stop_reason=tool_use when no tools param', asy
     apiKey: 'sk-ant-test',
     maxTokens: 100,
   });
-  // extractText filters out tool_use blocks, returns only text
+  // extractText 过滤掉 tool_use block，只返回 text
   assert.equal(result.text, 'fallback text');
 });
 
-test('anthropic tool_use: two-round tool call returns normally', async () => {
+test('anthropic tool_use: 两轮工具调用后正常返回', async () => {
   let callCount = 0;
   globalThis.fetch = () => {
     callCount++;
@@ -377,12 +377,12 @@ test('anthropic tool_use: two-round tool call returns normally', async () => {
   });
 
   assert.equal(result.text, 'done after 2 tools');
-  // 3 calls accumulated
+  // 3 次调用累加
   assert.equal(result.usage.inputTokens, 400);
   assert.equal(result.usage.outputTokens, 200);
 });
 
-test('anthropic tool_use: throws when exceeding 5 rounds', async () => {
+test('anthropic tool_use: 超过 5 轮抛错', async () => {
   let callCount = 0;
   globalThis.fetch = () => {
     callCount++;
@@ -412,7 +412,7 @@ test('anthropic tool_use: throws when exceeding 5 rounds', async () => {
   assert.ok(callCount >= 6);
 });
 
-test('anthropic tool_use: multiple tool_use blocks in single response', async () => {
+test('anthropic tool_use: 多个 tool_use block 在一次响应中', async () => {
   let callCount = 0;
   globalThis.fetch = () => {
     callCount++;
@@ -454,7 +454,7 @@ test('anthropic tool_use: multiple tool_use blocks in single response', async ()
   assert.equal(callCount, 2);
 });
 
-test('anthropic tool_use: unknown tool returns error text but does not break loop', async () => {
+test('anthropic tool_use: 未知工具返回错误文本但不中断循环', async () => {
   mockToolUseThenText('unknown_tool', { query: 'x' }, 'toolu_x', '继续分析');
   const knownTool = makeMockTool('known_tool');
 
@@ -468,7 +468,7 @@ test('anthropic tool_use: unknown tool returns error text but does not break loo
   assert.equal(result.text, '继续分析');
 });
 
-test('anthropic tool_use: handler exception does not break loop', async () => {
+test('anthropic tool_use: handler 抛异常不中断循环', async () => {
   mockToolUseThenText('bad_tool', { query: 'x' }, 'toolu_bad', '异常后继续');
   const badTool = makeMockTool('bad_tool', async () => { throw new Error('handler crash'); });
 
@@ -482,7 +482,7 @@ test('anthropic tool_use: handler exception does not break loop', async () => {
   assert.equal(result.text, '异常后继续');
 });
 
-test('anthropic tool_use: DeepSeek not affected by tools', async () => {
+test('anthropic tool_use: DeepSeek 不受 tools 影响', async () => {
   mockFetch(200, {
     choices: [{ message: { content: 'normal' } }],
     usage: { prompt_tokens: 100, completion_tokens: 50 },

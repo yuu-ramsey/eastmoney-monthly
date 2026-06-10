@@ -1,10 +1,10 @@
-// Judge Agent test
+// Judge Agent 测试
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { judgeAgent } from '../../lib/agents/judge.js';
 
 const sampleCtx = {
-  name: 'Kweichow Moutai',
+  name: '贵州茅台',
   code: '600519',
   period: 'monthly',
   periodLabel: '月线',
@@ -19,44 +19,44 @@ const sampleCtx = {
   },
 };
 
-test('judge.buildPrompt: includes all three agent texts', () => {
+test('judge.buildPrompt: 包含三方 Agent 文本', () => {
   const prompt = judgeAgent.buildPrompt(sampleCtx);
-  assert.match(prompt, /多头论点/);     // Bull output content
-  assert.match(prompt, /空头论点/);     // Bear output content
-  assert.match(prompt, /阻力位.*1650/); // Predictor output content
+  assert.match(prompt, /多头论点/);     // Bull 输出内容
+  assert.match(prompt, /空头论点/);     // Bear 输出内容
+  assert.match(prompt, /阻力位.*1650/); // Predictor 输出内容
 });
 
-test('judge.buildPrompt: includes "do not redo technical analysis" constraint', () => {
+test('judge.buildPrompt: 包含不要重新做技术分析约束', () => {
   const prompt = judgeAgent.buildPrompt(sampleCtx);
   assert.match(prompt, /不要重新做.*技术分析|不重新做.*技术分析/);
 });
 
-test('judge.buildPrompt: includes composite directional judgment options', () => {
+test('judge.buildPrompt: 包含综合方向判断选项', () => {
   const prompt = judgeAgent.buildPrompt(sampleCtx);
   assert.match(prompt, /偏多/);
   assert.match(prompt, /偏空/);
   assert.match(prompt, /信号不一致/);
 });
 
-test('judge.buildPrompt: includes risk disclaimer', () => {
+test('judge.buildPrompt: 包含风险声明', () => {
   const prompt = judgeAgent.buildPrompt(sampleCtx);
   assert.match(prompt, /不构成投资建议/);
 });
 
-test('judge.buildPrompt: includes prohibition of action language', () => {
+test('judge.buildPrompt: 包含禁止操作语言', () => {
   const prompt = judgeAgent.buildPrompt(sampleCtx);
   assert.match(prompt, /不要给出.*建议买入/);
   assert.match(prompt, /不要使用.*建议加仓/);
 });
 
-test('judge.buildPrompt: includes stock name and latest closing price', () => {
+test('judge.buildPrompt: 包含股票名和最新收盘价', () => {
   const prompt = judgeAgent.buildPrompt(sampleCtx);
   assert.match(prompt, /贵州茅台/);
   assert.match(prompt, /600519/);
   assert.match(prompt, /1600/);
 });
 
-test('judge.buildPrompt: shows failure markers when agents fail', () => {
+test('judge.buildPrompt: Agent 失败时显示失败标记', () => {
   const failCtx = { ...sampleCtx, partials: { bull: null, bear: null, predictor: null } };
   const prompt = judgeAgent.buildPrompt(failCtx);
   assert.match(prompt, /Bull Agent 调用失败/);

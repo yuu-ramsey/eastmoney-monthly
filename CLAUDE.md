@@ -5,6 +5,28 @@
 Chrome MV3 extension, injected into Eastmoney stock pages (quote.eastmoney.com),
 analyzing stock trends via LLM API. Local personal use only, not published to Chrome Web Store.
 
+## Language Policy (HARD RULE, established 2026-06-10 after incident)
+
+**Repo primary language is English** (comments, logs, docs, commit messages, README) **BUT
+functional strings MUST stay Chinese**:
+
+- LLM prompt templates and constraint text (`lib/build-prompt.js`, `lib/prompt-templates.js`,
+  agent prompts) — tuned for Chinese financial corpora; Chan Theory terms have no standard
+  English translation
+- LLM output parsers' keywords and fallback labels (`lib/self-backtest.js`,
+  `lib/parse-structured-output.js`)
+- User-facing strings: error messages shown in popup, history markdown export headers,
+  capacity-trim reasons
+- Test fixtures and assertions that encode the above contracts
+
+**Incident record**: commits `6665380`/`050d012` ("remove remaining Chinese") blanket-converted
+functional strings AND test fixture inputs → 64/252 tests failed, extension produced English
+reports for Chinese users, self-backtest parser contract broke mid-file. Restored 2026-06-10.
+**Never run a blanket "remove all Chinese" pass again.** Machine-readable contracts (structured
+JSON output enums) should be language-neutral English enums (`bullish/bearish/neutral`) — that
+is the only sanctioned English in the LLM I/O path. Planned: user-selectable output language
+(default Chinese) via an appended output-language instruction — analysis constraints stay Chinese.
+
 ## Regime-Adaptive MoE Architecture (designed 2026-06-05)
 
 ### Design Principles

@@ -1,11 +1,11 @@
-// Self-backtest function test
+// 自我回测函数测试
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { calculateActualReturn, buildSelfCalibrationBlock } from '../lib/self-backtest.js';
 
-// ---- calculateActualReturn numeric tests ----
+// ---- calculateActualReturn 数值测试 ----
 
-test('calculateActualReturn: uptrend scenario', () => {
+test('calculateActualReturn: 上涨场景', () => {
   const klines = [
     { date: '2024-01', close: 10.0 },
     { date: '2024-02', close: 12.0 },
@@ -13,21 +13,21 @@ test('calculateActualReturn: uptrend scenario', () => {
   const result = calculateActualReturn(klines, 0, 1, null);
   assert.equal(result.fromDate, '2024-01');
   assert.equal(result.toDate, '2024-02');
-  assert.ok(Math.abs(result.stockReturn - 20.0) < 0.01, `should be +20%, got ${result.stockReturn}`);
+  assert.ok(Math.abs(result.stockReturn - 20.0) < 0.01, `应为 +20%，实际 ${result.stockReturn}`);
   assert.equal(result.indexReturn, null);
   assert.equal(result.alpha, null);
 });
 
-test('calculateActualReturn: downtrend scenario', () => {
+test('calculateActualReturn: 下跌场景', () => {
   const klines = [
     { date: '2024-01', close: 20.0 },
     { date: '2024-06', close: 15.0 },
   ];
   const result = calculateActualReturn(klines, 0, 1, null);
-  assert.ok(Math.abs(result.stockReturn - (-25.0)) < 0.01, `should be -25%, got ${result.stockReturn}`);
+  assert.ok(Math.abs(result.stockReturn - (-25.0)) < 0.01, `应为 -25%，实际 ${result.stockReturn}`);
 });
 
-test('calculateActualReturn: alpha calculation with CSI 300', () => {
+test('calculateActualReturn: 含沪深300 alpha 计算', () => {
   const klines = [
     { date: '2024-01', close: 10.0 },
     { date: '2024-06', close: 13.0 }, // +30%
@@ -39,10 +39,10 @@ test('calculateActualReturn: alpha calculation with CSI 300', () => {
   const result = calculateActualReturn(klines, 0, 1, indexKlines);
   assert.equal(result.stockReturn, 30.0);
   assert.ok(Math.abs(result.indexReturn - 5.0) < 0.01);
-  assert.ok(Math.abs(result.alpha - 25.0) < 0.01, `alpha should be 25%, got ${result.alpha}`);
+  assert.ok(Math.abs(result.alpha - 25.0) < 0.01, `alpha 应为 25%，实际 ${result.alpha}`);
 });
 
-test('calculateActualReturn: negative alpha', () => {
+test('calculateActualReturn: 负 alpha', () => {
   const klines = [
     { date: '2024-01', close: 10.0 },
     { date: '2024-06', close: 10.5 }, // +5%
@@ -55,12 +55,12 @@ test('calculateActualReturn: negative alpha', () => {
   assert.ok(Math.abs(result.alpha - (-5.0)) < 0.01);
 });
 
-test('calculateActualReturn: CSI 300 mismatch returns null', () => {
+test('calculateActualReturn: 沪深300不匹配时返回null', () => {
   const klines = [
     { date: '2024-01', close: 10.0 },
     { date: '2024-06', close: 12.0 },
   ];
-  // CSI 300 dates have zero overlap
+  // 沪深300日期完全不重叠
   const indexKlines = [
     { date: '2025-01', close: 4000 },
     { date: '2025-02', close: 4100 },
@@ -70,7 +70,7 @@ test('calculateActualReturn: CSI 300 mismatch returns null', () => {
   assert.equal(result.alpha, null);
 });
 
-test('calculateActualReturn: invalid index throws error', () => {
+test('calculateActualReturn: 无效索引抛错', () => {
   const klines = [
     { date: '2024-01', close: 10.0 },
     { date: '2024-02', close: 12.0 },
@@ -79,8 +79,8 @@ test('calculateActualReturn: invalid index throws error', () => {
   assert.throws(() => calculateActualReturn(klines, 1, 0, null), /无效索引/);
 });
 
-test('calculateActualReturn: CSI 300 monthly matching tolerance', () => {
-  // Stock dates have day, CSI 300 only has month
+test('calculateActualReturn: 沪深300按月匹配容差', () => {
+  // 个股日期有日，沪深300只有月
   const klines = [
     { date: '2024-01-15', close: 10.0 },
     { date: '2024-06-20', close: 12.0 },
@@ -96,14 +96,14 @@ test('calculateActualReturn: CSI 300 monthly matching tolerance', () => {
   assert.ok(result.alpha != null);
 });
 
-// ---- buildSelfCalibrationBlock format tests ----
+// ---- buildSelfCalibrationBlock 格式测试 ----
 
-test('buildSelfCalibrationBlock: empty array returns empty string', () => {
+test('buildSelfCalibrationBlock: 空数组返回空字符串', () => {
   assert.equal(buildSelfCalibrationBlock([]), '');
   assert.equal(buildSelfCalibrationBlock(null), '');
 });
 
-test('buildSelfCalibrationBlock: includes heading and required elements', () => {
+test('buildSelfCalibrationBlock: 包含标题和必要元素', () => {
   const results = [{
     date: '2024-01',
     judgment: '偏多',
@@ -120,7 +120,7 @@ test('buildSelfCalibrationBlock: includes heading and required elements', () => 
   assert.ok(block.includes('alpha = +7.50%'));
 });
 
-test('buildSelfCalibrationBlock: backtest at two points in time', () => {
+test('buildSelfCalibrationBlock: 两个时点的回测', () => {
   const results = [
     { date: '2023-05', judgment: '中性', keyLevels: [], actualReturn: { toDate: '2024-05', stockReturn: -5.2, indexReturn: 2.0, alpha: -7.2 } },
     { date: '2024-05', judgment: '偏空', keyLevels: [18.50], actualReturn: { toDate: '2025-05', stockReturn: -12.8, indexReturn: -3.0, alpha: -9.8 } },
@@ -134,7 +134,7 @@ test('buildSelfCalibrationBlock: backtest at two points in time', () => {
   assert.ok(block.includes('跌 12.80%'));
 });
 
-test('buildSelfCalibrationBlock: skips alpha when no index data', () => {
+test('buildSelfCalibrationBlock: 无大盘数据时跳过alpha', () => {
   const results = [{
     date: '2024-01',
     judgment: '偏多',
@@ -145,7 +145,7 @@ test('buildSelfCalibrationBlock: skips alpha when no index data', () => {
   assert.ok(block.includes('无大盘对照数据'));
 });
 
-test('buildSelfCalibrationBlock: includes confidence reminder', () => {
+test('buildSelfCalibrationBlock: 包含置信度提醒', () => {
   const results = [{
     date: '2024-01', judgment: '偏多', keyLevels: [],
     actualReturn: { toDate: '2025-01', stockReturn: 10.0, indexReturn: 5.0, alpha: 5.0 },
@@ -155,22 +155,22 @@ test('buildSelfCalibrationBlock: includes confidence reminder', () => {
   assert.ok(block.includes('可能存在偏差'));
 });
 
-// ---- Insufficient data degradation ----
+// ---- 数据不足降级 ----
 
-test('runHistoricalAnalysis: cutoffIndex<12 throws error', async () => {
+test('runHistoricalAnalysis: cutoffIndex<12 抛错', async () => {
   const { runHistoricalAnalysis } = await import('../lib/self-backtest.js');
   try {
     await runHistoricalAnalysis([], 5, 'technical', 'anthropic', {});
-    assert.fail('should throw');
+    assert.fail('应抛错');
   } catch (err) {
     assert.ok(err.message.includes('数据不足'));
   }
 });
 
-// ---- extractJudgment internal logic (indirectly tested via runHistoricalAnalysis) ----
+// ---- extractJudgment 内部逻辑（通过 runHistoricalAnalysis 间接测试） ----
 
-test('extractJudgment: model output contains "偏多"', async () => {
-  // Mock provider.call to return text containing "偏多"
+test('extractJudgment: 模型输出包含"偏多"', async () => {
+  // mock provider.call 返回含"偏多"的文本
   const originalFetch = globalThis.fetch;
   const { getProvider } = await import('../lib/llm/index.js');
 
@@ -186,7 +186,7 @@ test('extractJudgment: model output contains "偏多"', async () => {
 
   try {
     const { runHistoricalAnalysis } = await import('../lib/self-backtest.js');
-    // Build minimum 12 K-line data
+    // 构造最少 12 根 K 线数据
     const klines = Array.from({ length: 12 }, (_, i) => ({
       date: `2025-${String(i + 1).padStart(2, '0')}`,
       open: 10 + i, close: 10 + i + 0.5, high: 11 + i, low: 9 + i,

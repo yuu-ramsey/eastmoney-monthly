@@ -13,9 +13,9 @@
 
 | 等级 | 发现 | 状态 |
 |------|------|------|
-| 🔴 严重 | 根目录乱码文件 `D␺ClaudeProjects…config​tushare_token.txt` 内含 57 字符 tushare token 明文，**不被 .gitignore 覆盖**，`git add .` 会直接暴露到公开仓库 | 待处理 |
-| 🟠 高 | `git add .` 会扫入 ~4.4GB 未跟踪文件：`data/kronos-training/` 2.1GB、`models/` 2GB、`data/pead-baostock.sqlite` 118MB（超 GitHub 100MB 硬限制，且是抓取进程正在写的活库） | 待加 ignore |
-| 🟡 中 | `.gitignore` 的 `config/` 规则是未提交的工作区改动 | 待 commit |
+| 🔴 严重 | 根目录乱码文件 `D␺ClaudeProjects…config​tushare_token.txt` 内含 57 字符 tushare token 明文，**不被 .gitignore 覆盖**，`git add .` 会直接暴露到公开仓库 | ✅ 已修复：与 `config/tushare_token.txt` 比对一致后删除，加 `*tushare_token*` 规则 |
+| 🟠 高 | `git add .` 会扫入 ~4.4GB 未跟踪文件：`data/kronos-training/` 2.1GB、`models/` 2GB、`data/pead-baostock.sqlite` 118MB（超 GitHub 100MB 硬限制，且是抓取进程正在写的活库） | ✅ 已修复：全部加入 .gitignore，11 个目标 `git check-ignore` 验证通过 |
+| 🟡 中 | `.gitignore` 的 `config/` 规则是未提交的工作区改动 | ✅ 已随安全提交落地 |
 | 🟡 中 | `data/baostock-klines-cache.json`（~10MB K线）、`data/SwClass2021_stock.xls`（申万分类）已公开，属行情数据再分发的授权灰区 | 已公开，知悉即可 |
 | 🟢 干净 | 见下节 | — |
 
@@ -30,7 +30,7 @@
 7. `data/frozen-eval-*.json` 虽被 .gitignore 注释标为 "private info" 但实际已被跟踪并公开——核查内容仅为股票代码清单 + 评测配置，**无真实私密信息**（该注释主要针对 `.eastmoney-ai/` 的预算数据，后者确实未被跟踪）
 8. 未推送的 6 个提交（neutralize 框架 + 文档 + baostock 控制变量抓取脚本）：纯代码与文档，脚本不含任何凭据（baostock 匿名登录、tushare 脚本仅注释提及 token）——**推送安全**
 
-## 待用户批准的修复建议（均未执行）
+## 修复建议（用户批准后已于 2026-06-10 执行，见状态列；第 4、5 条为操作守则）
 
 1. **处理 token 文件**（二选一，建议先做 a 再做 b）：
    - a. 在 `.gitignore` 追加一行 `*tushare_token*`（先堵住 `git add .` 的口子）

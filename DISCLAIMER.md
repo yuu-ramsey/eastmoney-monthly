@@ -1,5 +1,15 @@
 # 免责声明 / Disclaimer
 
+> **项目定位：这不是一个产生收益的工具，它的目标是帮你避免亏损。**
+> 本项目的全部设计（风险标记、信号冲突提示、"何时不动手"的判断辅助）都服务于减少损失，
+> 而非创造利润。它不能、也不试图让你赚钱；任何信号、验证状态（包括 verified）或分析输出
+> 都不代表盈利能力或未来收益。
+>
+> **Positioning: this project does not generate profits — it exists to help you avoid losses.**
+> Everything in it (risk flags, signal-conflict warnings, "when to stay out" guidance) serves loss
+> reduction, not profit creation. It cannot and does not try to make you money; no signal, status
+> flag (including "verified"), or analysis output implies profitability or future returns.
+
 ## 中文
 
 1. **非投资建议**。本项目（包括 Chrome 插件、命令行工具、研究脚本及其输出的任何分析文本、信号、状态标记）仅用于技术研究、学术学习与软件工程演示，**不构成任何形式的投资建议、买卖推荐或金融服务**。所有分析输出均为条件式陈述（"若 X 则验证 Y"），不应被解读为操作指令。

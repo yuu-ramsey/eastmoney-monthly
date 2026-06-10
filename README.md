@@ -9,12 +9,13 @@
 
 > ⚠️ **This is a personal research project, not a commercial product.**
 > Updates and bug fixes happen on my own schedule — there are no guarantees of timely patches, backward compatibility, or continued development.
-> **Use entirely at your own risk.**
+> **Use entirely at your own risk.** Not investment advice — see [DISCLAIMER.md](DISCLAIMER.md) (中文/English).
 
 ---
 
 ## 📌 News
 
+- 🗓️ **[Planned: 2026-06-20]** Next update — Chain A (PEAD/SUE) kill-or-confirm first real-data results on the full A-share panel (5,030 stocks / 168K earnings events, 2010-2024), signal registry refresh, and point-in-time ST history fix.
 - 🚩 **[2026.06]** Regime-Adaptive MoE architecture designed (v2). Three-detector voting for regime detection, no single point of failure.
 - 🚩 **[2026.05]** Survivorship bias quantified at **8.4 percentage points** — rebuilt evaluation pool with Baostock (includes delisted stocks). All prior signal conclusions invalidated and re-evaluated.
 - 🚩 **[2026.05]** P0–P3 research cycle completed: 12 signal sources tested on 24-timepoint unbiased pool. Kronos most reliable overall (+9.7%); momentum and LightGBM validated in bear-market regimes (+20.6%); LLM effective as interpreter with strong directional accuracy in extreme cases.

@@ -4,6 +4,8 @@
 !.env.example
 *.key
 *.pem
+config/
+*tushare_token*
 native-host/manifest/eastmoney-ai-sync-installed.json
 .claude/settings.local.json
 
@@ -19,6 +21,18 @@ kronos/*.pt
 kronos/*.safetensors
 lib/lstm/*.pt
 *.onnx
+models/
+
+# Bulk research data + live DBs (exceed GitHub limits / rebuildable / active WAL)
+data/kronos-training*/
+data/kronos-compare/
+data/*.sqlite
+data/*.sqlite-shm
+data/*.sqlite-wal
+klines-v2.sqlite
+*.pid
+.aris/
+kronos/finetune_csv/
 
 # Dependencies
 node_modules/

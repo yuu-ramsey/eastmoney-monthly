@@ -53,3 +53,18 @@ kronos/venv/
 kronos/weights/
 temp_scripts/
 skills-lock.json
+
+# === Security + large-data hardening (2026-06-15, pre-push) ===
+# Secrets / API tokens - never commit
+config/
+*tushare_token*
+*.token
+# Large research databases (2GB+, rebuildable from raw)
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+# Model weights
+models/
+# Process IDs + scratch error logs
+*.pid
+data/*.err

@@ -60,20 +60,24 @@
 <rect x="40" y="353" width="600" height="195" rx="10" fill="#EEEDFE" stroke="#AFA9EC" stroke-width="0.5"/>
 <text class="heading" x="340" y="377" text-anchor="middle" fill="#3C3489">Layer 3: expert pool + gating (mechanical lookup)</text>
 
-<rect x="65" y="392" width="100" height="44" rx="8" fill="#CECBF6" stroke="#AFA9EC" stroke-width="0.5"/>
-<text class="heading" x="115" y="418" text-anchor="middle" fill="#3C3489">Kronos</text>
+<rect x="65" y="392" width="80" height="44" rx="8" fill="#CECBF6" stroke="#AFA9EC" stroke-width="0.5"/>
+<text class="heading" x="105" y="418" text-anchor="middle" fill="#3C3489">Kronos</text>
 
-<rect x="180" y="392" width="100" height="44" rx="8" fill="#CECBF6" stroke="#AFA9EC" stroke-width="0.5"/>
-<text class="heading" x="230" y="418" text-anchor="middle" fill="#3C3489">Reversal</text>
+<rect x="158" y="392" width="80" height="44" rx="8" fill="#CECBF6" stroke="#AFA9EC" stroke-width="0.5"/>
+<text class="heading" x="198" y="418" text-anchor="middle" fill="#3C3489">Momentum</text>
 
-<rect x="295" y="392" width="100" height="44" rx="8" fill="#CECBF6" stroke="#AFA9EC" stroke-width="0.5"/>
-<text class="heading" x="345" y="418" text-anchor="middle" fill="#3C3489">Momentum</text>
+<rect x="251" y="392" width="80" height="44" rx="8" fill="#CECBF6" stroke="#AFA9EC" stroke-width="0.5"/>
+<text class="heading" x="291" y="418" text-anchor="middle" fill="#3C3489">Reversal</text>
 
-<rect x="410" y="392" width="100" height="44" rx="8" fill="#CECBF6" stroke="#AFA9EC" stroke-width="0.5"/>
-<text class="heading" x="460" y="418" text-anchor="middle" fill="#3C3489">GRU</text>
+<rect x="344" y="392" width="80" height="44" rx="8" fill="#C9BFF2" stroke="#8A7BD8" stroke-width="1"/>
+<text class="heading" x="384" y="414" text-anchor="middle" fill="#3C3489">PEAD/SUE</text>
+<text class="note" x="384" y="429" text-anchor="middle" fill="#6B5FB0">2010-21 only</text>
 
-<rect x="525" y="392" width="85" height="44" rx="8" fill="#CECBF6" stroke="#AFA9EC" stroke-width="0.5"/>
-<text class="heading" x="567" y="418" text-anchor="middle" fill="#3C3489">LLM sig</text>
+<rect x="437" y="392" width="80" height="44" rx="8" fill="#CECBF6" stroke="#AFA9EC" stroke-width="0.5"/>
+<text class="heading" x="477" y="418" text-anchor="middle" fill="#3C3489">GRU</text>
+
+<rect x="530" y="392" width="80" height="44" rx="8" fill="#CECBF6" stroke="#AFA9EC" stroke-width="0.5"/>
+<text class="heading" x="570" y="418" text-anchor="middle" fill="#3C3489">LLM sig</text>
 
 <text class="note" x="340" y="462" text-anchor="middle">Each expert validated per-regime · max weight ≤ 40% · transition period = all reduced</text>
 

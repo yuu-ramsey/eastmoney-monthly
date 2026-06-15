@@ -14,7 +14,7 @@
 
 ## 📌 News
 
-- 🗓️ **[Planned: 2026-06-20]** Next update — Chain A (PEAD/SUE) kill-or-confirm first real-data results on the full A-share panel (5,030 stocks / 168K earnings events, 2010-2024), signal registry refresh, and point-in-time ST history fix.
+- 🚩 **[2026.06]** Chain A (PEAD/SUE) first real-data results — full A-share panel (4,623 stocks / 166K events, 2010-2024, Baostock, point-in-time). Verdict: **CONFIRMED 2010-2021** (Fama-MacBeth t ≈ +9.5, strictly monotone), **DEAD 2022-2024** (drift decays to zero). Robust to EPS-line choice (net-profit vs parent-attributable; externally reviewed, 7-run sensitivity all pass). Honest takeaway: a historical phenomenon, not a tradeable present-day edge; short leg not executable in A-shares regardless. Spec + results on branch `pead-koc-sue`.
 - 🚩 **[2026.06]** Regime-Adaptive MoE architecture designed (v2). Three-detector voting for regime detection, no single point of failure.
 - 🚩 **[2026.05]** Survivorship bias quantified at **8.4 percentage points** — rebuilt evaluation pool with Baostock (includes delisted stocks). All prior signal conclusions invalidated and re-evaluated.
 - 🚩 **[2026.05]** P0–P3 research cycle completed: 12 signal sources tested on 24-timepoint unbiased pool. Kronos most reliable overall (+9.7%); momentum and LightGBM validated in bear-market regimes (+20.6%); LLM effective as interpreter with strong directional accuracy in extreme cases.

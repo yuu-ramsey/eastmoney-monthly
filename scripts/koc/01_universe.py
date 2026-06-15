@@ -1,700 +1,405 @@
 """
-KoC §1 — Stock Universe Construction
-=====================================
-Builds two lookup tables in data/universe.sqlite for KoC analysis:
+KoC §3 Universe Builder — PIT Full Version
+==========================================
+基于 §14 SUE + §16 PIT 市值 + §15 换手率 + §17 ST 历史，
+构建两个可比池：
 
-  universe_liquid  — main test pool (market cap / turnover / listing age filters)
-  universe_full    — comparison pool (ST and EPS filters only; tradability paradox)
+  流动池（liquid_pool）：
+    - ST filter:   事件公告日前最近 snapshot 中 is_st=0
+    - Size filter: PIT 市值 ≥ 30亿（mktcap_missing=1 视为不通过）
+    - Turn filter: turn_20d ≥ 0.5% 且 turn_insufficient=0
 
-Liquid pool filters (ALL must pass):
-  1. >= 8 complete fiscal quarters  (trusted=1 in sue table)
-  2. Single-quarter EPS >= 0        (no loss-making quarters)
-  3. NOT ST / *ST at rebalancing    (PIT; proxy in dry-run)
-  4. Market cap >= 5 billion CNY    (PIT; SZ proxy in dry-run; SH = unknown = pass)
-  5. Avg daily turnover >= 5% (20d) (PIT; DATA_PENDING in dry-run)
-  6. Listed >= 24 months            (PIT-correct; from exchange listing data)
+  全样本（full_sample）：
+    - 所有 trusted=1 的 SUE 事件（不施任何 filter）
 
-Full sample filters (strict subset):
-  1. >= 8 complete fiscal quarters
-  2. Single-quarter EPS >= 0
-  3. NOT ST / *ST
+两池分别写入 koc_universe 表的 in_liquid_pool / in_full_sample 列，
+供 §4/§5/§6 各读取，实现悖论对比。
 
-PIT status per filter (dry-run mode):
-  Filters 1, 2, 6 : PIT-correct (actual historical data)
-  Filter 3        : PIT-CORRECT via §17 st_history table (once built)
-                    query_all_stock(date) returns historical stock names; 'ST' in name = ST on that date.
-                    §17 (17_st_history.py) polls monthly 2008-2024 (~204 queries) → st_history table.
-                    Until §17 runs: remains KNOWN LOOKAHEAD (current ST snapshot).
-                    Note: baostock daily k-data isST is NOT PIT-reliable (reflects current status).
-                    tradestatus=0 (suspension) from daily_kline IS reliable for per-day suspension.
-  Filter 4        : NOW PIT-CORRECT via §15/§16 — market_cap_yi = close × total_share / 1e8 (亿元)
-                    total_share unit confirmed = 股 (shares); see 16_pit_marketcap.py
-  Filter 5        : DATA_PENDING → usable once §15 daily_kline table is built
-                    turn (換手率) from daily_kline enables 20-day avg turnover filter
+报告输出 docs/koc-universe.md，含：
+  [1] 各 filter 单独剔除量 + 最终池规模
+  [2] 板块分布（沪主板/深主板/中小板/创业板）
+  [3] 市值分布（10/25/50/75/90 分位）
+  [4] 入池时间序列（每季度，2010-2024）
 
-Usage:
-  .venv/Scripts/python.exe scripts/koc/01_universe.py           # full dry-run
-  .venv/Scripts/python.exe scripts/koc/01_universe.py --smoke   # 50 stocks only
-  .venv/Scripts/python.exe scripts/koc/01_universe.py --no-cache # clear cached data
+Usage: python scripts/koc/01_universe.py [--real]
 """
-
 import argparse
-import json
 import sqlite3
 import sys
-import time
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
 import pandas as pd
 
-# ── Constants ──────────────────────────────────────────────────────────────────
-DB_SUE: str = "data/pead.sqlite"
-DB_OUT: str = "data/universe.sqlite"
+DB_PATH: str = "data/pead-baostock.sqlite"
 REPORT_PATH: str = "docs/koc-universe.md"
 
-CACHE_LISTING: Path = Path("data/_listing_dates.json")
-CACHE_SPOT: Path = Path("data/_spot_snapshot.json")
-CACHE_ST: Path = Path("data/_st_list.json")
-
-MKTCAP_THRESHOLD: float = 5e8    # 5 billion CNY = 500 million
-TURNOVER_THRESHOLD: float = 5.0  # 5% daily avg [needs validation]
-LISTING_MIN_MONTHS: int = 24
-TURNOVER_SAMPLE_N: int = 50
-SMOKE_MAX_STOCKS: int = 50
+# 流动池过滤阈值
+MKTCAP_MIN_YI: float = 30.0       # 市值下限（亿元）
+TURN_20D_MIN: float = 0.5         # 20日均换手率下限（%）
 
 
-# ── DB init ────────────────────────────────────────────────────────────────────
-def init_out_db(conn: sqlite3.Connection) -> None:
-    conn.executescript("""
-        DROP TABLE IF EXISTS universe_liquid;
-        DROP TABLE IF EXISTS universe_full;
-        DROP TABLE IF EXISTS universe_meta;
+# ── 板块分类 ──────────────────────────────────────────────────────────────────
+def classify_board(code: str) -> str:
+    """根据股票代码前缀判断板块。"""
+    code_num = code.split(".")[-1]
+    if code.startswith("sh."):
+        if code_num.startswith("688"):
+            return "科创板"
+        return "沪主板"
+    elif code.startswith("sz."):
+        if code_num.startswith("300") or code_num.startswith("301"):
+            return "创业板"
+        if code_num.startswith("002") or code_num.startswith("003"):
+            return "中小板"
+        return "深主板"
+    return "其他"
 
-        CREATE TABLE universe_liquid (
+
+# ── 数据加载 ──────────────────────────────────────────────────────────────────
+def load_sue_events(conn: sqlite3.Connection) -> pd.DataFrame:
+    """加载全部 trusted=1 的 SUE 事件。"""
+    df = pd.read_sql_query(
+        "SELECT code, fiscal_year, fiscal_quarter, pub_date, sue "
+        "FROM sue_baostock WHERE trusted=1 AND pub_date IS NOT NULL",
+        conn,
+    )
+    df["pub_date"] = pd.to_datetime(df["pub_date"])
+    return df
+
+
+def build_st_filter(conn: sqlite3.Connection, events: pd.DataFrame) -> pd.Series:
+    """
+    返回 bool Series（长度=len(events)），True=该事件股票在 pub_date 时是 ST。
+
+    实现：pandas merge_asof(direction='backward')，以 pub_date 对应最近 snapshot_date 的 is_st。
+    """
+    st = pd.read_sql_query(
+        "SELECT code, snapshot_date, is_st FROM st_history ORDER BY code, snapshot_date",
+        conn,
+    )
+    st["snapshot_date"] = pd.to_datetime(st["snapshot_date"])
+
+    # merge_asof 要求 on 列全局有序
+    ev_sorted = events[["code", "pub_date"]].copy().sort_values("pub_date")
+    st_sorted = st.sort_values("snapshot_date")
+
+    merged = pd.merge_asof(
+        ev_sorted.reset_index(),         # 保留原始索引
+        st_sorted,
+        left_on="pub_date",
+        right_on="snapshot_date",
+        by="code",
+        direction="backward",
+    )
+    # is_st NaN → 无历史记录 → 视为非 ST（is_st=0）
+    merged["is_st"] = merged["is_st"].fillna(0).astype(int)
+
+    # 还原到原始顺序
+    result = merged.set_index("index")["is_st"].reindex(events.index)
+    return result.fillna(0).astype(bool)
+
+
+def build_mktcap_filter(conn: sqlite3.Connection, events: pd.DataFrame) -> pd.DataFrame:
+    """
+    返回 DataFrame，含 market_cap_yi（事件公告日对应的 PIT 市值，亿）和 mktcap_missing 列。
+
+    as-of join：pit_mktcap WHERE trade_date ≤ pub_date，取最近一条。
+    注意：pit_mktcap.trade_date 是交易日，pub_date 通常是公历日；
+    merge_asof backward 会找 pub_date 之前最近的交易日市值。
+    """
+    pit = pd.read_sql_query(
+        "SELECT code, trade_date, market_cap_yi, mktcap_missing "
+        "FROM pit_mktcap ORDER BY trade_date",   # merge_asof 要求 on 列全局有序
+        conn,
+    )
+    pit["trade_date"] = pd.to_datetime(pit["trade_date"])
+
+    ev_sorted = events[["code", "pub_date"]].copy().sort_values("pub_date")
+
+    merged = pd.merge_asof(
+        ev_sorted.reset_index(),
+        pit,
+        left_on="pub_date",
+        right_on="trade_date",
+        by="code",
+        direction="backward",
+    )
+    merged["mktcap_missing"] = merged["mktcap_missing"].fillna(1).astype(int)
+    merged["market_cap_yi"] = merged["market_cap_yi"].where(
+        merged["mktcap_missing"] == 0
+    )
+
+    result = merged.set_index("index")[["market_cap_yi", "mktcap_missing"]].reindex(events.index)
+    result["mktcap_missing"] = result["mktcap_missing"].fillna(1).astype(int)
+    return result
+
+
+def build_turn_filter(conn: sqlite3.Connection, events: pd.DataFrame) -> pd.DataFrame:
+    """
+    返回 DataFrame，含 turn_20d 和 turn_insufficient 列。
+    kline_event_features 按 (code, pub_date) 直接 JOIN，不需要 as-of。
+    """
+    kef = pd.read_sql_query(
+        "SELECT code, pub_date, turn_20d, turn_insufficient "
+        "FROM kline_event_features",
+        conn,
+    )
+    kef["pub_date"] = pd.to_datetime(kef["pub_date"])
+
+    result = events[["code", "pub_date"]].merge(
+        kef, on=["code", "pub_date"], how="left"
+    )
+    result.index = events.index
+    result["turn_insufficient"] = result["turn_insufficient"].fillna(1).astype(int)
+    return result[["turn_20d", "turn_insufficient"]]
+
+
+# ── 主逻辑 ────────────────────────────────────────────────────────────────────
+def build_universe(conn: sqlite3.Connection) -> pd.DataFrame:
+    """
+    返回完整 universe DataFrame，含过滤标志列。
+    """
+    print("[1/5] 加载 SUE 事件...")
+    events = load_sue_events(conn)
+    n_total = len(events)
+    print(f"  全样本: {n_total:,} 事件, {events['code'].nunique()} 只股票")
+
+    print("[2/5] 板块分类...")
+    events["board"] = events["code"].apply(classify_board)
+
+    print("[3/5] ST 过滤（as-of join st_history）...")
+    events["is_st"] = build_st_filter(conn, events)
+    n_st = int(events["is_st"].sum())
+    print(f"  ST 事件: {n_st} ({100*n_st/n_total:.1f}%)")
+
+    print("[4/5] 市值过滤（as-of join pit_mktcap）...")
+    mktcap_df = build_mktcap_filter(conn, events)
+    events["market_cap_yi"] = mktcap_df["market_cap_yi"]
+    events["mktcap_missing"] = mktcap_df["mktcap_missing"]
+    events["excluded_size"] = (
+        (events["mktcap_missing"] == 1) |
+        (events["market_cap_yi"] < MKTCAP_MIN_YI)
+    )
+    n_miss = int(events["mktcap_missing"].sum())
+    n_small = int(((events["mktcap_missing"] == 0) & (events["market_cap_yi"] < MKTCAP_MIN_YI)).sum())
+    print(f"  mktcap_missing: {n_miss} ({100*n_miss/n_total:.1f}%)")
+    print(f"  市值 < {MKTCAP_MIN_YI}亿: {n_small}")
+    print(f"  总 size 排除: {int(events['excluded_size'].sum())}")
+
+    print("[5/5] 换手率过滤（join kline_event_features）...")
+    turn_df = build_turn_filter(conn, events)
+    events["turn_20d"] = turn_df["turn_20d"]
+    events["turn_insufficient"] = turn_df["turn_insufficient"]
+    events["excluded_turn"] = (
+        (events["turn_insufficient"] == 1) |
+        (events["turn_20d"] < TURN_20D_MIN)
+    )
+    n_turn_insuf = int((events["turn_insufficient"] == 1).sum())
+    n_turn_low = int(((events["turn_insufficient"] == 0) & (events["turn_20d"] < TURN_20D_MIN)).sum())
+    print(f"  turn_insufficient: {n_turn_insuf}")
+    print(f"  turn_20d < {TURN_20D_MIN}%: {n_turn_low}")
+    print(f"  总换手率排除: {int(events['excluded_turn'].sum())}")
+
+    # 汇总
+    events["in_full_sample"] = True
+    events["in_liquid_pool"] = (
+        ~events["is_st"] &
+        ~events["excluded_size"] &
+        ~events["excluded_turn"]
+    )
+
+    n_liquid = int(events["in_liquid_pool"].sum())
+    print(f"\n  流动池事件: {n_liquid:,} ({100*n_liquid/n_total:.1f}% of full sample)")
+    print(f"  流动池股票: {events.loc[events['in_liquid_pool'], 'code'].nunique()}")
+
+    return events
+
+
+def write_universe_table(conn: sqlite3.Connection, events: pd.DataFrame) -> None:
+    """写入 koc_universe 表。"""
+    conn.execute("DROP TABLE IF EXISTS koc_universe")
+    conn.execute("""
+        CREATE TABLE koc_universe (
             code            TEXT    NOT NULL,
             fiscal_year     INTEGER NOT NULL,
             fiscal_quarter  INTEGER NOT NULL,
             pub_date        TEXT    NOT NULL,
-            pass_quarters   INTEGER NOT NULL,
-            pass_pos_eps    INTEGER NOT NULL,
-            pass_st         INTEGER NOT NULL,
-            pass_mktcap     INTEGER NOT NULL,  -- 1=pass, 0=fail, -1=DATA_PENDING (size_missing=1)
-            size_missing    INTEGER NOT NULL,  -- 1 = market cap unavailable at this obs (SH in dry-run)
-            pass_turnover   INTEGER NOT NULL,  -- -1 = DATA_PENDING
-            pass_listing    INTEGER NOT NULL,
-            in_pool         INTEGER NOT NULL,
+            board           TEXT,
+            is_st           INTEGER DEFAULT 0,
+            mktcap_missing  INTEGER DEFAULT 0,
+            market_cap_yi   REAL,
+            excluded_size   INTEGER DEFAULT 0,
+            turn_20d        REAL,
+            turn_insufficient INTEGER DEFAULT 0,
+            excluded_turn   INTEGER DEFAULT 0,
+            in_liquid_pool  INTEGER DEFAULT 0,
+            in_full_sample  INTEGER DEFAULT 1,
             PRIMARY KEY (code, fiscal_year, fiscal_quarter)
-        );
-        CREATE TABLE universe_full (
-            code            TEXT    NOT NULL,
-            fiscal_year     INTEGER NOT NULL,
-            fiscal_quarter  INTEGER NOT NULL,
-            pub_date        TEXT    NOT NULL,
-            pass_quarters   INTEGER NOT NULL,
-            pass_pos_eps    INTEGER NOT NULL,
-            pass_st         INTEGER NOT NULL,
-            in_pool         INTEGER NOT NULL,
-            PRIMARY KEY (code, fiscal_year, fiscal_quarter)
-        );
-        CREATE TABLE universe_meta (key TEXT PRIMARY KEY, value TEXT);
+        )
     """)
+
+    out = events[[
+        "code", "fiscal_year", "fiscal_quarter", "pub_date",
+        "board", "is_st", "mktcap_missing", "market_cap_yi",
+        "excluded_size", "turn_20d", "turn_insufficient", "excluded_turn",
+        "in_liquid_pool", "in_full_sample",
+    ]].copy()
+    out["pub_date"] = out["pub_date"].dt.strftime("%Y-%m-%d")
+    out["is_st"] = out["is_st"].astype(int)
+    out["excluded_size"] = out["excluded_size"].astype(int)
+    out["excluded_turn"] = out["excluded_turn"].astype(int)
+    out["in_liquid_pool"] = out["in_liquid_pool"].astype(int)
+    out["in_full_sample"] = out["in_full_sample"].astype(int)
+
+    out.to_sql("koc_universe", conn, if_exists="append", index=False, chunksize=5_000)
     conn.commit()
 
 
-# ── Auxiliary data loaders ─────────────────────────────────────────────────────
-def load_listing_dates() -> dict[str, date]:
-    """
-    Load listing dates for all A-shares from SH/SZ exchange lists.
-    Returns {6-digit-code: listing_date}. Cached to CACHE_LISTING.
-    """
-    if CACHE_LISTING.exists():
-        raw: dict[str, str] = json.loads(CACHE_LISTING.read_text(encoding="utf-8"))
-        return {k: date.fromisoformat(v) for k, v in raw.items()}
+def build_report(events: pd.DataFrame) -> str:
+    """生成 docs/koc-universe.md 报告。"""
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    n_total = len(events)
+    n_stocks = int(events["code"].nunique())
+    n_liquid = int(events["in_liquid_pool"].sum())
+    n_st = int(events["is_st"].sum())
+    n_size = int(events["excluded_size"].sum())
+    n_turn = int(events["excluded_turn"].sum())
 
-    import akshare as ak
+    # [1] Filter summary
+    filter_rows = f"""
+| Filter | 排除事件数 | 占全样本比 |
+|--------|-----------|----------|
+| ST (is_st=1) | {n_st:,} | {100*n_st/n_total:.1f}% |
+| 市值缺失或 < {MKTCAP_MIN_YI}亿 | {n_size:,} | {100*n_size/n_total:.1f}% |
+| 换手率不足 (turn_20d < {TURN_20D_MIN}% 或不足) | {n_turn:,} | {100*n_turn/n_total:.1f}% |
+| **全样本** | **{n_total:,}** | 100% |
+| **流动池** | **{n_liquid:,}** | **{100*n_liquid/n_total:.1f}%** |
+"""
 
-    listing: dict[str, date] = {}
-    sources = [
-        ("SH main",  lambda: ak.stock_info_sh_name_code(symbol="主板A股")),
-        ("SH STAR",  lambda: ak.stock_info_sh_name_code(symbol="科创板")),
-        ("SZ",       lambda: ak.stock_info_sz_name_code()),
-    ]
-    for src_name, fetcher in sources:
-        try:
-            df = fetcher()
-        except Exception as exc:
-            print(f"  [WARN] {src_name} listing fetch failed: {exc}", file=sys.stderr)
-            continue
-        code_col = next((c for c in df.columns if "代码" in c), None)
-        date_col = next((c for c in df.columns if "日期" in c or "上市" in c), None)
-        if not code_col or not date_col:
-            print(f"  [WARN] {src_name}: unexpected cols {df.columns.tolist()}")
-            continue
-        for _, row in df.iterrows():
-            code_6 = str(row[code_col]).strip().zfill(6)
-            try:
-                listing[code_6] = pd.to_datetime(row[date_col]).date()
-            except Exception:
-                pass
-        print(f"  {src_name}: {len(df)} stocks")
-
-    CACHE_LISTING.write_text(
-        json.dumps({k: v.isoformat() for k, v in listing.items()}, ensure_ascii=False),
-        encoding="utf-8",
+    # [2] Board distribution
+    board_full = events["board"].value_counts().to_dict()
+    board_liq = events.loc[events["in_liquid_pool"], "board"].value_counts().to_dict()
+    boards = ["沪主板", "深主板", "中小板", "创业板", "科创板", "其他"]
+    board_rows = "\n".join(
+        f"| {b} | {board_full.get(b, 0):,} | {100*board_full.get(b,0)/n_total:.1f}% "
+        f"| {board_liq.get(b, 0):,} | "
+        f"{100*board_liq.get(b,0)/n_liquid:.1f}% |"
+        for b in boards if board_full.get(b, 0) > 0 or board_liq.get(b, 0) > 0
     )
-    return listing
+    board_section = f"""
+| 板块 | 全样本事件 | 占比 | 流动池事件 | 占比 |
+|------|-----------|-----|-----------|-----|
+{board_rows}
+"""
 
+    # [3] Market cap distribution (liquid pool only)
+    mc = events.loc[events["in_liquid_pool"] & events["market_cap_yi"].notna(), "market_cap_yi"]
+    if len(mc) > 0:
+        pcts = np.percentile(mc, [10, 25, 50, 75, 90])
+        mc_section = f"""
+| 分位 | 市值（亿元） |
+|------|------------|
+| P10 | {pcts[0]:.1f} |
+| P25 | {pcts[1]:.1f} |
+| P50（中位数） | {pcts[2]:.1f} |
+| P75 | {pcts[3]:.1f} |
+| P90 | {pcts[4]:.1f} |
 
-def load_st_set() -> set[str]:
-    """
-    Build current ST / *ST set from SH/SZ exchange name lists.
-    DRY-RUN PROXY: reflects current ST status, not historical.
-    Returns set of 6-digit codes.
-    """
-    if CACHE_ST.exists():
-        return set(json.loads(CACHE_ST.read_text(encoding="utf-8")))
-
-    import akshare as ak
-
-    st_codes: set[str] = set()
-    sources = [
-        ("SH main",  lambda: ak.stock_info_sh_name_code(symbol="主板A股")),
-        ("SH STAR",  lambda: ak.stock_info_sh_name_code(symbol="科创板")),
-        ("SZ",       lambda: ak.stock_info_sz_name_code()),
-    ]
-    for src_name, fetcher in sources:
-        try:
-            df = fetcher()
-        except Exception:
-            continue
-        code_col = next((c for c in df.columns if "代码" in c), None)
-        name_col = next((c for c in df.columns if "简称" in c), None)
-        if not code_col or not name_col:
-            continue
-        st_mask = df[name_col].astype(str).str.contains("ST", case=True, na=False)
-        codes = df.loc[st_mask, code_col].astype(str).str.zfill(6).tolist()
-        st_codes.update(codes)
-
-    CACHE_ST.write_text(json.dumps(sorted(st_codes), ensure_ascii=False), encoding="utf-8")
-    return st_codes
-
-
-def load_market_cap_proxy() -> dict[str, float]:
-    """
-    Build {6-digit-code: float_market_cap_yuan} from SZ float shares x current price.
-    DRY-RUN PROXY: current prices, not PIT. SH stocks are absent (no SH float-share data).
-    Cached to CACHE_SPOT.
-    """
-    if CACHE_SPOT.exists():
-        raw = json.loads(CACHE_SPOT.read_text(encoding="utf-8"))
-        return {k: float(v) for k, v in raw.items()}
-
-    import akshare as ak
-
-    mktcap: dict[str, float] = {}
-
-    # Load SZ float shares (流通股本)
-    sz_shares: dict[str, float] = {}
-    try:
-        df_sz = ak.stock_info_sz_name_code()
-        code_col = next(c for c in df_sz.columns if "代码" in c)
-        share_col = next(c for c in df_sz.columns if "流通" in c)
-        for _, row in df_sz.iterrows():
-            code_6 = str(row[code_col]).strip().zfill(6)
-            try:
-                sz_shares[code_6] = float(str(row[share_col]).replace(",", ""))
-            except (ValueError, TypeError):
-                pass
-        print(f"  SZ float shares: {len(sz_shares)} stocks")
-    except Exception as exc:
-        print(f"  [WARN] SZ shares fetch failed: {exc}", file=sys.stderr)
-
-    # Fetch current prices via stock_zh_a_spot
-    print("  Fetching spot prices (stock_zh_a_spot, ~60s)...")
-    try:
-        df_spot = ak.stock_zh_a_spot()
-        price_map: dict[str, float] = {}
-        for _, row in df_spot.iterrows():
-            # spot codes like 'sh600519', 'sz000001', 'bj920000' — last 6 digits
-            code_6 = str(row["代码"]).strip()[-6:].zfill(6)
-            try:
-                price = float(row["最新价"])
-                if price > 0:
-                    price_map[code_6] = price
-            except (ValueError, TypeError):
-                pass
-        print(f"  Spot prices: {len(price_map)} stocks")
-
-        for code_6, shares in sz_shares.items():
-            price = price_map.get(code_6)
-            if price is not None and shares > 0:
-                mktcap[code_6] = shares * price
-        print(f"  Market cap computed (SZ): {len(mktcap)} stocks")
-
-    except Exception as exc:
-        print(f"  [WARN] Spot fetch failed: {exc}", file=sys.stderr)
-
-    CACHE_SPOT.write_text(json.dumps(mktcap, ensure_ascii=False), encoding="utf-8")
-    return mktcap
-
-
-def sample_turnover_distribution(all_codes: list[str], n: int = TURNOVER_SAMPLE_N) -> pd.DataFrame:
-    """
-    Fetch 30-day daily turnover history for n randomly sampled stocks.
-    Returns DataFrame with columns: code, avg_turnover_20d (%).
-    Used to validate TURNOVER_THRESHOLD only; NOT applied as filter in dry-run.
-    """
-    import akshare as ak
-
-    rng = np.random.default_rng(42)
-    sampled = rng.choice(all_codes, size=min(n, len(all_codes)), replace=False).tolist()
-
-    end_dt = datetime.today().strftime("%Y%m%d")
-    start_str = (pd.Timestamp.today() - pd.Timedelta(days=45)).strftime("%Y%m%d")
-
-    rows: list[dict] = []
-    for code_full in sampled:
-        code_6 = code_full.split(".")[-1]
-        try:
-            df = ak.stock_zh_a_hist(
-                symbol=code_6,
-                period="daily",
-                start_date=start_str,
-                end_date=end_dt,
-                adjust="",
-            )
-            if df.empty or "换手率" not in df.columns:
-                continue
-            df["换手率"] = pd.to_numeric(df["换手率"], errors="coerce")
-            avg_20 = float(df["换手率"].tail(20).mean())
-            rows.append({"code": code_full, "avg_turnover_20d": round(avg_20, 4)})
-        except Exception:
-            pass
-
-    return pd.DataFrame(rows) if rows else pd.DataFrame(columns=["code", "avg_turnover_20d"])
-
-
-# ── Pool construction ──────────────────────────────────────────────────────────
-def build_pools(
-    df_base: pd.DataFrame,
-    listing_dates: dict[str, date],
-    st_set: set[str],
-    mktcap_map: dict[str, float],
-) -> tuple[pd.DataFrame, pd.DataFrame, int]:
-    """
-    Apply all 6 filters and return (df_liquid, df_full).
-
-    PIT assertions enforced here:
-      - listing_date <= pub_date for all stocks with known listing date
-      - EPS data is historical by construction (pub_date-anchored in pead.sqlite)
-      - Filters 3/4 are DRY-RUN PROXY (current-snapshot, not PIT)
-
-    pass values: 1=pass, 0=fail, -1=unknown/pending (treated as pass).
-    """
-    assert not df_base.empty, "build_pools: empty input"
-    assert pd.api.types.is_datetime64_any_dtype(df_base["pub_date"]), "pub_date must be datetime64"
-
-    df = df_base.copy()
-    df["code_6"] = df["code"].str.split(".").str[-1]
-    pub_dates_dt = df["pub_date"].dt.date
-
-    # Filter 1: >= 8 quarters (all True by construction — input is trusted=1)
-    df["pass_quarters"] = 1
-
-    # Filter 2: positive single-quarter EPS
-    df["pass_pos_eps"] = (df["eps_single"].fillna(-1.0) >= 0.0).astype(int)
-
-    # Filter 3: not ST (current proxy)
-    df["pass_st"] = (~df["code_6"].isin(st_set)).astype(int)
-
-    # Filter 4: market cap >= 5 billion (SZ proxy; SH = DATA_PENDING)
-    # size_missing=1 means no market cap data is available for this observation.
-    # These are NOT auto-passing — they are explicitly flagged and kept only because
-    # §10 data (PIT market cap) is not yet ready. Once §10 is complete, size_missing=1
-    # rows must be re-evaluated with actual market cap before including in the pool.
-    mktcap_vals: pd.Series = df["code_6"].map(mktcap_map)
-    df["size_missing"] = mktcap_vals.isna().astype(int)
-    df["pass_mktcap"] = np.where(
-        mktcap_vals.isna(), -1,       # DATA_PENDING — see size_missing flag
-        (mktcap_vals >= MKTCAP_THRESHOLD).astype(int),
-    )
-
-    # Filter 5: turnover (DATA_PENDING in dry-run)
-    df["pass_turnover"] = -1
-
-    # Filter 6: listed >= 24 months (PIT-correct)
-    listing_series: pd.Series = df["code_6"].map(listing_dates)
-
-    # PIT note: pre-IPO earnings exist for some stocks (pub_date < listing_date).
-    # The listing filter handles them correctly (listing_months < 0 → pass_listing=0).
-    # Count is computed at the end and returned.
-    known_mask = listing_series.notna()
-
-    def _listing_months(pub_dt: date, list_dt: Optional[date]) -> int:
-        if list_dt is None or pd.isna(list_dt):
-            return -1
-        return (pub_dt.year - list_dt.year) * 12 + (pub_dt.month - list_dt.month)
-
-    listing_months = [
-        _listing_months(p, l)
-        for p, l in zip(pub_dates_dt, listing_series)
-    ]
-    df["listing_months"] = listing_months
-    # listing_months == -1 (unknown) → conservative fail (listing date required for liquid pool)
-    df["pass_listing"] = ((pd.Series(listing_months, index=df.index) >= LISTING_MIN_MONTHS)).astype(int)
-
-    # ── Full sample: filters 1, 2, 3 ──────────────────────────────────────────
-    full_in = (
-        (df["pass_quarters"] == 1) &
-        (df["pass_pos_eps"] == 1) &
-        (df["pass_st"] == 1)
-    )
-    df["in_full"] = full_in.astype(int)
-
-    # ── Liquid pool: all 6 filters (-1 treated as pass) ───────────────────────
-    liquid_in = (
-        (df["pass_quarters"] == 1) &
-        (df["pass_pos_eps"] == 1) &
-        (df["pass_st"] == 1) &
-        (df["pass_mktcap"] != 0) &      # -1 (unknown) = pass
-        (df["pass_turnover"] != 0) &    # -1 (pending) = pass
-        (df["pass_listing"] == 1)
-    )
-    df["in_liquid"] = liquid_in.astype(int)
-
-    pub_str = df["pub_date"].dt.strftime("%Y-%m-%d")
-
-    df_liquid = df[[
-        "code", "fiscal_year", "fiscal_quarter",
-        "pass_quarters", "pass_pos_eps", "pass_st",
-        "pass_mktcap", "size_missing", "pass_turnover", "pass_listing", "in_liquid",
-    ]].copy()
-    df_liquid.insert(3, "pub_date", pub_str.values)
-    df_liquid = df_liquid.rename(columns={"in_liquid": "in_pool"})
-
-    df_full = df[[
-        "code", "fiscal_year", "fiscal_quarter",
-        "pass_quarters", "pass_pos_eps", "pass_st", "in_full",
-    ]].copy()
-    df_full.insert(3, "pub_date", pub_str.values)
-    df_full = df_full.rename(columns={"in_full": "in_pool"})
-
-    pre_ipo_count = 0
-    if known_mask.any():
-        pre_ipo_count = int(
-            (
-                df.loc[known_mask, "pub_date"].dt.date
-                < pd.Series([listing_series[i] for i in df.index[known_mask]], index=df.index[known_mask])
-            ).sum()
-        )
-        if pre_ipo_count > 0:
-            print(f"  [INFO] {pre_ipo_count} obs with pub_date < listing_date (pre-IPO history) "
-                  f"— excluded by listing filter")
-
-    return df_liquid, df_full, pre_ipo_count
-
-
-# ── Report generation ──────────────────────────────────────────────────────────
-def generate_report(
-    df_liquid: pd.DataFrame,
-    df_full: pd.DataFrame,
-    turnover_dist: pd.DataFrame,
-    is_smoke: bool,
-    pre_ipo_count: int = 0,
-) -> str:
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-    smoke_note = " [SMOKE — 50 stocks only]" if is_smoke else ""
-
-    n_liq = int(df_liquid["in_pool"].sum())
-    n_full = int(df_full["in_pool"].sum())
-    liq_stocks = int(df_liquid[df_liquid["in_pool"] == 1]["code"].nunique())
-    full_stocks = int(df_full[df_full["in_pool"] == 1]["code"].nunique())
-
-    def funnel_row(col: str, label: str, df: pd.DataFrame = df_liquid) -> str:
-        if col not in df.columns:
-            return f"| {label} | — | — | — |"
-        pass_1 = int((df[col] == 1).sum())
-        unknown = int((df[col] == -1).sum())
-        fail_0 = int((df[col] == 0).sum())
-        return f"| {label} | {pass_1:,} | {unknown:,} | {fail_0:,} |"
-
-    # Turnover distribution section
-    if not turnover_dist.empty:
-        vals = turnover_dist["avg_turnover_20d"].dropna()
-        p50 = float(np.percentile(vals, 50))
-        warn = "" if p50 < TURNOVER_THRESHOLD else f"\n> **[WARN]** Median {p50:.2f}% > threshold {TURNOVER_THRESHOLD}% — consider lowering threshold."
-        turn_sec = (
-            f"\n## Turnover Distribution (Sample, n={len(vals)}, 20d avg %)\n\n"
-            f"| P10 | P25 | P50 | P75 | P90 | P95 |\n"
-            f"|-----|-----|-----|-----|-----|-----|\n"
-            f"| {np.percentile(vals,10):.2f} | {np.percentile(vals,25):.2f} "
-            f"| {p50:.2f} | {np.percentile(vals,75):.2f} "
-            f"| {np.percentile(vals,90):.2f} | {np.percentile(vals,95):.2f} |\n"
-            f"{warn}\n"
-            f"> **[需要验证]** Threshold = {TURNOVER_THRESHOLD}%. "
-            f"NOT applied as filter in dry-run (DATA_PENDING). "
-            f"Turnover data reflects current market conditions, not PIT.\n"
-        )
+> 注：流动池市值分布中位数 {pcts[2]:.1f}亿，大市值股票占比高反映可交易性筛选效果。
+"""
     else:
-        turn_sec = "\n## Turnover Distribution\n\nSample data unavailable.\n"
+        mc_section = "\n> 无有效市值数据。\n"
 
-    # Pool size time series
-    liq_ts = (
-        df_liquid[df_liquid["in_pool"] == 1]
-        .groupby(["fiscal_year", "fiscal_quarter"]).size()
-        .reset_index(name="n_liq")
+    # [4] Time series (quarterly count)
+    events["fy_fq"] = (
+        events["fiscal_year"].astype(str) + "Q" + events["fiscal_quarter"].astype(str)
     )
-    full_ts = (
-        df_full[df_full["in_pool"] == 1]
-        .groupby(["fiscal_year", "fiscal_quarter"]).size()
-        .reset_index(name="n_full")
+    ts_full = events.groupby("fy_fq")["in_full_sample"].sum()
+    ts_liq = events.groupby("fy_fq")["in_liquid_pool"].sum()
+    ts_df = pd.DataFrame({"full": ts_full, "liquid": ts_liq}).dropna()
+    ts_rows = "\n".join(
+        f"| {q} | {int(ts_df.loc[q,'full'])} | {int(ts_df.loc[q,'liquid'])} |"
+        for q in sorted(ts_df.index)
+        if ts_df.loc[q, "full"] >= 10
     )
-    ts = liq_ts.merge(full_ts, on=["fiscal_year", "fiscal_quarter"], how="outer").fillna(0)
-    ts = ts.sort_values(["fiscal_year", "fiscal_quarter"])
-    ts_rows = [
-        f"| {int(r.fiscal_year)}Q{int(r.fiscal_quarter)} | {int(r.n_liq):,} | {int(r.n_full):,} |"
-        for _, r in ts.iterrows()
-    ]
-    if len(ts_rows) > 16:
-        ts_table = "\n".join(ts_rows[:8] + ["| ... | ... | ... |"] + ts_rows[-4:])
-    else:
-        ts_table = "\n".join(ts_rows)
+    ts_section = f"""
+| 季度 | 全样本 | 流动池 |
+|------|-------|-------|
+{ts_rows}
+"""
 
-    # size_missing count (DATA_PENDING market cap observations)
-    size_missing_obs = int(df_liquid["size_missing"].sum())
-    size_missing_stocks = int(
-        df_liquid[df_liquid["size_missing"] == 1]["code"].nunique()
-    )
+    return f"""# KoC §3 Universe 报告
 
-    return f"""# KoC Universe — Quality Report{smoke_note}
+**生成时间**：{now}
+**数据来源**：§14 baostock SUE + §16 PIT 市值 + §15 换手率 + §17 ST 历史
 
-**Generated**: {now_str}
-**Input**: data/pead.sqlite (akshare YTD-based SUE, 2010-2024)
-**Output**: data/universe.sqlite
-**Mode**: DRY-RUN (see PIT status section for what is and isn't point-in-time)
+## [1] Filter 剔除汇总
+{filter_rows}
 
-## Coverage
+## [2] 板块分布
+{board_section}
 
-| Metric | Liquid Pool | Full Sample |
-|--------|-------------|-------------|
-| Total observations | {len(df_liquid):,} | {len(df_full):,} |
-| Observations in pool | {n_liq:,} | {n_full:,} |
-| Distinct stocks in pool | {liq_stocks:,} | {full_stocks:,} |
+## [3] 流动池市值分布
+{mc_section}
 
-## Filter Funnel (Liquid Pool)
+## [4] 入池时间序列（每季度）
+{ts_section}
 
-Values: Pass=1, Unknown/Pending=-1, Fail=0
+## 过滤参数
 
-| Filter | Pass | Unknown/-1 | Fail |
-|--------|------|------------|------|
-{funnel_row('pass_quarters', '>= 8 quarters (trusted=1)')}
-{funnel_row('pass_pos_eps', 'EPS >= 0 (no loss quarter)')}
-{funnel_row('pass_st', 'Not ST/*ST [PROXY: current]')}
-{funnel_row('pass_mktcap', 'Market cap >= 5亿 [PROXY: SZ; SH=unknown]')}
-{funnel_row('pass_turnover', 'Avg turnover >= 5% [DATA_PENDING]')}
-{funnel_row('pass_listing', 'Listed >= 24 months [PIT-correct]')}
-{turn_sec}
-## Pool Size by Period
+| 参数 | 值 |
+|------|---|
+| 市值下限 | {MKTCAP_MIN_YI}亿元 |
+| 20日均换手率下限 | {TURN_20D_MIN}% |
+| ST 判断 | st_history PIT as-of join（snapshot_date ≤ pub_date） |
+| 市值判断 | pit_mktcap as-of join（trade_date ≤ pub_date） |
 
-| Period | Liquid | Full |
-|--------|--------|------|
-{ts_table}
+## 注意事项
 
-## PIT Status Summary
-
-| Filter | PIT-correct? | Notes |
-|--------|:-------------|-------|
-| >= 8 quarters | ✅ Yes | `trusted=1` in pead.sqlite uses only historical EPS through pub_date |
-| EPS >= 0 | ✅ Yes | `eps_single` anchored to pub_date; no future data |
-| Not ST | ⚠️ Proxy | Current exchange name list; stocks that recovered (or became) ST since are misclassified |
-| Market cap >= 5亿 | ⚠️ Proxy (SZ) / ❌ Missing (SH) | SZ: current float shares × current price; SH: `size_missing=1` ({size_missing_obs:,} obs, {size_missing_stocks:,} stocks) |
-| Avg turnover >= 5% | ❌ Pending | Requires daily price history per stock at each pub_date |
-| Listed >= 24 months | ✅ Yes | Exchange listing date is static; {pre_ipo_count:,} pre-IPO obs found and correctly excluded |
-
-## Size-Missing Stocks (DATA_PENDING Market Cap)
-
-`size_missing=1` obs: **{size_missing_obs:,}** across **{size_missing_stocks:,}** distinct stocks.
-
-These observations have NO market cap data available (SH stocks in dry-run mode).
-They are currently **not excluded** (pass_mktcap=-1 = DATA_PENDING) but are **explicitly flagged**.
-Once §10 market cap data is ready, all `size_missing=1` rows must be re-evaluated before
-including them in the final pool. They must NOT be treated as having passed the market cap filter.
-
-## ST Historical Data Exploration (B1)
-
-**Result**: PIT historical ST status is **not available** via simple API calls.
-
-Explored sources:
-- `akshare.stock_info_change_name(symbol)` — returns name history list **without dates**;
-  cannot determine when ST designation was applied or removed
-- `akshare.stock_info_sz_change_name(symbol='全称变更')` — connection failed (server reset)
-- `baostock.query_stock_basic` — returns current `code_name` only; no historical name timeline
-
-**Conclusion**: The current ST filter uses a snapshot of today's exchange name list.
-Stocks that were ST historically (e.g. during 2015-2016 restructuring wave) but have since
-recovered are incorrectly **included** in the pool. Stocks that became ST after this snapshot
-are incorrectly **included** as non-ST for recent periods.
-
-> ⚠️ **Known Lookahead**: ST filter is a present-day snapshot, not point-in-time.
-> This is a conservative approximation: currently-ST stocks are excluded even for
-> historical periods when they may have been clean. The opposite error (including
-> stocks that were ST during the test period) is harder to bound without historical data.
-
-## Known Limitations (Dry-Run Mode)
-
-1. **Turnover filter not applied** — filter logic is implemented but uses DATA_PENDING (-1 = all pass).
-   Liquid pool observation count will decrease once this filter is active.
-2. **Market cap for SH stocks** is DATA_PENDING ({size_missing_obs:,} observations, {size_missing_stocks:,} stocks,
-   `size_missing=1`). These are flagged but temporarily retained pending §10 data. SH main board / STAR
-   stocks tend to be large-cap, so over-inclusion is likely small, but must be verified.
-3. **ST status** uses current exchange name list. See "ST Historical Data Exploration" section above.
-   *This is a known lookahead and must be disclosed in any published results.*
-4. **Market cap** uses current float shares × current price (SZ only), not values at each pub_date.
-   Stocks that have grown significantly since early periods are incorrectly included for those periods.
-
-## Schema
-
-```sql
-universe_liquid(code, fiscal_year, fiscal_quarter, pub_date,
-    pass_quarters, pass_pos_eps, pass_st,
-    pass_mktcap,   -- 1=pass, 0=fail, -1=DATA_PENDING
-    size_missing,  -- 1 = no market cap data; must re-evaluate when §10 data available
-    pass_turnover, -- -1=DATA_PENDING
-    pass_listing,
-    in_pool)
-
-universe_full(code, fiscal_year, fiscal_quarter, pub_date,
-    pass_quarters, pass_pos_eps, pass_st, in_pool)
-
--- pass values: 1=pass, 0=fail, -1=DATA_PENDING
--- size_missing=1 rows are in-pool (dry-run only) — must NOT be assumed to pass market cap filter
-```
-
-## Next Step (PIT Mode)
-
-After pead-baostock.sqlite §10 is complete, update data sources:
-- **Market cap**: `total_share` from baostock × closing price at pub_date
-  (requires separate `query_history_k_data_plus` fetch per stock per period)
-- **Turnover**: rolling 20d average from daily close data at pub_date
-- **ST status**: PIT source not found in B1 exploration (see section above).
-  Options: (a) accept known lookahead, disclose in paper; (b) reconstruct from
-  individual stock name histories if a dated source is identified later.
+- 本 universe 覆盖 {n_stocks:,} 只股票（trusted SUE 事件）。§10 EPS 已全量重建
+  （4734/5225 complete，491 只次新股经 akshare 双重确认真无数据，标 no_data_confirmed）。
+- mktcap_missing=1 统一排除出流动池（不允许"未知=通过"）。
+- turn_insufficient=1 同样排除（无法判断流动性）。
 """
 
 
-# ── Main ───────────────────────────────────────────────────────────────────────
 def main() -> None:
-    parser = argparse.ArgumentParser(description="KoC §1: Universe construction (dry-run)")
-    parser.add_argument("--smoke", action="store_true",
-                        help=f"Use first {SMOKE_MAX_STOCKS} stocks for quick validation")
-    parser.add_argument("--no-cache", action="store_true",
-                        help="Delete cached auxiliary data before fetching")
+    parser = argparse.ArgumentParser(description="KoC §3 Universe Builder")
+    parser.add_argument("--real", action="store_true", default=True,
+                        help="真实数据模式（当前唯一模式）")
     args = parser.parse_args()
 
-    if args.no_cache:
-        for cache in [CACHE_LISTING, CACHE_SPOT, CACHE_ST]:
-            if cache.exists():
-                cache.unlink()
-                print(f"  Cleared cache: {cache}")
+    t0 = datetime.now()
+    print(f"[01_universe] {t0:%Y-%m-%d %H:%M:%S}")
 
-    t0 = time.time()
-    print(f"[01_universe] {datetime.now():%Y-%m-%d %H:%M:%S} | mode: {'SMOKE' if args.smoke else 'FULL'} dry-run")
+    # 读操作用独立连接，读完显式关闭再写
+    read_conn = sqlite3.connect(DB_PATH)
+    try:
+        events = build_universe(read_conn)
+    finally:
+        read_conn.close()
 
-    # Assertions before any computation
-    assert Path(DB_SUE).exists(), f"Input DB not found: {DB_SUE}"
-    Path(DB_OUT).parent.mkdir(parents=True, exist_ok=True)
+    print("\n写入 koc_universe 表...")
+    write_conn = sqlite3.connect(DB_PATH)
+    try:
+        write_universe_table(write_conn, events)
+        n_written = write_conn.execute("SELECT COUNT(*) FROM koc_universe").fetchone()[0]
+        print(f"  koc_universe: {n_written:,} 行")
+    finally:
+        write_conn.close()
+
+    print("\n生成报告...")
+    report = build_report(events)
     Path(REPORT_PATH).parent.mkdir(parents=True, exist_ok=True)
-
-    # Step 1: load base data from pead.sqlite
-    print("[1/5] Loading base trusted SUE observations from pead.sqlite...")
-    with sqlite3.connect(DB_SUE) as conn_src:
-        if args.smoke:
-            query = f"""
-                SELECT s.code, s.fiscal_year, s.fiscal_quarter,
-                       s.pub_date, s.eps_single, s.trusted
-                FROM sue s
-                WHERE s.trusted = 1 AND s.pub_date IS NOT NULL
-                  AND s.code IN (
-                      SELECT DISTINCT code FROM sue WHERE trusted=1 LIMIT {SMOKE_MAX_STOCKS}
-                  )
-            """
-        else:
-            query = """
-                SELECT code, fiscal_year, fiscal_quarter, pub_date, eps_single, trusted
-                FROM sue
-                WHERE trusted = 1 AND pub_date IS NOT NULL
-            """
-        df_base = pd.read_sql_query(query, conn_src)
-
-    assert not df_base.empty, "No trusted observations found in sue table"
-    df_base["pub_date"] = pd.to_datetime(df_base["pub_date"])
-    df_base["eps_single"] = pd.to_numeric(df_base["eps_single"], errors="coerce")
-    print(f"  {len(df_base):,} observations | {df_base['code'].nunique():,} stocks")
-
-    # Step 2: load auxiliary data
-    print("[2/5] Loading auxiliary data (listing dates, ST, market cap)...")
-    listing_dates = load_listing_dates()
-    st_set = load_st_set()
-    mktcap_map = load_market_cap_proxy()
-    known_listing = sum(1 for c in df_base["code"].str.split(".").str[-1].unique() if c in listing_dates)
-    print(f"  Listing dates: {len(listing_dates):,} | ST stocks: {len(st_set)} "
-          f"| Market cap: {len(mktcap_map):,} | Coverage in universe: {known_listing}/{df_base['code'].nunique()}")
-
-    # Step 3: turnover distribution sample
-    print(f"[3/5] Sampling turnover distribution ({TURNOVER_SAMPLE_N} stocks)...")
-    all_codes = df_base["code"].unique().tolist()
-    turnover_dist = sample_turnover_distribution(all_codes, n=TURNOVER_SAMPLE_N)
-    if not turnover_dist.empty:
-        vals = turnover_dist["avg_turnover_20d"].dropna()
-        p10, p50, p90 = np.percentile(vals, [10, 50, 90])
-        print(f"  n={len(vals)} | P10={p10:.2f}% | P50={p50:.2f}% | P90={p90:.2f}%")
-        if p50 > TURNOVER_THRESHOLD:
-            print(f"  [需要验证] Median {p50:.2f}% > threshold {TURNOVER_THRESHOLD}% — consider adjusting")
-    else:
-        print("  Turnover sample unavailable")
-
-    # Step 4: build pools
-    print("[4/5] Building pools (applying all 6 filters)...")
-    df_liquid, df_full, pre_ipo_count = build_pools(df_base, listing_dates, st_set, mktcap_map)
-    n_liq = int(df_liquid["in_pool"].sum())
-    n_full = int(df_full["in_pool"].sum())
-    liq_stocks = int(df_liquid[df_liquid["in_pool"] == 1]["code"].nunique())
-    full_stocks = int(df_full[df_full["in_pool"] == 1]["code"].nunique())
-    print(f"  Liquid pool: {n_liq:,} obs, {liq_stocks:,} stocks")
-    print(f"  Full sample: {n_full:,} obs, {full_stocks:,} stocks")
-
-    # Step 5: write to DB and generate report
-    print("[5/5] Writing universe.sqlite and generating report...")
-    with sqlite3.connect(DB_OUT, timeout=30) as conn_out:
-        init_out_db(conn_out)
-        df_liquid.to_sql("universe_liquid", conn_out, if_exists="append", index=False)
-        df_full.to_sql("universe_full", conn_out, if_exists="append", index=False)
-        meta = [
-            ("generated_at", datetime.now().isoformat()),
-            ("mode", "dry-run"),
-            ("input_db", DB_SUE),
-            ("smoke", str(args.smoke)),
-            ("n_liquid_in_pool", str(n_liq)),
-            ("n_full_in_pool", str(n_full)),
-            ("liquid_stocks", str(liq_stocks)),
-            ("full_stocks", str(full_stocks)),
-            ("turnover_threshold_note", f"{TURNOVER_THRESHOLD}% [需要验证]"),
-        ]
-        conn_out.executemany("INSERT OR REPLACE INTO universe_meta VALUES (?,?)", meta)
-        conn_out.commit()
-
-    report = generate_report(df_liquid, df_full, turnover_dist, is_smoke=args.smoke, pre_ipo_count=pre_ipo_count)
     Path(REPORT_PATH).write_text(report, encoding="utf-8")
-    print(f"  Report: {REPORT_PATH}")
+    print(f"  报告: {REPORT_PATH}")
 
-    elapsed = time.time() - t0
-    print(f"\n[01_universe] done in {elapsed:.1f}s")
-    print(f"  Liquid pool : {n_liq:,} observations | {liq_stocks:,} distinct stocks")
-    print(f"  Full sample : {n_full:,} observations | {full_stocks:,} distinct stocks")
-    print("✅ Script completed successfully")
+    elapsed = (datetime.now() - t0).total_seconds()
+    print(f"\n[01_universe] 完成，耗时 {elapsed:.1f}s")
+    print("[OK] Script completed successfully")
 
 
 if __name__ == "__main__":

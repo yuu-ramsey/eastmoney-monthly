@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT))
 from lib.portfolio.retail_cash import (                       # noqa: E402
     allocation, filter_double_low, exclude_delisting, strong_redemption_filter,
     concentration_weights, cap_feasible, ipo_breakeven_action, base_position_screen,
-    expected_performance, CB_SINGLE_CAP,
+    expected_performance, disclaimer, CB_SINGLE_CAP,
 )
 
 PASSED = 0
@@ -150,10 +150,20 @@ def test_expected_performance() -> None:
     check("披露不可达3", "3" in p.note)
 
 
+def test_disclaimer() -> None:
+    print("test_disclaimer")
+    d = disclaimer()
+    check("声明含'不要碰杠杆'", "杠杆" in d)
+    check("声明含'不要碰期权'", "期权" in d)
+    check("声明含'不是赚钱机器'类表述", "赚钱" in d)
+    check("声明含'实验性/研究小工具'", "实验性" in d or "研究小工具" in d)
+    check("声明含'后果自负'", "后果自负" in d)
+
+
 def main() -> int:
     for fn in [test_allocation, test_filter_double_low, test_exclude_delisting,
                test_strong_redemption, test_concentration, test_ipo_breakeven,
-               test_base_position, test_expected_performance]:
+               test_base_position, test_expected_performance, test_disclaimer]:
         fn()
     print(f"\n结果:{PASSED} 通过 / {FAILED} 失败")
     return 1 if FAILED else 0

@@ -23,7 +23,7 @@ sys.path.insert(0, str(ROOT))
 
 from lib.portfolio.retail_cash import (                       # noqa: E402
     allocation, filter_double_low, exclude_delisting, strong_redemption_filter,
-    concentration_weights, cap_feasible, expected_performance,
+    concentration_weights, cap_feasible, expected_performance, disclaimer,
 )
 
 CB_REQUIRED_COLS = {"code", "close", "premium", "pure_value", "conv_value", "date"}
@@ -98,9 +98,12 @@ def render_report(total_cash: float, cb: pd.DataFrame, dz: pd.DataFrame) -> tupl
     lines = [
         f"# 散户纯现金组合策略信号 — {now}",
         "",
+        "```",
+        disclaimer(),                                    # 免责声明置顶,必须最先看到
+        "```",
+        "",
         f"> 诚实业绩:净 Sharpe **{perf.honest_sharpe_low}-{perf.honest_sharpe_high}**"
         f"({perf.method});{perf.note}",
-        "> ⚠️ 研究信号,非投资建议。实盘需纪律执行 + 风控。",
         "",
         f"## 配置建议(总现金 {total_cash:,.0f} 元)",
         "",
@@ -144,14 +147,15 @@ def render_report(total_cash: float, cb: pd.DataFrame, dz: pd.DataFrame) -> tupl
         "expected_sharpe": [perf.honest_sharpe_low, perf.honest_sharpe_high],
         "convertibles": cb.to_dict(orient="records"),
         "ipo": dz.assign(date=dz["date"].astype(str) if "date" in dz else None).to_dict(orient="records") if not dz.empty else [],
-        "disclaimer": "研究信号非投资建议;Sharpe 为回测中心值非保证;纯现金不可达3。",
+        "disclaimer": disclaimer(),
     }
     return md, payload
 
 
 def main() -> int:
     total_cash = float(sys.argv[1]) if len(sys.argv) > 1 else 1_000_000.0
-    print(f"生成散户纯现金组合信号(总现金 {total_cash:,.0f})...")
+    print(disclaimer())                                  # 控制台先打免责声明
+    print(f"\n生成散户纯现金组合信号(总现金 {total_cash:,.0f})...")
     try:
         cb = build_cb_signal()
     except Exception as exc:

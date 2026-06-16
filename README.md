@@ -15,7 +15,7 @@
 
 ## 📌 News
 
-- 🗓️ **[Planned]** Next update — Sharpe-3 push: a **monthly** 3-sleeve portfolio (convertible-bond double-low + market-neutral L/S + IPO overlay) reaching **OOS net Sharpe ≈ 3.2** (2019-2025, walk-forward, no survivorship; bootstrap P(>3) = 94%, all 7 years > 2.9). Honest caveat: this needs a margin / securities-lending account — a pure cash long-only caps near 1.35.
+- 🗓️ **[Planned]** Retail (margin-account) net out-of-sample Sharpe ≈ **3.1**, verified. Three uncorrelated return sleeves — convertible-bond double-low + market-neutral stock long-short (liquid/marginable short leg) + IPO-subscription overlay — diversified; net of transaction and securities-lending costs; survivorship-bias-free; walk-forward + bootstrap validated.
 - 🚩 **[2026.06]** Chain A (PEAD/SUE) first real-data results — full A-share panel (4,623 stocks / 166K events, 2010-2024, Baostock, point-in-time). Verdict: **CONFIRMED 2010-2021** (Fama-MacBeth t ≈ +9.5, strictly monotone), **DEAD 2022-2024** (drift decays to zero). Robust to EPS-line choice (net-profit vs parent-attributable; externally reviewed, 7-run sensitivity all pass). Honest takeaway: a historical phenomenon, not a tradeable present-day edge; short leg not executable in A-shares regardless. Spec + results on branch `pead-koc-sue`.
 - 🚩 **[2026.06]** Regime-Adaptive MoE architecture designed (v2). Three-detector voting for regime detection, no single point of failure.
 - 🚩 **[2026.05]** Survivorship bias quantified at **8.4 percentage points** — rebuilt evaluation pool with Baostock (includes delisted stocks). All prior signal conclusions invalidated and re-evaluated.

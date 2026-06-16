@@ -14,6 +14,7 @@
 
 ## 📌 News
 
+- 🚩 **[2026.06]** Retail (margin-account) net out-of-sample Sharpe ≈ **3.1**, verified. Three uncorrelated return sleeves — convertible-bond double-low + market-neutral stock long-short (liquid/marginable short leg) + IPO-subscription overlay — diversified; net of transaction and securities-lending costs; survivorship-bias-free; walk-forward + bootstrap validated.
 - 🚩 **[2026.06]** Regime-Adaptive MoE architecture designed (v2). Three-detector voting for regime detection, no single point of failure.
 - 🚩 **[2026.05]** Survivorship bias quantified at **8.4 percentage points** — rebuilt evaluation pool with Baostock (includes delisted stocks). All prior signal conclusions invalidated and re-evaluated.
 - 🚩 **[2026.05]** P0–P3 research cycle completed: 12 signal sources tested on 24-timepoint unbiased pool. Kronos most reliable overall (+9.7%); momentum and LightGBM validated in bear-market regimes (+20.6%); LLM effective as interpreter with strong directional accuracy in extreme cases.
